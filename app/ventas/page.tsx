@@ -19,7 +19,7 @@ import { useState } from "react";
 import { SkeletonPagina } from "@/components/Basicos";
 import { BannerFicticioPremium, KpiPremiumCard } from "@/components/ResumenPremium";
 import { fmtMoneda } from "@/lib/calculos";
-import { cadenaDeFactura, cuadreVentasFacturacion, hayCadena, ventasConTotal } from "@/lib/cadena";
+import { cadenaDeFactura, cuadreVentasFacturacion, hayCadena, ventasConTotal, vinculoVentaFacturaDisponible } from "@/lib/cadena";
 import { argumentoVentas } from "@/lib/argumento";
 import { useApp } from "@/lib/store";
 import { Encabezado } from "@/components/Encabezado";
@@ -35,6 +35,8 @@ const SECCIONES = [
 
 export default function PaginaVentas() {
   const { dataset, cargando, fechaCorte } = useApp();
+  const moneda = dataset.fuente === "odoo-real" ? "GTQ" : "USD";
+  const fmt = (n: number) => fmtMoneda(n, moneda);
   const [abierta, setAbierta] = useState<string | null>("VTA-9003");
   const [facturaCruce, setFacturaCruce] = useState("FAC-1003");
 
@@ -60,8 +62,9 @@ export default function PaginaVentas() {
   const totalVendido = ventas.reduce((s, v) => s + v.total, 0);
   const margenTotal = ventas.reduce((s, v) => s + v.margen, 0);
   const cuadre = cuadreVentasFacturacion(dataset);
-  const cadena = cadenaDeFactura(dataset, facturaCruce, fmtMoneda);
+  const cadena = cadenaDeFactura(dataset, facturaCruce, fmt);
   const facturasConVenta = dataset.facturas.filter((f) => f.id_venta);
+  const vinculoDisponible = vinculoVentaFacturaDisponible(dataset);
 
   // ── Las cifras de los cuatro anillos — las mismas que arma el argumento. ──
   const mayorVenta = [...ventas].sort((a, b) => b.total - a.total)[0] ?? null;
@@ -87,22 +90,22 @@ export default function PaginaVentas() {
             kpis={[
               {
                 etiqueta: "vendido · cuadre con lo facturado",
-                valor: fmtMoneda(cuadre.totalVendido),
+                valor: fmt(cuadre.totalVendido),
                 pct: cuadre.totalVendido > 0 ? Math.min(100, (cuadre.totalFacturado / cuadre.totalVendido) * 100) : 0,
               },
               {
                 etiqueta: "venta líder · de lo vendido",
-                valor: mayorVenta ? fmtMoneda(mayorVenta.total) : "—",
+                valor: mayorVenta ? fmt(mayorVenta.total) : "—",
                 pct: pctMayorVenta,
               },
               {
                 etiqueta: "mayor margen · del margen total",
-                valor: mayorMargen ? fmtMoneda(mayorMargen.margen) : "—",
+                valor: mayorMargen ? fmt(mayorMargen.margen) : "—",
                 pct: pctMayorMargen,
               },
               {
                 etiqueta: "margen bruto · sobre lo vendido",
-                valor: fmtMoneda(margenTotal),
+                valor: fmt(margenTotal),
                 pct: totalVendido > 0 ? (margenTotal / totalVendido) * 100 : 0,
               },
             ]}
@@ -125,26 +128,30 @@ export default function PaginaVentas() {
             }`}
           >
             {cuadre.cuadra ? (
-              <>✓ <b>Ventas y facturación cuadran</b> — vendido {fmtMoneda(cuadre.totalVendido)} = facturado {fmtMoneda(cuadre.totalFacturado)}.</>
+              <>✓ <b>Ventas y facturación cuadran</b> — vendido {fmt(cuadre.totalVendido)} = facturado {fmt(cuadre.totalFacturado)}.</>
             ) : (
-              <>✗ <b>DESCUADRE de {fmtMoneda(Math.abs(cuadre.diferencia))}</b> — vendido {fmtMoneda(cuadre.totalVendido)} contra facturado {fmtMoneda(cuadre.totalFacturado)}. La cadena se rompió: hay ventas sin factura o facturas sin venta.</>
+              <>✗ <b>DESCUADRE de {fmt(Math.abs(cuadre.diferencia))}</b> — vendido {fmt(cuadre.totalVendido)} contra facturado {fmt(cuadre.totalFacturado)}. La cadena se rompió: hay ventas sin factura o facturas sin venta.</>
             )}
           </div>
 
           <div className="mt-4 grid grid-cols-2 gap-4 lg:grid-cols-4">
-            <KpiPremiumCard etiqueta="Total vendido" valor={fmtMoneda(totalVendido)} nota={`${ventas.length} ventas confirmadas`} variante="soft" />
+            <KpiPremiumCard etiqueta="Total vendido" valor={fmt(totalVendido)} nota={`${ventas.length} ventas confirmadas`} variante="soft" />
             <KpiPremiumCard
               etiqueta="Margen bruto"
-              valor={fmtMoneda(margenTotal)}
+              valor={fmt(margenTotal)}
               nota={`${totalVendido > 0 ? Math.round((margenTotal / totalVendido) * 100) : 0}% — sin costo por línea se vende sin saber si se gana`}
               variante="cool"
             />
-            <KpiPremiumCard etiqueta="Ticket promedio" valor={fmtMoneda(ventas.length ? totalVendido / ventas.length : 0)} nota="total ÷ cantidad de ventas" variante="soft" />
+            <KpiPremiumCard etiqueta="Ticket promedio" valor={fmt(ventas.length ? totalVendido / ventas.length : 0)} nota="total ÷ cantidad de ventas" variante="soft" />
             <KpiPremiumCard
               etiqueta="Ventas con factura"
               valor={`${ventas.filter((v) => v.id_factura).length}/${ventas.length}`}
-              tono={ventas.every((v) => v.id_factura) ? "normal" : "alerta"}
-              nota="una venta sin factura es cadena rota"
+              tono={!vinculoDisponible || ventas.every((v) => v.id_factura) ? "normal" : "alerta"}
+              nota={
+                !vinculoDisponible
+                  ? "vínculo venta↔factura no disponible en este export de Odoo — no es una alarma de negocio, es un límite de la fuente de datos"
+                  : "una venta sin factura es cadena rota"
+              }
               variante="warm"
             />
           </div>
@@ -179,7 +186,7 @@ export default function PaginaVentas() {
                     <span className="hidden text-xs text-tintaSuave sm:block">
                       {v.id_factura ? <span className="font-mono">{v.id_factura}</span> : <span className="font-bold text-red-600">SIN FACTURA</span>}
                     </span>
-                    <span className="text-sm font-bold tabular-nums text-tinta">{fmtMoneda(v.total)}</span>
+                    <span className="text-sm font-bold tabular-nums text-tinta">{fmt(v.total)}</span>
                     <span
                       className={`text-[11px] transition ${
                         estaAbierta ? "pastilla-activa px-2 py-0.5 opacity-90" : "text-tintaSuave opacity-45"
@@ -206,17 +213,17 @@ export default function PaginaVentas() {
                             <tr key={j} className="border-b border-borde/30 last:border-0">
                               <td className="py-1.5 pr-3"><span className="font-mono text-tintaSuave">{l.sku}</span> {l.producto}</td>
                               <td className="py-1.5 pr-3 text-right tabular-nums">{l.cantidad}</td>
-                              <td className="py-1.5 pr-3 text-right tabular-nums">{fmtMoneda(l.precio)}</td>
-                              <td className="py-1.5 pr-3 text-right font-semibold tabular-nums">{fmtMoneda(l.importe)}</td>
-                              <td className="py-1.5 text-right tabular-nums text-emerald-700">{fmtMoneda(l.importe - l.costo)}</td>
+                              <td className="py-1.5 pr-3 text-right tabular-nums">{fmt(l.precio)}</td>
+                              <td className="py-1.5 pr-3 text-right font-semibold tabular-nums">{fmt(l.importe)}</td>
+                              <td className="py-1.5 text-right tabular-nums text-emerald-700">{fmt(l.importe - l.costo)}</td>
                             </tr>
                           ))}
                           <tr className="border-t border-borde/60 font-bold">
                             <td className="py-1.5 pr-3">Total (suma exacta de las líneas)</td>
                             <td className="py-1.5 pr-3" colSpan={2} />
-                            <td className="py-1.5 pr-3 text-right tabular-nums">{fmtMoneda(v.total)}</td>
+                            <td className="py-1.5 pr-3 text-right tabular-nums">{fmt(v.total)}</td>
                             <td className="py-1.5 text-right tabular-nums text-emerald-700">
-                              {fmtMoneda(v.margen)} ({v.margenPct}%)
+                              {fmt(v.margen)} ({v.margenPct}%)
                             </td>
                           </tr>
                         </tbody>
@@ -307,7 +314,7 @@ export default function PaginaVentas() {
                 <p>
                   <span className="mr-1.5 opacity-40">✓</span>
                   <b className="font-semibold text-white">Saldo hoy:</b>{" "}
-                  <span className="tabular-nums text-white">{fmtMoneda(cadena.saldoHoy)}</span> — el mismo que deriva CxC
+                  <span className="tabular-nums text-white">{fmt(cadena.saldoHoy)}</span> — el mismo que deriva CxC
                 </p>
               </div>
             </>

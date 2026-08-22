@@ -8,7 +8,7 @@
 //
 // ⚠️ Fórmulas PENDIENTES DE VALIDACIÓN POR FINANZAS, como todo el prototipo.
 
-import { saldoPendiente } from "./calculos";
+import { nombreDeCliente, saldoPendiente } from "./calculos";
 import type { Dataset, MovimientoInventario, Producto } from "./types";
 
 const redondear2 = (n: number) => Math.round(n * 100) / 100;
@@ -19,6 +19,16 @@ const dias = (a: string, b: string) =>
 /** El Paso 11 es opcional en el Dataset: un CSV solo-CxC no lo trae. */
 export function hayCadena(d: Dataset): boolean {
   return !!(d.productos?.length && d.ventas?.length && d.ventaLineas?.length && d.movimientosInventario?.length);
+}
+
+/**
+ * ¿Al menos una factura del dataset trae id_venta poblado? Si NINGUNA lo trae,
+ * "ventas sin factura" no es una alarma de negocio: es que este export de Odoo
+ * nunca capturó el vínculo venta↔factura. No se puede acusar a la venta de una
+ * cadena rota que el propio dato es incapaz de mostrar.
+ */
+export function vinculoVentaFacturaDisponible(d: Dataset): boolean {
+  return d.facturas.some((f) => f.id_venta);
 }
 
 // ── Inventario ──────────────────────────────────────────────────────────────
@@ -69,7 +79,7 @@ export interface VentaConTotal {
 
 export function ventasConTotal(d: Dataset): VentaConTotal[] {
   const nombreCliente = (id: string) =>
-    d.clientes.find((c) => c.id_cliente === id)?.nombre_cliente ?? id;
+    nombreDeCliente(d.clientes, id);
   const producto = (id: string) => (d.productos ?? []).find((p) => p.id_producto === id);
 
   return (d.ventas ?? [])

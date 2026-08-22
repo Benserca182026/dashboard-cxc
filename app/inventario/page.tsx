@@ -34,6 +34,8 @@ const SECCIONES = [
 
 export default function PaginaInventario() {
   const { dataset, cargando, fechaCorte } = useApp();
+  const moneda = dataset.fuente === "odoo-real" ? "GTQ" : "USD";
+  const fmt = (n: number) => fmtMoneda(n, moneda);
   const [abierto, setAbierto] = useState<string | null>("PRD-C");
 
   if (cargando) return <SkeletonPagina />;
@@ -89,7 +91,7 @@ export default function PaginaInventario() {
             kpis={[
               {
                 etiqueta: "SKU líder por valor · del valor total",
-                valor: mayorValor ? fmtMoneda(mayorValor.valorCosto) : "—",
+                valor: mayorValor ? fmt(mayorValor.valorCosto) : "—",
                 pct: pctMayorValor,
               },
               {
@@ -106,7 +108,7 @@ export default function PaginaInventario() {
               },
               {
                 etiqueta: "valor en riesgo · del valor total",
-                valor: fmtMoneda(valorEnRiesgo),
+                valor: fmt(valorEnRiesgo),
                 pct: valorTotal > 0 ? (valorEnRiesgo / valorTotal) * 100 : 0,
               },
             ]}
@@ -137,7 +139,7 @@ export default function PaginaInventario() {
               nota="toda salida debe decir qué venta la produjo"
               variante="cool"
             />
-            <KpiPremiumCard etiqueta="Valor a costo" valor={fmtMoneda(valorTotal)} nota="derivado, no almacenado" variante="soft" />
+            <KpiPremiumCard etiqueta="Valor a costo" valor={fmt(valorTotal)} nota="derivado, no almacenado" variante="soft" />
           </div>
 
           <p className="mb-2 mt-5 text-[11.5px] leading-snug text-[#85878c]">
@@ -174,7 +176,7 @@ export default function PaginaInventario() {
                         </span>
                       )}
                     </span>
-                    <span className="hidden text-xs tabular-nums text-tintaSuave sm:block">{fmtMoneda(s.valorCosto)}</span>
+                    <span className="hidden text-xs tabular-nums text-tintaSuave sm:block">{fmt(s.valorCosto)}</span>
                     <span
                       className={`text-[11px] transition ${
                         estaAbierto ? "pastilla-activa px-2 py-0.5 opacity-90" : "text-tintaSuave opacity-45"

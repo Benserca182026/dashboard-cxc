@@ -12,7 +12,7 @@
 // vuelta al hecho. Cada función devuelve, junto al número, el DESGLOSE de las
 // facturas o pagos que lo componen, para que la UI pueda abrirlo.
 
-import { calcularAging, saldoPendiente, type FacturaClasificada } from "./calculos";
+import { calcularAging, nombreDeCliente, pagosAplicados, saldoPendiente, type FacturaClasificada } from "./calculos";
 import type { Dataset } from "./types";
 
 const MS_POR_DIA = 86_400_000;
@@ -122,11 +122,22 @@ export function antiguedadPonderada(dataset: Dataset, fechaCorte: string): Resul
 export interface ResultadoEfectividad {
   /** null cuando nada vencía en la ventana (0/0 se reporta, no se disfraza de 0% ni de 100%). */
   efectividadPct: number | null;
+  /**
+   * Efectividad por cohorte: sólo cuenta, por cada factura que vencía en la
+   * ventana, lo que ESA factura cobró (sin importar cuándo se pagó), topado a
+   * su propio monto. A diferencia de efectividadPct — que compara dos
+   * poblaciones sin cruzarlas (caja recibida en el período) — ésta mide
+   * cobrabilidad real de lo que venció, factura por factura. null en el mismo
+   * caso 0/0 que efectividadPct.
+   */
+  efectividadCohortePct: number | null;
   ventanaDias: number;
   desde: string;
   hasta: string;
   montoQueVencia: number;
   cobradoVentana: number;
+  /** Suma, por factura que vencía, de lo cobrado a esa factura (topado a su monto original). */
+  cobradoCohorte: number;
   facturasQueVencian: { id_factura: string; numero: string; fecha_vencimiento: string; monto: number }[];
   pagosVentana: { id_pago: string; id_factura: string | null; fecha_pago: string; monto: number }[];
 }
@@ -171,7 +182,38 @@ export function efectividadCobro(dataset: Dataset, fechaCorte: string, ventanaDi
   const efectividadPct =
     montoQueVencia > 0 ? redondear2((cobradoVentana / montoQueVencia) * 100) : null;
 
-  return { efectividadPct, ventanaDias, desde, hasta: fechaCorte, montoQueVencia, cobradoVentana, facturasQueVencian, pagosVentana };
+  // Cohorte: mismo filtro de "qué vencía", pero por cada factura se suma lo
+  // que a ELLA se le cobró (cualquier fecha de pago), topado a su propio
+  // monto — así un pago que cancela una factura vieja no infla el número de
+  // lo que venció ahora.
+  const facturasQueVencianCompletas = dataset.facturas.filter(
+    (f) =>
+      f.estado_factura !== "anulada" &&
+      f.fecha_vencimiento !== null &&
+      f.fecha_vencimiento > desde &&
+      f.fecha_vencimiento <= fechaCorte
+  );
+  const cobradoCohorte = redondear2(
+    facturasQueVencianCompletas.reduce(
+      (s, f) => s + Math.min(pagosAplicados(f, dataset.pagos), f.monto_original),
+      0
+    )
+  );
+  const efectividadCohortePct =
+    montoQueVencia > 0 ? redondear2((cobradoCohorte / montoQueVencia) * 100) : null;
+
+  return {
+    efectividadPct,
+    efectividadCohortePct,
+    ventanaDias,
+    desde,
+    hasta: fechaCorte,
+    montoQueVencia,
+    cobradoVentana,
+    cobradoCohorte,
+    facturasQueVencian,
+    pagosVentana,
+  };
 }
 
 // ── 4 · Concentración del riesgo por cliente ────────────────────────────────
@@ -203,7 +245,7 @@ export function concentracionRiesgo(dataset: Dataset, fechaCorte: string): Resul
 
   const saldoTotal = redondear2([...porClienteMap.values()].reduce((a, b) => a + b, 0));
   const nombre = (id: string) =>
-    dataset.clientes.find((c) => c.id_cliente === id)?.nombre_cliente ?? id;
+    nombreDeCliente(dataset.clientes, id);
 
   const porCliente = [...porClienteMap.entries()]
     .map(([id_cliente, saldo]) => ({

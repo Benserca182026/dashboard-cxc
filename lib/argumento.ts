@@ -20,7 +20,7 @@
 // ⚠️ Los umbrales (concentración > 35%, dominancia de tramo > 60%) son
 // PROPUESTA PENDIENTE DE VALIDACIÓN POR FINANZAS, como toda regla del proyecto.
 
-import { calcularAging, saldoPendiente, type FacturaClasificada } from "./calculos";
+import { calcularAging, nombreDeCliente, saldoPendiente, type FacturaClasificada } from "./calculos";
 import { antiguedadPonderada, calcularDso, concentracionRiesgo } from "./kpis";
 import { BUCKETS, type BucketAging, type Dataset, type GestionCobranza } from "./types";
 import { prioridadSimulada, forecastSimulado } from "./simulados";
@@ -72,8 +72,12 @@ export interface Argumento {
 
 // Igual que fmtMoneda (lib/calculos.ts): USD para demo-ficticio, GTQ para
 // datos reales de Benserca 18 (moneda_id real en el 100% de la muestra).
-// Default USD para no romper ningún llamador que no pase moneda.
-const dinero = (n: number, moneda: "USD" | "GTQ" = "USD") =>
+//
+// `moneda` NO tiene default, por la misma razón que en fmtMoneda: un default
+// correcto sigue permitiendo el olvido silencioso; un parámetro obligatorio
+// lo convierte en un error de compilación. Estas cadenas se pintan en
+// pantalla, así que el olvido aquí se ve igual que en fmtMoneda.
+const dinero = (n: number, moneda: "USD" | "GTQ") =>
   n.toLocaleString(moneda === "GTQ" ? "es-GT" : "en-US", { style: "currency", currency: moneda, minimumFractionDigits: 2 });
 const pct = (parte: number, total: number) => (total > 0 ? (parte / total) * 100 : 0);
 /** Recorta el sufijo "Ficticia/Ficticio" de los nombres del dataset demo, para
@@ -225,6 +229,7 @@ export function argumentoDso(dataset: Dataset, fechaCorte: string): Argumento {
  * Se calcula sólo si el dataset trae la cadena del Paso 11.
  */
 export function argumentoInventario(dataset: Dataset): Argumento | null {
+  const d = (n: number) => dinero(n, dataset.fuente === "odoo-real" ? "GTQ" : "USD");
   if (!dataset.productos?.length || !dataset.movimientosInventario?.length) return null;
 
   const stock = dataset.productos.map((p) => {
@@ -243,9 +248,9 @@ export function argumentoInventario(dataset: Dataset): Argumento | null {
       id: "i1",
       fase: "¿El total dice algo?",
       tipo: "objecion",
-      rotulo: `${dinero(valorTotal)} en ${stock.length} SKU`,
-      titulo: `${dinero(valorTotal)} repartidos en ${stock.length} productos`,
-      dato: stock.map((x) => `${x.p.sku}: ${dinero(x.valor)}`).join(" · "),
+      rotulo: `${d(valorTotal)} en ${stock.length} SKU`,
+      titulo: `${d(valorTotal)} repartidos en ${stock.length} productos`,
+      dato: stock.map((x) => `${x.p.sku}: ${d(x.valor)}`).join(" · "),
       porque:
         "El valor total es una suma contable: no distingue lo que sobra de lo que está por faltar. Dos inventarios con el mismo valor pueden estar en situaciones opuestas.",
       barras: stock.map((x) => ({ etiqueta: x.p.sku, valor: x.valor, destacada: x.bajo })),
@@ -292,13 +297,16 @@ export function argumentoInventario(dataset: Dataset): Argumento | null {
       ? `${critico.existencia} u restantes contra ${critico.salidas} u de demanda reciente`
       : "Sin faltantes ni productos críticos",
     porque: critico
-      ? "El valor total ($" + valorTotal.toFixed(0) + ") no habría revelado esto: es un promedio que esconde el caso."
+      // El "$" estaba escrito a mano en la cadena — no pasaba por ningún
+      // formateador, así que ningún chequeo de tipos podía atraparlo. Ahora
+      // usa d(), que decide la moneda según el dataset como todo lo demás.
+      ? `El valor total (${d(valorTotal)}) no habría revelado esto: es un promedio que esconde el caso.`
       : "Conclusión negativa: no hay acto pendiente derivado de los datos actuales.",
   });
 
   return {
     titular: "Inventario a costo",
-    valorTitular: dinero(valorTotal),
+    valorTitular: d(valorTotal),
     lecturaIngenua: "Leído solo, el valor total sugiere que el inventario está sano porque hay existencias.",
     etapas,
     accion: critico ? `Reponer ${critico.p.sku} — ${critico.existencia} u restantes` : "Sin acción pendiente",
@@ -350,7 +358,7 @@ export function argumentoAging(dataset: Dataset, fechaCorte: string): Argumento 
     porCliente.set(c.factura.id_cliente, (porCliente.get(c.factura.id_cliente) ?? 0) + c.saldo);
   }
   const nombreDe = (id: string) =>
-    dataset.clientes.find((c) => c.id_cliente === id)?.nombre_cliente ?? id;
+    nombreDeCliente(dataset.clientes, id);
   const ranking = [...porCliente.entries()]
     .map(([id, saldo]) => ({ id, nombre: nombreDe(id), saldo }))
     .sort((a, b) => b.saldo - a.saldo);
@@ -494,6 +502,7 @@ export function argumentoAging(dataset: Dataset, fechaCorte: string): Argumento 
  * validación por Finanzas) — la etiqueta de simulación NO se oculta acá.
  */
 export function argumentoPrioritarios(dataset: Dataset, fechaCorte: string): Argumento {
+  const d = (n: number) => dinero(n, dataset.fuente === "odoo-real" ? "GTQ" : "USD");
   const filas = prioridadSimulada(dataset, fechaCorte);
   const totalClientes = dataset.clientes.length;
   const totalSaldo = filas.reduce((s, f) => s + f.saldoTotal, 0);
@@ -508,7 +517,7 @@ export function argumentoPrioritarios(dataset: Dataset, fechaCorte: string): Arg
       tipo: "objecion",
       rotulo: `${filas.length} de ${totalClientes}`,
       titulo: `${filas.length} de ${totalClientes} cliente(s) tienen saldo abierto`,
-      dato: `${dinero(totalSaldo)} en saldo abierto repartidos en ${filas.length} cuenta(s)`,
+      dato: `${d(totalSaldo)} en saldo abierto repartidos en ${filas.length} cuenta(s)`,
       porque:
         filas.length > 0
           ? "No todo el catálogo debe cobranza hoy: la worklist filtra al que sí, antes de preguntar a quién primero."
@@ -523,7 +532,7 @@ export function argumentoPrioritarios(dataset: Dataset, fechaCorte: string): Arg
       titulo: lider
         ? `${lider.nombreCliente} tiene el score (🟣 simulado) más alto: ${lider.scoreSimulado}`
         : "No hay cuentas para puntuar",
-      dato: lider ? `${dinero(lider.saldoTotal)} · ${lider.diasMaxAtraso} días de atraso máx.` : "—",
+      dato: lider ? `${d(lider.saldoTotal)} · ${lider.diasMaxAtraso} días de atraso máx.` : "—",
       porque:
         "El score combina saldo y días de atraso 50/50 (🟣 simulado, sin validar): el más alto es el candidato a mirar primero, no el que más ruido hace.",
       barras: filas
@@ -538,7 +547,7 @@ export function argumentoPrioritarios(dataset: Dataset, fechaCorte: string): Arg
       titulo: esCaso
         ? `${lider!.nombreCliente} concentra el ${Math.round(parteLider)}% del saldo priorizado`
         : "El saldo priorizado está repartido entre varios clientes",
-      dato: lider ? `${dinero(lider.saldoTotal)} de ${dinero(totalSaldo)} en la worklist` : "—",
+      dato: lider ? `${d(lider.saldoTotal)} de ${d(totalSaldo)} en la worklist` : "—",
       porque: esCaso
         ? "Con un cliente por encima del umbral, priorizar hoy es gestionar una cuenta puntual, no reorganizar el proceso de cobranza entero."
         : "Sin concentración, la worklist describe un comportamiento repartido: conviene trabajarla en orden, no perseguir un caso.",
@@ -562,7 +571,7 @@ export function argumentoPrioritarios(dataset: Dataset, fechaCorte: string): Arg
     lecturaIngenua:
       "Leída sola, una lista larga de cuentas pendientes sugiere que hay que llamar a todas por igual, empezando por la primera de la lista.",
     etapas,
-    accion: lider ? `${lider.accionSugerida} — ${lider.nombreCliente} (${dinero(lider.saldoTotal)})` : "Sin acción pendiente",
+    accion: lider ? `${lider.accionSugerida} — ${lider.nombreCliente} (${d(lider.saldoTotal)})` : "Sin acción pendiente",
     sinHallazgo: !esCaso,
   };
 }
@@ -578,8 +587,9 @@ export function argumentoSeguimiento(
   gestiones: GestionCobranza[],
   fechaCorte: string
 ): Argumento {
+  const d = (n: number) => dinero(n, dataset.fuente === "odoo-real" ? "GTQ" : "USD");
   const prioridad = prioridadSimulada(dataset, fechaCorte);
-  const nombreDe = (id: string) => dataset.clientes.find((c) => c.id_cliente === id)?.nombre_cliente ?? id;
+  const nombreDe = (id: string) => nombreDeCliente(dataset.clientes, id);
 
   const porCliente = new Map<string, number>();
   for (const g of gestiones) {
@@ -619,7 +629,7 @@ export function argumentoSeguimiento(
       titulo: masGestionado
         ? `${masGestionado.nombre} concentra ${masGestionado.n} de ${gestiones.length} gestión(es)`
         : "Todavía no hay gestiones registradas",
-      dato: masGestionado ? `${masGestionado.n} gestión(es) de ${gestiones.length} totales` : "—",
+      dato: masGestionado ? `${masGestionado.n} gestión(es) de ${gestiones.length} totales` : "ninguna gestión registrada todavía",
       porque: "La bitácora se puede llenar hablando siempre con el mismo cliente y dejando a los demás sin tocar.",
       barras: ranking.slice(0, 4).map((r) => ({ etiqueta: corto(r.nombre), valor: r.n, destacada: masGestionado ? r.id === masGestionado.id : false })),
     },
@@ -645,7 +655,7 @@ export function argumentoSeguimiento(
         ? `Iniciar contacto con ${prioridadSinGestion.nombreCliente} — el de mayor score sin ninguna gestión`
         : "Todos los clientes con saldo ya tienen historial de gestión",
       dato: prioridadSinGestion
-        ? `score ${prioridadSinGestion.scoreSimulado} · ${dinero(prioridadSinGestion.saldoTotal)}`
+        ? `score ${prioridadSinGestion.scoreSimulado} · ${d(prioridadSinGestion.saldoTotal)}`
         : `${gestiones.length} gestión(es) sobre ${clientesConGestion.size} cliente(s)`,
       porque: prioridadSinGestion
         ? "Empezar por el de mayor score sin contacto cierra el vacío más urgente antes que repetir gestión donde ya hay historial."
@@ -673,6 +683,7 @@ export function argumentoSeguimiento(
  * 2026-08-15) — si no, la página avisa en vez de mostrar ceros.
  */
 export function argumentoVentas(dataset: Dataset): Argumento | null {
+  const d = (n: number) => dinero(n, dataset.fuente === "odoo-real" ? "GTQ" : "USD");
   if (!hayCadena(dataset)) return null;
 
   const ventas = ventasConTotal(dataset);
@@ -692,11 +703,11 @@ export function argumentoVentas(dataset: Dataset): Argumento | null {
       id: "v1",
       fase: "¿Vendido y facturado cuadran?",
       tipo: "objecion",
-      rotulo: cuadre.cuadra ? "Cuadra" : `Descuadre ${dinero(Math.abs(cuadre.diferencia))}`,
+      rotulo: cuadre.cuadra ? "Cuadra" : `Descuadre ${d(Math.abs(cuadre.diferencia))}`,
       titulo: cuadre.cuadra
-        ? `Vendido y facturado cuadran: ${dinero(cuadre.totalVendido)}`
-        : `Hay un descuadre de ${dinero(Math.abs(cuadre.diferencia))} entre lo vendido y lo facturado`,
-      dato: `vendido ${dinero(cuadre.totalVendido)} · facturado ${dinero(cuadre.totalFacturado)}`,
+        ? `Vendido y facturado cuadran: ${d(cuadre.totalVendido)}`
+        : `Hay un descuadre de ${d(Math.abs(cuadre.diferencia))} entre lo vendido y lo facturado`,
+      dato: `vendido ${d(cuadre.totalVendido)} · facturado ${d(cuadre.totalFacturado)}`,
       porque: cuadre.cuadra
         ? "Vendido y facturado nacen de la misma cadena de hechos: si cuadran, es porque están bien construidos, no porque coincida."
         : "Un descuadre significa que la cadena se rompió: hay una venta sin factura o una factura sin venta. Se declara el monto exacto, no un booleano.",
@@ -714,7 +725,7 @@ export function argumentoVentas(dataset: Dataset): Argumento | null {
         ? `${mayorVenta.id_venta} (${mayorVenta.cliente}) es el ${Math.round(pctMayorVenta)}% de lo vendido`
         : "No hay ventas para comparar",
       dato: mayorVenta
-        ? `${dinero(mayorVenta.total)} de ${dinero(totalVendido)} vendidos en ${ventas.length} venta(s)`
+        ? `${d(mayorVenta.total)} de ${d(totalVendido)} vendidos en ${ventas.length} venta(s)`
         : "—",
       porque: "El total vendido es una suma: no dice si nace de muchas ventas parejas o de una sola grande.",
       barras: ventas
@@ -729,9 +740,9 @@ export function argumentoVentas(dataset: Dataset): Argumento | null {
       titulo: margenConcentrado
         ? `${mayorMargen!.id_venta} aporta el ${Math.round(pctMayorMargen)}% del margen bruto`
         : "El margen bruto está repartido entre varias ventas",
-      dato: mayorMargen ? `${dinero(mayorMargen.margen)} de ${dinero(margenTotal)} de margen total` : "—",
+      dato: mayorMargen ? `${d(mayorMargen.margen)} de ${d(margenTotal)} de margen total` : "—",
       porque: margenConcentrado
-        ? `El margen total (${dinero(margenTotal)}) esconde que una sola venta sostiene la mayor parte: perderla pesa más que el promedio sugiere.`
+        ? `El margen total (${d(margenTotal)}) esconde que una sola venta sostiene la mayor parte: perderla pesa más que el promedio sugiere.`
         : "Sin una venta dominante, el margen depende del conjunto y no de una operación puntual.",
     },
     {
@@ -745,9 +756,9 @@ export function argumentoVentas(dataset: Dataset): Argumento | null {
         ? `${mayorMargen!.id_venta} sostiene el margen: cuidar esa relación antes que el promedio`
         : "Vendido, facturado y margen no dependen de un caso puntual",
       dato: !cuadre.cuadra
-        ? `descuadre de ${dinero(Math.abs(cuadre.diferencia))}`
+        ? `descuadre de ${d(Math.abs(cuadre.diferencia))}`
         : margenConcentrado
-        ? `${mayorMargen!.id_venta}: ${dinero(mayorMargen!.margen)} de margen`
+        ? `${mayorMargen!.id_venta}: ${d(mayorMargen!.margen)} de margen`
         : `${ventas.length} venta(s), ninguna domina el margen`,
       porque:
         cuadre.cuadra && !margenConcentrado
@@ -758,12 +769,12 @@ export function argumentoVentas(dataset: Dataset): Argumento | null {
 
   return {
     titular: "Total vendido",
-    valorTitular: dinero(totalVendido),
+    valorTitular: d(totalVendido),
     lecturaIngenua:
       "Leído solo, el total vendido sugiere una cartera de ventas pareja, sin saber si depende de una sola operación.",
     etapas,
     accion: !cuadre.cuadra
-      ? `Investigar el descuadre de ${dinero(Math.abs(cuadre.diferencia))}`
+      ? `Investigar el descuadre de ${d(Math.abs(cuadre.diferencia))}`
       : margenConcentrado
       ? `Dar seguimiento a la venta ${mayorMargen!.id_venta} (${mayorVenta?.cliente ?? ""})`
       : "Sin acción puntual pendiente",
@@ -778,6 +789,7 @@ export function argumentoVentas(dataset: Dataset): Argumento | null {
  * caja real.
  */
 export function argumentoForecast(dataset: Dataset, fechaCorte: string): Argumento {
+  const d = (n: number) => dinero(n, dataset.fuente === "odoo-real" ? "GTQ" : "USD");
   const puntos = forecastSimulado(dataset, fechaCorte);
   const ultimo = puntos[puntos.length - 1];
   const spread = ultimo.optimista - ultimo.pesimista;
@@ -790,9 +802,9 @@ export function argumentoForecast(dataset: Dataset, fechaCorte: string): Argumen
       id: "f1",
       fase: "¿Qué se proyecta cobrar?",
       tipo: "objecion",
-      rotulo: `${dinero(ultimo.base)} en 13 sem.`,
-      titulo: `El escenario base simula ${dinero(ultimo.base)} cobrados en 13 semanas`,
-      dato: `optimista ${dinero(ultimo.optimista)} · pesimista ${dinero(ultimo.pesimista)} · corte ${fechaCorte}`,
+      rotulo: `${d(ultimo.base)} en 13 sem.`,
+      titulo: `El escenario base simula ${d(ultimo.base)} cobrados en 13 semanas`,
+      dato: `optimista ${d(ultimo.optimista)} · pesimista ${d(ultimo.pesimista)} · corte ${fechaCorte}`,
       porque:
         "Es una ILUSTRACIÓN mecánica de tres desplazamientos inventados (10/30/60 días), no una proyección de caja real: no hay histórico de cobro detrás.",
       barras: [
@@ -806,8 +818,8 @@ export function argumentoForecast(dataset: Dataset, fechaCorte: string): Argumen
       fase: "¿Qué tan ancha es la incertidumbre?",
       tipo: "premisa",
       rotulo: `${Math.round(pctSpread)}% de ancho`,
-      titulo: `Entre optimista y pesimista hay ${dinero(spread)} de diferencia — el ${Math.round(pctSpread)}% del escenario base`,
-      dato: `semana 13: optimista ${dinero(ultimo.optimista)} − pesimista ${dinero(ultimo.pesimista)} = ${dinero(spread)}`,
+      titulo: `Entre optimista y pesimista hay ${d(spread)} de diferencia — el ${Math.round(pctSpread)}% del escenario base`,
+      dato: `semana 13: optimista ${d(ultimo.optimista)} − pesimista ${d(ultimo.pesimista)} = ${d(spread)}`,
       porque:
         "Tres escenarios sin ancho no dirían nada distinto entre sí: el ancho es la única razón de mostrar tres líneas y no una.",
       barras: puntos
@@ -825,7 +837,7 @@ export function argumentoForecast(dataset: Dataset, fechaCorte: string): Argumen
           : "No hay cobro simulado que promediar",
       dato:
         semanaMitad !== null
-          ? `${dinero(mitad)} es la mitad de ${dinero(ultimo.base)} · alcanzada en la semana ${semanaMitad} de 13`
+          ? `${d(mitad)} es la mitad de ${d(ultimo.base)} · alcanzada en la semana ${semanaMitad} de 13`
           : "—",
       porque: "El total de la semana 13 no dice si el cobro simulado se concentra al principio o al final del horizonte.",
       barras: puntos.map((p) => ({ etiqueta: `${p.semana}`, valor: p.base, destacada: p.semana === semanaMitad })),
@@ -836,7 +848,7 @@ export function argumentoForecast(dataset: Dataset, fechaCorte: string): Argumen
       tipo: "conclusion",
       rotulo: "Simulación, no dato",
       titulo: "Ningún número de este forecast es caja real: es una ilustración del patrón de tres escenarios",
-      dato: `base semana 13: ${dinero(ultimo.base)} · pendiente de validación por Finanzas`,
+      dato: `base semana 13: ${d(ultimo.base)} · pendiente de validación por Finanzas`,
       porque:
         "La conclusión acá no es un acto de cobranza: es una advertencia. Tratar esta cifra como caja real sería el error que el rótulo «Simulación» busca evitar.",
     },
@@ -844,7 +856,7 @@ export function argumentoForecast(dataset: Dataset, fechaCorte: string): Argumen
 
   return {
     titular: "Forecast de cobro (simulado)",
-    valorTitular: dinero(ultimo.base),
+    valorTitular: d(ultimo.base),
     lecturaIngenua:
       "Leído solo, un forecast con curvas suaves y tres escenarios sugiere una proyección de caja calculada con datos históricos reales.",
     etapas,

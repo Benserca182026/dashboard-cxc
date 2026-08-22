@@ -9,7 +9,7 @@ import { Suspense, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { SkeletonPagina } from "@/components/Basicos";
-import { calcularAging, fmtMoneda, type FacturaClasificada } from "@/lib/calculos";
+import { calcularAging, fmtMoneda, nombreDeCliente, type FacturaClasificada } from "@/lib/calculos";
 import { BUCKETS, type BucketAging, type EstadoFactura } from "@/lib/types";
 import { BUCKET_INFO } from "@/lib/bucketInfo";
 import { useApp } from "@/lib/store";
@@ -53,7 +53,7 @@ function ContenidoDetalle() {
 
   const aging = calcularAging(dataset, fechaCorte);
   const nombreCliente = (id: string) =>
-    dataset.clientes.find((c) => c.id_cliente === id)?.nombre_cliente ?? id;
+    nombreDeCliente(dataset.clientes, id);
   const fmt = (n: number) => fmtMoneda(n, dataset.fuente === "odoo-real" ? "GTQ" : "USD");
 
   const filasBucket =

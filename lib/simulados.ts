@@ -61,7 +61,7 @@ export const SUPUESTOS_SCORING = [
   "El score combina saldo normalizado y días de atraso normalizados con pesos 50/50 — pesos FICTICIOS de demostración, sin ninguna base de negocio.",
   "No existe señal de riesgo de crédito real (historial, buró, límite de crédito) en este prototipo — el plan maestro exige definirla con Finanzas antes de usar un score en serio.",
   "Las cuentas en disputa se retiran del flujo de cobro y se marcan «resolver disputa» (regla estructural del Paso 3/4 — esta parte sí es regla de diseño, no simulación).",
-  "Techos de normalización: $5,000 y 120 días — arbitrarios de esta demo.",
+  "Techos de normalización: NO son constantes — se recalculan sobre el dataset cargado como el percentil 95 observado del saldo por cliente y de los días de atraso máximo. Sobre los datos reales de Benserca 18 (111 cuentas, corte 2026-08-20) dan Q39,637.50 y 1,164 días; sobre el demo-ficticio dan otros. El techo describe la distribución que tiene enfrente, no una cifra heredada.",
 ];
 
 export interface FilaPrioridad {
@@ -75,8 +75,23 @@ export interface FilaPrioridad {
   accionSugerida: string;
 }
 
-const TECHO_SALDO = 5000;
-const TECHO_DIAS = 120;
+// Techos MÍNIMOS de emergencia. Sólo se usan si el p95 observado no sirve como
+// divisor (dataset vacío, una sola fila, o p95 = 0 porque la dimensión es toda
+// ceros). No son "los techos": son el piso que evita una división por cero.
+const TECHO_SALDO_MINIMO = 1;
+const TECHO_DIAS_MINIMO = 1;
+
+/**
+ * Percentil 95 por RANGO MÁS CERCANO (nearest-rank): el valor de la posición
+ * ceil(0.95·n) del arreglo ordenado. Sin interpolación, así el techo es siempre
+ * un valor REALMENTE observado en el dataset y no un punto inventado entre dos.
+ */
+function percentil95(valores: number[]): number {
+  if (valores.length === 0) return 0;
+  const orden = [...valores].sort((a, b) => a - b);
+  const i = Math.min(orden.length - 1, Math.ceil(0.95 * orden.length) - 1);
+  return orden[i];
+}
 
 function accionPorRegla(diasMax: number, enDisputa: boolean): string {
   // Cascada conceptual del Paso 3 (M5): disputa → resolver; luego severidad por días.
@@ -88,8 +103,23 @@ function accionPorRegla(diasMax: number, enDisputa: boolean): string {
   return "sin acción — al día";
 }
 
+/**
+ * Worklist de prioridad SIMULADA.
+ *
+ * Se arma en DOS PASADAS, y el orden importa:
+ *   1ª — se construyen todas las filas con su saldo y sus días de atraso máximo.
+ *   2ª — recién con la distribución completa a la vista se calcula el percentil
+ *        95 de cada dimensión, y ése es el techo de normalización.
+ *
+ * Por qué así: los techos anteriores ($5,000 y 120 días) estaban calibrados
+ * sobre un dataset ficticio EN DÓLARES. Aplicados a los quetzales reales,
+ * saturaban a 55 de 111 cuentas en el techo de saldo y a 51 de 111 en el de
+ * días, y dejaban 23 cuentas empatadas en score 100 — un score que no ordena
+ * nada. Un techo derivado del propio dataset se adapta solo, sea demo o real.
+ */
 export function prioridadSimulada(dataset: Dataset, fechaCorte: string): FilaPrioridad[] {
-  const filas: FilaPrioridad[] = [];
+  // ── 1ª pasada: los hechos por cliente, todavía sin score. ──
+  const crudas: Omit<FilaPrioridad, "scoreSimulado">[] = [];
   for (const cliente of dataset.clientes) {
     const facturasCliente = dataset.facturas.filter(
       (f) => f.id_cliente === cliente.id_cliente
@@ -110,23 +140,45 @@ export function prioridadSimulada(dataset: Dataset, fechaCorte: string): FilaPri
     }
     if (saldoTotal <= 0) continue;
 
-    const nSaldo = Math.min(saldoTotal / TECHO_SALDO, 1);
-    const nDias = Math.min(Math.max(diasMax, 0) / TECHO_DIAS, 1);
-    let score = Math.round((nSaldo * 0.5 + nDias * 0.5) * 100);
-    // Despriorización estructural de cuentas en disputa (concepto del Paso 3).
-    if (enDisputa) score = Math.round(score * 0.5);
-
-    filas.push({
+    crudas.push({
       idCliente: cliente.id_cliente,
       nombreCliente: cliente.nombre_cliente,
       saldoTotal: Math.round(saldoTotal * 100) / 100,
       diasMaxAtraso: Math.max(diasMax, 0),
       enDisputa,
-      scoreSimulado: score,
       accionSugerida: accionPorRegla(diasMax, enDisputa),
     });
   }
-  return filas.sort((a, b) => b.scoreSimulado - a.scoreSimulado);
+
+  // ── Techos: percentil 95 OBSERVADO, no constante heredada. ──
+  // Con 0 o 1 fila, o si el p95 sale 0 (dimensión toda en ceros), el p95 no
+  // sirve de divisor: se cae al mínimo de emergencia para no dividir por cero.
+  const techoSaldo = Math.max(percentil95(crudas.map((f) => f.saldoTotal)), TECHO_SALDO_MINIMO);
+  const techoDias = Math.max(percentil95(crudas.map((f) => f.diasMaxAtraso)), TECHO_DIAS_MINIMO);
+
+  // ── 2ª pasada: ahora sí, el score. ──
+  const filas: FilaPrioridad[] = crudas.map((f) => {
+    const nSaldo = Math.min(f.saldoTotal / techoSaldo, 1);
+    const nDias = Math.min(Math.max(f.diasMaxAtraso, 0) / techoDias, 1);
+    let score = Math.round((nSaldo * 0.5 + nDias * 0.5) * 100);
+    // Despriorización estructural de cuentas en disputa (concepto del Paso 3).
+    if (f.enDisputa) score = Math.round(score * 0.5);
+    return { ...f, scoreSimulado: score };
+  });
+
+  // ── Orden con DESEMPATE EXPLÍCITO. ──
+  // Antes el sort era sólo por score, y con 23 cuentas empatadas en 100 el
+  // "líder" que mostraba la página era el primero de esos 23 según el orden
+  // accidental de la tabla de clientes — no un líder, un accidente.
+  // A igual score decide el MAYOR SALDO; a igual saldo, MÁS DÍAS; y como
+  // último recurso el idCliente, para que el orden sea determinista siempre.
+  return filas.sort(
+    (a, b) =>
+      b.scoreSimulado - a.scoreSimulado ||
+      b.saldoTotal - a.saldoTotal ||
+      b.diasMaxAtraso - a.diasMaxAtraso ||
+      a.idCliente.localeCompare(b.idCliente)
+  );
 }
 
 // ---------------------------------------------------------------------------

@@ -111,6 +111,8 @@ function rutaMonotona(pts: { x: number; y: number }[]): string {
 
 export default function PaginaForecast() {
   const { dataset, cargando, fechaCorte } = useApp();
+  const moneda = dataset.fuente === "odoo-real" ? "GTQ" : "USD";
+  const fmt = (n: number) => fmtMoneda(n, moneda);
   const [serieActiva, setSerieActiva] = useState<ClaveSerie | null>(null);
   const [semanaHover, setSemanaHover] = useState<number | null>(null);
   const svgRef = useRef<SVGSVGElement>(null);
@@ -180,12 +182,12 @@ export default function PaginaForecast() {
           kpis={[
             {
               etiqueta: "base semana 13 · del optimista",
-              valor: fmtMoneda(ultimo.base),
+              valor: fmt(ultimo.base),
               pct: ultimo.optimista > 0 ? (ultimo.base / ultimo.optimista) * 100 : 0,
             },
             {
               etiqueta: "brecha optimista−pesimista · del base",
-              valor: fmtMoneda(spread),
+              valor: fmt(spread),
               pct: pctSpread,
             },
             {
@@ -195,7 +197,7 @@ export default function PaginaForecast() {
             },
             {
               etiqueta: "pesimista · del optimista",
-              valor: fmtMoneda(ultimo.pesimista),
+              valor: fmt(ultimo.pesimista),
               pct: ultimo.optimista > 0 ? (ultimo.pesimista / ultimo.optimista) * 100 : 0,
             },
           ]}
@@ -249,7 +251,7 @@ export default function PaginaForecast() {
                   </span>
                 </div>
                 <p className="mt-7 text-[1.9rem] font-bold leading-none tabular-nums tracking-tight text-tinta">
-                  {fmtMoneda(ultimo[s.clave])}
+                  {fmt(ultimo[s.clave])}
                 </p>
                 <p className="mt-2 text-xs font-medium text-tinta/60">
                   cobro acumulado · 13 semanas
@@ -324,7 +326,7 @@ export default function PaginaForecast() {
                       />
                       {s.etiqueta}:{" "}
                       <span className="tabular-nums text-tinta">
-                        {fmtMoneda(pHover[s.clave])}
+                        {fmt(pHover[s.clave])}
                       </span>
                     </p>
                   ))}
@@ -372,7 +374,7 @@ export default function PaginaForecast() {
                     fill="#94a3b8"
                     textAnchor="end"
                   >
-                    {fmtMoneda(maximo * f)}
+                    {fmt(maximo * f)}
                   </text>
                 </g>
               ))}
@@ -464,7 +466,7 @@ export default function PaginaForecast() {
           <div className="mt-2 flex justify-end">
             <div className="text-right">
               <p className="text-4xl font-bold tabular-nums tracking-tight text-tinta">
-                {fmtMoneda(ultimo.base)}
+                {fmt(ultimo.base)}
               </p>
               <p className="text-xs font-medium text-tintaSuave">
                 escenario base · semana 13 · simulado

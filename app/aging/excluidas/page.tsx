@@ -12,7 +12,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { SkeletonPagina } from "@/components/Basicos";
-import { calcularAging, fmtMoneda, type FacturaExcluida } from "@/lib/calculos";
+import { calcularAging, fmtMoneda, nombreDeCliente, type FacturaExcluida } from "@/lib/calculos";
 import { useApp } from "@/lib/store";
 
 const MOTIVO_ETIQUETA: Record<FacturaExcluida["motivo"], string> = {
@@ -32,7 +32,7 @@ export default function PaginaExcluidas() {
 
   const aging = calcularAging(dataset, fechaCorte);
   const nombreCliente = (id: string) =>
-    dataset.clientes.find((c) => c.id_cliente === id)?.nombre_cliente ?? id;
+    nombreDeCliente(dataset.clientes, id);
   const fmt = (n: number) => fmtMoneda(n, dataset.fuente === "odoo-real" ? "GTQ" : "USD");
 
   const porMotivo = new Map<FacturaExcluida["motivo"], { n: number; saldo: number }>();

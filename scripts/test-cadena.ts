@@ -101,7 +101,7 @@ prueba("dataset solo-CxC (sin cadena) → hayCadena false, módulos avisan en ve
 
 console.log("\n— Paso 11 · El cruce: una operación de punta a punta —");
 
-const cadena = cadenaDeFactura(datosDemo, "FAC-1003", fmtMoneda)!;
+const cadena = cadenaDeFactura(datosDemo, "FAC-1003", (n) => fmtMoneda(n, datosDemo.fuente === "odoo-real" ? "GTQ" : "USD"))!;
 prueba("FAC-1003 atraviesa los tres módulos (Inventario, Ventas y CxC presentes)", () => {
   const modulos = new Set(cadena.pasos.map((p) => p.modulo));
   assert.deepEqual([...modulos].sort(), ["CxC", "Inventario", "Ventas"]);

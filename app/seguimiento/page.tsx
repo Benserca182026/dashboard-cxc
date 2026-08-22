@@ -24,6 +24,7 @@ import { LienzoConAgentes, RecorridoArgumental } from "@/components/Argumento";
 import { BannerFicticioPremium } from "@/components/ResumenPremium";
 import { argumentoSeguimiento } from "@/lib/argumento";
 import { prioridadSimulada } from "@/lib/simulados";
+import { nombreDeCliente } from "@/lib/calculos";
 
 const TIPOS: TipoGestion[] = ["llamada", "email", "carta", "visita", "escalamiento_legal", "otro"];
 
@@ -45,8 +46,9 @@ export default function PaginaSeguimiento() {
   if (cargando) return <SkeletonPagina />;
 
   const clientes = dataset.clientes;
-  const nombre = (id: string) =>
-    clientes.find((c) => c.id_cliente === id)?.nombre_cliente ?? id;
+  // Nunca imprimir un id crudo como si fuera un nombre: si no resuelve, la
+  // pantalla lo DICE (ver nombreDeCliente en lib/calculos.ts).
+  const nombre = (id: string) => nombreDeCliente(clientes, id);
   const gestionesVisibles = clienteSel
     ? gestiones.filter((g) => g.id_cliente === clienteSel)
     : gestiones;
@@ -132,7 +134,10 @@ export default function PaginaSeguimiento() {
             },
             {
               etiqueta: "más gestionado · del total de gestiones",
-              valor: masGestionado ? `${masGestionado.nombre} · ${masGestionado.n}` : "—",
+              // Sin gestiones registradas no hay "más gestionado". Se dice así
+              // y no con un "—" ambiguo, que se lee como "dato faltante"
+              // cuando en realidad el hecho es que nadie gestionó todavía.
+              valor: masGestionado ? `${masGestionado.nombre} · ${masGestionado.n}` : "sin gestiones registradas",
               pct: masGestionado ? porcentaje(masGestionado.n, gestiones.length) : 0,
             },
             {

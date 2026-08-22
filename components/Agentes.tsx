@@ -12,7 +12,7 @@
 // balanza, reloj, sello). Poner caras sugeriría que hay alguien mirando.
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { calcularAging, diasAtraso, disputaActiva, estadoFacturaDerivado, fmtMoneda } from "@/lib/calculos";
+import { calcularAging, diasAtraso, disputaActiva, estadoFacturaDerivado, fmtMoneda, nombreDeCliente } from "@/lib/calculos";
 import { antiguedadPonderada, calcularDso, concentracionRiesgo } from "@/lib/kpis";
 import { hayCadena, salidasSinVenta, stockPorProducto, ventasConTotal } from "@/lib/cadena";
 import { forecastSimulado, prioridadSimulada } from "@/lib/simulados";
@@ -43,6 +43,8 @@ const AGENTES: Agente[] = [
     pregunta: "¿Hay una sola factura sosteniendo un tramo entero?",
     base: "mayor saldo del tramo ÷ total del tramo · umbral 60%",
     mirar: (d, corte) => {
+      const moneda = d.fuente === "odoo-real" ? "GTQ" : "USD";
+      const fmt = (n: number) => fmtMoneda(n, moneda);
       const a = calcularAging(d, corte);
       for (const [bucket, total] of Object.entries(a.totalesPorBucket)) {
         // "actual" (al día) se excluye igual que en tramoDominado()
@@ -56,7 +58,7 @@ const AGENTES: Agente[] = [
         if (part >= 60) {
           return {
             hay: true,
-            texto: `${mayor.factura.numero_factura} es el ${Math.round(part)}% del tramo ${bucket} (${fmtMoneda(mayor.saldo)} de ${fmtMoneda(total)}). El tramo describe una factura, no una tendencia.`,
+            texto: `${mayor.factura.numero_factura} es el ${Math.round(part)}% del tramo ${bucket} (${fmt(mayor.saldo)} de ${fmt(total)}). El tramo describe una factura, no una tendencia.`,
           };
         }
       }
@@ -70,11 +72,13 @@ const AGENTES: Agente[] = [
     pregunta: "¿Un cliente concentra el riesgo?",
     base: "mayor saldo por cliente ÷ saldo total · umbral 35%",
     mirar: (d, corte) => {
+      const moneda = d.fuente === "odoo-real" ? "GTQ" : "USD";
+      const fmt = (n: number) => fmtMoneda(n, moneda);
       const c = concentracionRiesgo(d, corte);
       if ((c.mayorPct ?? 0) >= 35) {
         return {
           hay: true,
-          texto: `${c.mayorCliente?.nombre} tiene el ${c.mayorPct}% de la cartera (${fmtMoneda(c.mayorCliente?.saldo ?? 0)} de ${fmtMoneda(c.saldoTotal)}). El promedio lo describe a él, no al conjunto.`,
+          texto: `${c.mayorCliente?.nombre} tiene el ${c.mayorPct}% de la cartera (${fmt(c.mayorCliente?.saldo ?? 0)} de ${fmt(c.saldoTotal)}). El promedio lo describe a él, no al conjunto.`,
         };
       }
       return { hay: false, texto: `Mayor cliente: ${c.mayorPct}%, bajo el umbral de 35%. Nadie concentra el riesgo.` };
@@ -121,11 +125,13 @@ const AGENTES: Agente[] = [
     pregunta: "¿Hay saldo que el aging no puede clasificar?",
     base: "facturas con saldo y sin fecha de vencimiento",
     mirar: (d, corte) => {
+      const moneda = d.fuente === "odoo-real" ? "GTQ" : "USD";
+      const fmt = (n: number) => fmtMoneda(n, moneda);
       const a = calcularAging(d, corte);
       if (a.saldoNoClasificable > 0) {
         return {
           hay: true,
-          texto: `${fmtMoneda(a.saldoNoClasificable)} quedan FUERA del aging por fecha de vencimiento faltante (${a.excluidas.length} factura(s)). No se les inventa una fecha: se las declara.`,
+          texto: `${fmt(a.saldoNoClasificable)} quedan FUERA del aging por fecha de vencimiento faltante (${a.excluidas.length} factura(s)). No se les inventa una fecha: se las declara.`,
         };
       }
       return { hay: false, texto: "Todas las facturas con saldo tienen fecha de vencimiento. Nada queda fuera del aging." };
@@ -167,6 +173,8 @@ export const AGENTES_PRIORITARIOS: Agente[] = [
     pregunta: "¿Un cliente concentra el saldo de la worklist?",
     base: "mayor saldoTotal de la worklist ÷ saldo total de la worklist · umbral 35%",
     mirar: (d, corte) => {
+      const moneda = d.fuente === "odoo-real" ? "GTQ" : "USD";
+      const fmt = (n: number) => fmtMoneda(n, moneda);
       const filas = prioridadSimulada(d, corte);
       const total = filas.reduce((s, f) => s + f.saldoTotal, 0);
       const mayor = [...filas].sort((a, b) => b.saldoTotal - a.saldoTotal)[0];
@@ -175,7 +183,7 @@ export const AGENTES_PRIORITARIOS: Agente[] = [
       if (part >= 35) {
         return {
           hay: true,
-          texto: `${mayor.nombreCliente} concentra el ${Math.round(part)}% del saldo de la worklist (${fmtMoneda(mayor.saldoTotal)} de ${fmtMoneda(total)}).`,
+          texto: `${mayor.nombreCliente} concentra el ${Math.round(part)}% del saldo de la worklist (${fmt(mayor.saldoTotal)} de ${fmt(total)}).`,
         };
       }
       return { hay: false, texto: `Mayor cliente: ${Math.round(part)}% del saldo de la worklist, bajo el umbral de 35%. El saldo está repartido.` };
@@ -251,13 +259,15 @@ export const AGENTES_SEGUIMIENTO: Agente[] = [
     pregunta: "¿Cuál factura abierta lleva más días esperando cobro?",
     base: "facturas clasificadas no pagadas · máximo de días de atraso",
     mirar: (d, corte) => {
+      const moneda = d.fuente === "odoo-real" ? "GTQ" : "USD";
+      const fmt = (n: number) => fmtMoneda(n, moneda);
       const abiertas = calcularAging(d, corte).clasificadas.filter((c) => c.estado !== "pagada");
       if (abiertas.length === 0) return { hay: false, texto: "No hay facturas clasificadas abiertas: nada que esperar." };
       const peor = [...abiertas].sort((x, y) => y.dias - x.dias)[0];
       if (peor.dias > 0) {
         return {
           hay: true,
-          texto: `${peor.factura.numero_factura} lleva ${peor.dias} días de atraso — es la que más tiempo espera gestión (${fmtMoneda(peor.saldo)}).`,
+          texto: `${peor.factura.numero_factura} lleva ${peor.dias} días de atraso — es la que más tiempo espera gestión (${fmt(peor.saldo)}).`,
         };
       }
       return { hay: false, texto: "Ninguna factura clasificada está vencida: la que más espera todavía está en plazo." };
@@ -277,7 +287,7 @@ export const AGENTES_SEGUIMIENTO: Agente[] = [
       }
       const conVarias = [...porCliente.entries()].filter(([, n]) => n >= 2);
       if (conVarias.length > 0) {
-        const nombre = (id: string) => d.clientes.find((c) => c.id_cliente === id)?.nombre_cliente ?? id;
+        const nombre = (id: string) => nombreDeCliente(d.clientes, id);
         return {
           hay: true,
           texto: `${conVarias.length} cliente(s) tienen 2 o más facturas abiertas a la vez: ${conVarias.map(([id, n]) => `${nombre(id)} (${n})`).join(", ")}. Conviene gestionarlas juntas, no factura por factura.`,
@@ -317,12 +327,14 @@ export const AGENTES_VENTAS: Agente[] = [
     pregunta: "¿Vendido y facturado cuadran exactamente?",
     base: "Σ líneas de venta vs Σ monto_original no anulado · diferencia exacta",
     mirar: (d) => {
+      const moneda = d.fuente === "odoo-real" ? "GTQ" : "USD";
+      const fmt = (n: number) => fmtMoneda(n, moneda);
       if (!hayCadena(d)) return { hay: false, texto: "Este dataset no trae la cadena de ventas: nada que cuadrar." };
       const c = cuadreVentasFacturacionSafe(d);
       if (!c.cuadra) {
-        return { hay: true, texto: `Descuadre de ${fmtMoneda(Math.abs(c.diferencia))}: vendido ${fmtMoneda(c.totalVendido)} contra facturado ${fmtMoneda(c.totalFacturado)}.` };
+        return { hay: true, texto: `Descuadre de ${fmt(Math.abs(c.diferencia))}: vendido ${fmt(c.totalVendido)} contra facturado ${fmt(c.totalFacturado)}.` };
       }
-      return { hay: false, texto: `Vendido y facturado cuadran: ${fmtMoneda(c.totalVendido)}.` };
+      return { hay: false, texto: `Vendido y facturado cuadran: ${fmt(c.totalVendido)}.` };
     },
   },
   {
@@ -347,6 +359,8 @@ export const AGENTES_VENTAS: Agente[] = [
     pregunta: "¿Un cliente concentra más de 35% de lo vendido?",
     base: "Σ total de ventas por cliente ÷ total vendido · umbral 35%",
     mirar: (d) => {
+      const moneda = d.fuente === "odoo-real" ? "GTQ" : "USD";
+      const fmt = (n: number) => fmtMoneda(n, moneda);
       if (!hayCadena(d)) return { hay: false, texto: "Este dataset no trae la cadena de ventas: nada que concentrar." };
       const ventas = ventasConTotal(d);
       const total = ventas.reduce((s, v) => s + v.total, 0);
@@ -356,7 +370,7 @@ export const AGENTES_VENTAS: Agente[] = [
       if (!mayor || total <= 0) return { hay: false, texto: "Sin ventas: nada que concentrar." };
       const part = (mayor[1] / total) * 100;
       if (part >= 35) {
-        return { hay: true, texto: `${mayor[0]} concentra el ${Math.round(part)}% de lo vendido (${fmtMoneda(mayor[1])} de ${fmtMoneda(total)}).` };
+        return { hay: true, texto: `${mayor[0]} concentra el ${Math.round(part)}% de lo vendido (${fmt(mayor[1])} de ${fmt(total)}).` };
       }
       return { hay: false, texto: `Mayor cliente: ${Math.round(part)}% de lo vendido, bajo el umbral de 35%.` };
     },
@@ -470,11 +484,13 @@ export const AGENTES_FORECAST: Agente[] = [
     pregunta: "¿En qué semana la brecha optimista−pesimista es mayor?",
     base: "max(optimista − pesimista) sobre las 13 semanas simuladas",
     mirar: (d, corte) => {
+      const moneda = d.fuente === "odoo-real" ? "GTQ" : "USD";
+      const fmt = (n: number) => fmtMoneda(n, moneda);
       const puntos = forecastSimulado(d, corte);
       const conBrecha = puntos.map((p) => ({ semana: p.semana, brecha: p.optimista - p.pesimista }));
       const mayor = [...conBrecha].sort((a, b) => b.brecha - a.brecha)[0];
       if (!mayor || mayor.brecha <= 0) return { hay: false, texto: "Las tres curvas simuladas casi no se separan: la incertidumbre es pareja." };
-      return { hay: true, texto: `La brecha simulada es mayor en la semana ${mayor.semana}: ${fmtMoneda(mayor.brecha)} entre optimista y pesimista.` };
+      return { hay: true, texto: `La brecha simulada es mayor en la semana ${mayor.semana}: ${fmt(mayor.brecha)} entre optimista y pesimista.` };
     },
   },
   {
@@ -484,13 +500,15 @@ export const AGENTES_FORECAST: Agente[] = [
     pregunta: "¿Cuánto saldo disputado el escenario pesimista no cobra?",
     base: "Σ saldo de facturas con estado disputada — el pesimista las excluye del horizonte",
     mirar: (d, corte) => {
+      const moneda = d.fuente === "odoo-real" ? "GTQ" : "USD";
+      const fmt = (n: number) => fmtMoneda(n, moneda);
       const disputadas = d.facturas.filter(
         (f) => estadoFacturaDerivado(f, d.pagos, d.notasCredito, d.disputas) === "disputada"
       );
       void corte;
       if (disputadas.length === 0) return { hay: false, texto: "No hay facturas disputadas: el escenario pesimista no excluye nada por esa causa." };
       const monto = disputadas.reduce((s, f) => s + f.monto_original, 0);
-      return { hay: true, texto: `${fmtMoneda(monto)} en ${disputadas.length} factura(s) disputada(s) NO se cobran en el escenario pesimista dentro del horizonte (supuesto de simulación).` };
+      return { hay: true, texto: `${fmt(monto)} en ${disputadas.length} factura(s) disputada(s) NO se cobran en el escenario pesimista dentro del horizonte (supuesto de simulación).` };
     },
   },
   {

@@ -43,6 +43,8 @@ const SECCIONES = [
 
 export default function PaginaPrioritarios() {
   const { dataset, cargando, fechaCorte } = useApp();
+  const moneda = dataset.fuente === "odoo-real" ? "GTQ" : "USD";
+  const fmt = (n: number) => fmtMoneda(n, moneda);
   const [busqueda, setBusqueda] = useState("");
   const [ordenPor, setOrdenPor] = useState<ClaveColumna | null>(null);
   const [direccion, setDireccion] = useState<DireccionOrden>(null);
@@ -70,7 +72,7 @@ export default function PaginaPrioritarios() {
       titulo: "Saldo abierto",
       valor: (f) => f.saldoTotal,
       alinear: "derecha",
-      render: (f) => fmtMoneda(f.saldoTotal),
+      render: (f) => fmt(f.saldoTotal),
     },
     {
       clave: "dias",
@@ -183,7 +185,7 @@ export default function PaginaPrioritarios() {
             },
             {
               etiqueta: "líder · del saldo priorizado",
-              valor: lider ? fmtMoneda(lider.saldoTotal) : "—",
+              valor: lider ? fmt(lider.saldoTotal) : "—",
               pct: parteLider,
             },
             {

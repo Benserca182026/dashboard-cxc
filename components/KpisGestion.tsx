@@ -127,6 +127,8 @@ function TablaMini({
 }
 
 export function KpisGestion({ dataset, fechaCorte }: { dataset: Dataset; fechaCorte: string }) {
+  const moneda = dataset.fuente === "odoo-real" ? "GTQ" : "USD";
+  const fmt = (n: number) => fmtMoneda(n, moneda);
   const [abierta, setAbierta] = useState<string | null>(null);
   const alternar = (k: string) => setAbierta(abierta === k ? null : k);
 
@@ -154,7 +156,7 @@ export function KpisGestion({ dataset, fechaCorte }: { dataset: Dataset; fechaCo
           nota={
             dso.dso === null
               ? "sin facturación en la ventana: no calculable"
-              : `cartera ${fmtMoneda(dso.carteraPendiente)} ÷ facturado ${fmtMoneda(dso.facturadoVentana)} × ${dso.ventanaDias}`
+              : `cartera ${fmt(dso.carteraPendiente)} ÷ facturado ${fmt(dso.facturadoVentana)} × ${dso.ventanaDias}`
           }
           formula={`cartera ÷ facturado ${dso.ventanaDias}d × ${dso.ventanaDias}`}
           abierta={abierta === "dso"}
@@ -162,8 +164,8 @@ export function KpisGestion({ dataset, fechaCorte }: { dataset: Dataset; fechaCo
         >
           <TablaMini
             cabeceras={["Factura", "Emisión", "Monto"]}
-            filas={dso.facturasVentana.map((f) => [f.numero, f.fecha_emision, fmtMoneda(f.monto)])}
-            pie={["Facturado en ventana", `${dso.desde} → ${dso.hasta}`, fmtMoneda(dso.facturadoVentana)]}
+            filas={dso.facturasVentana.map((f) => [f.numero, f.fecha_emision, fmt(f.monto)])}
+            pie={["Facturado en ventana", `${dso.desde} → ${dso.hasta}`, fmt(dso.facturadoVentana)]}
           />
         </TarjetaAbrible>
 
@@ -183,13 +185,13 @@ export function KpisGestion({ dataset, fechaCorte }: { dataset: Dataset; fechaCo
             cabeceras={["Factura", "Saldo", "Días", "Saldo × días"]}
             filas={ant.filas.map((f) => [
               f.numero,
-              fmtMoneda(f.saldo),
+              fmt(f.saldo),
               f.dias < 0 ? `${f.dias} → 0` : f.dias,
               f.aporte.toLocaleString("en-US"),
             ])}
             pie={[
               "Total",
-              fmtMoneda(ant.saldoTotal),
+              fmt(ant.saldoTotal),
               "",
               `${ant.totalPonderado.toLocaleString("en-US")} ÷ ${ant.saldoTotal.toLocaleString("en-US")} = ${ant.ponderada}`,
             ]}
@@ -202,7 +204,7 @@ export function KpisGestion({ dataset, fechaCorte }: { dataset: Dataset; fechaCo
           nota={
             efe.efectividadPct === null
               ? "nada vencía en la ventana: 0/0 no se disfraza de porcentaje"
-              : `cobrado ${fmtMoneda(efe.cobradoVentana)} ÷ vencía ${fmtMoneda(efe.montoQueVencia)} en ${efe.ventanaDias} días`
+              : `caja recibida en el período: cobrado ${fmt(efe.cobradoVentana)} ÷ vencía ${fmt(efe.montoQueVencia)} en ${efe.ventanaDias} días — cobrabilidad de lo que venció (por factura): ${efe.efectividadCohortePct === null ? "—" : `${efe.efectividadCohortePct}%`} (${fmt(efe.cobradoCohorte)})`
           }
           formula={`cobrado ${efe.ventanaDias}d ÷ vencía ${efe.ventanaDias}d`}
           abierta={abierta === "efe"}
@@ -211,18 +213,18 @@ export function KpisGestion({ dataset, fechaCorte }: { dataset: Dataset; fechaCo
           <p className="mb-1 text-[11px] font-semibold text-tintaSuave">Vencía en la ventana</p>
           <TablaMini
             cabeceras={["Factura", "Vencía", "Monto"]}
-            filas={efe.facturasQueVencian.map((f) => [f.numero, f.fecha_vencimiento, fmtMoneda(f.monto)])}
-            pie={["Total que vencía", "", fmtMoneda(efe.montoQueVencia)]}
+            filas={efe.facturasQueVencian.map((f) => [f.numero, f.fecha_vencimiento, fmt(f.monto)])}
+            pie={["Total que vencía", "", fmt(efe.montoQueVencia)]}
           />
           <p className="mb-1 mt-3 text-[11px] font-semibold text-tintaSuave">Cobrado en la ventana</p>
           <TablaMini
             cabeceras={["Pago", "Fecha", "Monto"]}
             filas={
               efe.pagosVentana.length
-                ? efe.pagosVentana.map((p) => [p.id_pago, p.fecha_pago, fmtMoneda(p.monto)])
-                : [["—", "sin pagos en la ventana", fmtMoneda(0)]]
+                ? efe.pagosVentana.map((p) => [p.id_pago, p.fecha_pago, fmt(p.monto)])
+                : [["—", "sin pagos en la ventana", fmt(0)]]
             }
-            pie={["Total cobrado", "", fmtMoneda(efe.cobradoVentana)]}
+            pie={["Total cobrado", "", fmt(efe.cobradoVentana)]}
           />
         </TarjetaAbrible>
 
@@ -231,7 +233,7 @@ export function KpisGestion({ dataset, fechaCorte }: { dataset: Dataset; fechaCo
           valor={con.mayorPct === null ? "—" : `${con.mayorPct}%`}
           nota={
             con.mayorCliente
-              ? `${con.mayorCliente.nombre}: ${fmtMoneda(con.mayorCliente.saldo)} del total ${fmtMoneda(con.saldoTotal)}`
+              ? `${con.mayorCliente.nombre}: ${fmt(con.mayorCliente.saldo)} del total ${fmt(con.saldoTotal)}`
               : "sin saldo pendiente"
           }
           formula="mayor saldo por cliente ÷ saldo total"
@@ -240,8 +242,8 @@ export function KpisGestion({ dataset, fechaCorte }: { dataset: Dataset; fechaCo
         >
           <TablaMini
             cabeceras={["Cliente", "Saldo", "% del total"]}
-            filas={con.porCliente.map((c) => [c.nombre, fmtMoneda(c.saldo), `${c.pct}%`])}
-            pie={["Total", fmtMoneda(con.saldoTotal), "100%"]}
+            filas={con.porCliente.map((c) => [c.nombre, fmt(c.saldo), `${c.pct}%`])}
+            pie={["Total", fmt(con.saldoTotal), "100%"]}
           />
         </TarjetaAbrible>
       </div>

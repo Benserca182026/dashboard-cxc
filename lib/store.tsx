@@ -38,7 +38,10 @@ export function ProveedorApp({ children }: { children: React.ReactNode }) {
   const [cargando, setCargando] = useState(true);
   const [errorDatosReales, setErrorDatosReales] = useState<string | null>(null);
   const [fechaCorte, setFechaCorte] = useState(FECHA_CORTE_DEFAULT);
-  const [gestiones, setGestiones] = useState<GestionCobranza[]>(gestionesSemilla);
+  // Sólo las gestiones que registró el usuario. La semilla de demo NO vive
+  // acá: se agrega derivada más abajo, y sólo cuando corresponde. Ver el
+  // comentario de `gestiones`.
+  const [gestionesUsuario, setGestionesUsuario] = useState<GestionCobranza[]>([]);
 
   // Carga inicial: datos REALES de Benserca 18 desde Supabase. Si falla (sin
   // red, Supabase caído, etc.) se queda en el dataset demo-ficticio y se
@@ -69,17 +72,45 @@ export function ProveedorApp({ children }: { children: React.ReactNode }) {
       const crudo = window.localStorage.getItem(CLAVE_GESTIONES);
       if (crudo) {
         const guardadas = JSON.parse(crudo) as GestionCobranza[];
-        setGestiones([...gestionesSemilla, ...guardadas]);
+        // Sin re-inyectar la semilla: acá sólo entra lo que grabó el usuario.
+        setGestionesUsuario(guardadas);
       }
     } catch {
-      // localStorage corrupto/inaccesible: se sigue con la semilla.
+      // localStorage corrupto/inaccesible: se sigue sin gestiones guardadas.
     }
   }, []);
 
+  // La semilla de demo (lib/datos.ts) apunta a CLI-004 y CLI-002, clientes que
+  // SÓLO existen en el dataset demo-ficticio. Sobre el dataset real de Odoo
+  // esos ids no resuelven a ningún cliente de los 372, y la Bitácora terminaba
+  // mostrando "CLI-004" como si fuera el nombre de un cliente, con el KPI "más
+  // gestionado" señalando a ese fantasma.
+  //
+  // Se resuelve DERIVANDO la lista en vez de inicializar el estado con la
+  // semilla. Así es correcto en los dos momentos que importan, sin depender
+  // del orden de carga: en el primer render el dataset todavía es el demo (y
+  // la semilla es verdadera ahí), y cuando el useEffect asíncrono trae el
+  // dataset real la semilla desaparece sola, sin ningún paso de limpieza que
+  // pudiera olvidarse.
+  //
+  // La condición es POSITIVA (`=== "demo-ficticio"`) y no la negación de
+  // "odoo-real" a propósito: un dataset "csv-importado" tampoco contiene
+  // CLI-002 ni CLI-004, así que sufre exactamente el mismo defecto. Sólo el
+  // dataset que trae esos clientes muestra gestiones sobre esos clientes.
+  const gestiones = useMemo(
+    () =>
+      dataset.fuente === "demo-ficticio"
+        ? [...gestionesSemilla, ...gestionesUsuario]
+        : gestionesUsuario,
+    [dataset.fuente, gestionesUsuario]
+  );
+
   const agregarGestion = useCallback((g: GestionCobranza) => {
-    setGestiones((prev) => {
+    setGestionesUsuario((prev) => {
       const nuevas = [...prev, g];
       try {
+        // El filtro se conserva por defensa: si alguna vez entrara una fila
+        // marcada "sistema_demo", no debe llegar a localStorage.
         const soloUsuario = nuevas.filter((x) => x.creado_por !== "sistema_demo");
         window.localStorage.setItem(CLAVE_GESTIONES, JSON.stringify(soloUsuario));
       } catch {

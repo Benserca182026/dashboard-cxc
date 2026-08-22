@@ -188,12 +188,37 @@ export function calcularAging(dataset: Dataset, fechaCorte: string): ResultadoAg
 // Benserca 18 vienen en GTQ (Odoo así lo declara en moneda_id, verificado en
 // el 100% de la muestra real). Sin este parámetro, cada monto real se
 // mostraba con "$" como si fuera dólares — correcto en magnitud, engañoso en
-// la moneda. Default USD para no cambiar el comportamiento de ningún
-// llamador existente que no pasa moneda.
-export function fmtMoneda(n: number, moneda: "USD" | "GTQ" = "USD"): string {
+// la moneda.
+//
+// `moneda` NO tiene default, y es deliberado. Un default correcto sigue
+// permitiendo el olvido silencioso: quien no pasa moneda no se entera de
+// nada y la pantalla miente sin avisar. Un parámetro obligatorio convierte
+// ese olvido en un error de compilación. Se pasa de confiar en la memoria
+// del programador a confiar en la máquina.
+export function fmtMoneda(n: number, moneda: "USD" | "GTQ"): string {
   return n.toLocaleString(moneda === "GTQ" ? "es-GT" : "en-US", {
     style: "currency",
     currency: moneda,
     minimumFractionDigits: 2,
   });
+}
+
+/**
+ * Resuelve el nombre de un cliente a partir de su id.
+ *
+ * Cuando el id NO resuelve, esta función NO devuelve el id crudo: devuelve un
+ * texto que DECLARA el fallo de resolución. El patrón anterior
+ * (`...?.nombre_cliente ?? id`) hacía que la pantalla imprimiera "CLI-004" en
+ * la columna «cliente», indistinguible de un nombre real — un id disfrazado
+ * de nombre. Un fallo de resolución tiene que verse como lo que es, no
+ * confundirse con un dato.
+ */
+export function nombreDeCliente(
+  clientes: { id_cliente: string; nombre_cliente: string }[],
+  id: string
+): string {
+  return (
+    clientes.find((c) => c.id_cliente === id)?.nombre_cliente ??
+    `cliente no identificado (${id})`
+  );
 }

@@ -51,6 +51,8 @@ const SECCIONES = [
 
 export default function PaginaDatos() {
   const { dataset, cargando, errorDatosReales, fechaCorte, reemplazarDataset, volverADemo } = useApp();
+  const moneda = dataset.fuente === "odoo-real" ? "GTQ" : "USD";
+  const fmt = (n: number) => fmtMoneda(n, moneda);
   const [parseo, setParseo] = useState<ResultadoParseo | null>(null);
   const [mapeo, setMapeo] = useState<CampoDestino[]>([]);
   const [ordenFecha, setOrdenFecha] = useState<OrdenFecha>("auto");
@@ -333,7 +335,7 @@ export default function PaginaDatos() {
                 <li className="py-2.5">
                   Saldo total importado:{" "}
                   <b className="tabular-nums">
-                    {fmtMoneda(
+                    {fmt(
                       resultado.dataset.facturas.reduce((s, f) => s + f.monto_original, 0)
                     )}
                   </b>{" "}

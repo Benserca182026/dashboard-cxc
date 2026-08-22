@@ -75,6 +75,8 @@ function Ventana({
 /** Buscador con filtros. Busca de verdad: clientes y facturas del dataset
  *  cargado, con los filtros aplicándose en vivo sobre el resultado. */
 function PanelBuscar({ dataset }: { dataset: Dataset }) {
+  const moneda = dataset.fuente === "odoo-real" ? "GTQ" : "USD";
+  const fmt = (n: number) => fmtMoneda(n, moneda);
   const [texto, setTexto] = useState("");
   const [filtros, setFiltros] = useState<string[]>([]);
 
@@ -186,7 +188,7 @@ function PanelBuscar({ dataset }: { dataset: Dataset }) {
                 <td className="px-3 py-2 text-[#5b5e64]">{clientesPorId.get(f.id_cliente) ?? "—"}</td>
                 <td className="px-3 py-2 text-[#8b8f98]">{f.fecha_vencimiento ?? "sin fecha"}</td>
                 <td className="px-3 py-2 text-right tabular-nums text-tinta">
-                  {fmtMoneda(f.monto_original)}
+                  {fmt(f.monto_original)}
                 </td>
               </tr>
             ))}
