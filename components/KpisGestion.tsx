@@ -204,7 +204,16 @@ export function KpisGestion({ dataset, fechaCorte }: { dataset: Dataset; fechaCo
           nota={
             efe.efectividadPct === null
               ? "nada vencía en la ventana: 0/0 no se disfraza de porcentaje"
-              : `caja recibida en el período: cobrado ${fmt(efe.cobradoVentana)} ÷ vencía ${fmt(efe.montoQueVencia)} en ${efe.ventanaDias} días — cobrabilidad de lo que venció (por factura): ${efe.efectividadCohortePct === null ? "—" : `${efe.efectividadCohortePct}%`} (${fmt(efe.cobradoCohorte)})`
+              // La segunda mitad de esta frase mostraba la efectividad por
+              // COHORTE (efectividadCohortePct). Se retiró: sobre datos reales
+              // vale 0% siempre — los pagos importados de Odoo llegan con
+              // id_factura en null, y la cohorte cruza por ese campo — así que
+              // la tarjeta terminaba diciendo dos números contradictorios en el
+              // mismo renglón. El cálculo sigue en lib/kpis.ts, con el detalle
+              // de qué lo reactiva (pagos con id_factura poblado) y de dónde
+              // está hoy la cobranza real (notas de crédito sintéticas
+              // REC-<id_factura>, lib/datosReales.ts:189-205).
+              : `caja recibida en el período: cobrado ${fmt(efe.cobradoVentana)} ÷ vencía ${fmt(efe.montoQueVencia)} en ${efe.ventanaDias} días`
           }
           formula={`cobrado ${efe.ventanaDias}d ÷ vencía ${efe.ventanaDias}d`}
           abierta={abierta === "efe"}

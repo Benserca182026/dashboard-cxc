@@ -45,6 +45,7 @@
 // calcula margen real, no un valor inventado — no hizo falta ningún caso
 // especial "sin desglose" en lib/cadena.ts.
 
+import { Cifra } from "./types";
 import type {
   Cliente,
   Dataset,
@@ -61,12 +62,21 @@ import type {
 const SUPABASE_URL = "https://jfvmuemyjcdesnoqeaix.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_7l3WptofYtgvkDUHKyfwPQ_x0nl0lc1";
 const TAMANO_PAGINA = 1000; // límite por defecto de PostgREST por respuesta
+/** Único estado de Odoo que es una venta. "draft"/"sent" son presupuestos; "Cancelado" es un pedido caído. */
+const ESTADO_VENTA_CONFIRMADA = "sale";
 
-async function traerTodo<T>(tabla: string, columnas = "*"): Promise<T[]> {
+/**
+ * Paginado por header Range. `orden` NO es opcional a propósito: PostgREST no
+ * garantiza un orden estable entre respuestas si no se lo pide, así que sin
+ * `order` dos páginas consecutivas pueden repetir una fila y omitir otra —
+ * silenciosamente, y con 23,869 líneas nadie lo nota mirando. Se ordena
+ * siempre por la clave primaria de la tabla, que es única y no nula.
+ */
+async function traerTodo<T>(tabla: string, orden: string, columnas = "*"): Promise<T[]> {
   const filas: T[] = [];
   let desde = 0;
   for (;;) {
-    const resp = await fetch(`${SUPABASE_URL}/rest/v1/${tabla}?select=${columnas}`, {
+    const resp = await fetch(`${SUPABASE_URL}/rest/v1/${tabla}?select=${columnas}&order=${orden}.asc`, {
       headers: {
         apikey: SUPABASE_ANON_KEY,
         Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
@@ -133,6 +143,16 @@ interface FilaVentaSupabase {
   id_venta: string;
   id_cliente: string | null;
   fecha_venta: string;
+  /**
+   * Estado del pedido en Odoo, guardado tal cual por importar-ventas-odoo.mjs.
+   * Estaba en Supabase desde el primer import y este archivo nunca lo pedía:
+   * por eso hasta hoy NO había filtro de estado en ninguna parte del tablero y
+   * presupuestos ("draft", "sent") y cancelados entraban como ventas.
+   * Valores reales al 2026-08-23: sale 3189 · Cancelado 25 · draft 16 · sent 4.
+   */
+  estado_odoo: string | null;
+  /** Capa "hecho": el total que Odoo cerró para el pedido, con descuento ya aplicado. */
+  total_odoo_referencia: number | null;
 }
 
 interface FilaVentaLineaSupabase {
@@ -156,13 +176,17 @@ interface FilaMovimientoSupabase {
 export async function cargarDatasetReal(): Promise<Dataset> {
   const [clientesRaw, facturasRaw, pagosRaw, productosRaw, ventasRaw, ventaLineasRaw, movimientosRaw] =
     await Promise.all([
-      traerTodo<FilaClienteSupabase>("clientes"),
-      traerTodo<FilaFacturaSupabase>("facturas"),
-      traerTodo<FilaPagoSupabase>("pagos"),
-      traerTodo<FilaProductoSupabase>("productos"),
-      traerTodo<FilaVentaSupabase>("ventas"),
-      traerTodo<FilaVentaLineaSupabase>("venta_lineas"),
-      traerTodo<FilaMovimientoSupabase>("movimientos_inventario"),
+      traerTodo<FilaClienteSupabase>("clientes", "id_cliente"),
+      traerTodo<FilaFacturaSupabase>("facturas", "id_factura"),
+      traerTodo<FilaPagoSupabase>("pagos", "id_pago"),
+      traerTodo<FilaProductoSupabase>("productos", "id_producto"),
+      traerTodo<FilaVentaSupabase>(
+        "ventas",
+        "id_venta",
+        "id_venta,id_cliente,fecha_venta,estado_odoo,total_odoo_referencia"
+      ),
+      traerTodo<FilaVentaLineaSupabase>("venta_lineas", "id_linea"),
+      traerTodo<FilaMovimientoSupabase>("movimientos_inventario", "id_movimiento"),
     ]);
 
   const clientes: Cliente[] = clientesRaw.map((c) => ({
@@ -227,12 +251,22 @@ export async function cargarDatasetReal(): Promise<Dataset> {
   // Ventas con id_cliente null (pedido sin socio en Odoo, no visto en la
   // práctica pero el campo es nullable en el esquema) se descartan acá: Venta
   // exige id_cliente string, y no se inventa un cliente para tapar el hueco.
+  //
+  // Filtro de estado (2026-08-23): sólo entran los pedidos que Odoo tiene en
+  // "sale". Un presupuesto ("draft"/"sent") no es una venta: es una oferta que
+  // el cliente todavía puede no aceptar. Un pedido "Cancelado" tampoco.
+  // Contarlos inflaba el total. Las líneas de los pedidos excluidos se caen
+  // solas más abajo, porque ventaLineas se filtra por idsVentaValidos.
   const ventas: Venta[] = ventasRaw
     .filter((v): v is FilaVentaSupabase & { id_cliente: string } => v.id_cliente !== null)
+    .filter((v) => v.estado_odoo === ESTADO_VENTA_CONFIRMADA)
     .map((v) => ({
       id_venta: v.id_venta,
       id_cliente: v.id_cliente,
       fecha_venta: v.fecha_venta,
+      total_referencia:
+        v.total_odoo_referencia === null ? null : Cifra.hecho(Number(v.total_odoo_referencia)),
+      estado_odoo: v.estado_odoo,
     }));
   const idsVentaValidos = new Set(ventas.map((v) => v.id_venta));
 

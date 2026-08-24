@@ -1,0 +1,83 @@
+{
+  "_lea_esto_primero": [
+    "Cifras de CONTROL capturadas de Odoo a mano. Este archivo es a la vez la prueba",
+    "y la lista de pendientes: toda cifra con \"valor\": null es una cifra que TODAVIA",
+    "NO se le pidio a Odoo. scripts/test-cifras-control.ts la reporta como PENDIENTE",
+    "e imprime al lado el valor que la app calcula hoy, para que nunca pase en silencio.",
+    "",
+    "Para cerrar un pendiente: entrar al menu exacto que dice \"fuente\", copiar el numero,",
+    "poner la fecha de captura del dia, y volver a correr `npm test`.",
+    "",
+    "NUNCA se compara con igualdad exacta contra Odoo. La razon esta escrita en",
+    "lib/verificacionOdoo.ts: Odoo descuenta cosas que este esquema no tiene (anticipos",
+    "sin aplicar, redondeos por multi-moneda), asi que una diferencia chica es legitima",
+    "y una diferencia grande es un bug. La tolerancia porcentual es exactamente esa linea."
+  ],
+  "moneda": "GTQ",
+  "cifras": {
+    "ventas_total_confirmado": {
+      "valor": 19671235.56,
+      "tolerancia_pct": 0.5,
+      "unidad": "GTQ",
+      "fuente": "Odoo > Ventas > Pedidos > Pedidos de venta (filtro por defecto, estados confirmado/hecho) > pie de la columna \"Total\"",
+      "fecha_captura": "2026-08-23",
+      "nota": "Ya esta en la base: ventas.total_odoo_referencia. La pagina muestra hoy 26,285,671.61 porque multiplica cantidad x precio de lista sin restar el descuento — y el descuento NO existe en el esquema (venta_lineas no tiene columna de descuento; ver verificacion/linea-base.mjs)."
+    },
+    "ventas_pedidos_confirmados": {
+      "valor": 3234,
+      "tolerancia_pct": 0,
+      "unidad": "pedidos",
+      "fuente": "Odoo > Ventas > Pedidos > Pedidos de venta > contador de registros de la vista de lista",
+      "fecha_captura": "2026-08-23",
+      "nota": "Conteo, no monto: tolerancia 0. Si no cuadra, se perdieron o duplicaron pedidos en la importacion."
+    },
+    "inventario_existencia_ed_11_7_3": {
+      "valor": 658,
+      "tolerancia_pct": 0.5,
+      "unidad": "unidades",
+      "fuente": "Odoo > Inventario > Informes > Existencia (stock.quant) > filtro Producto = ED-11.7.3 > columna \"Cantidad a mano\"",
+      "fecha_captura": "2026-08-23",
+      "nota": "Testigo del bug de saldo inicial: la app calcula -149 porque suma solo los movimientos desde 2025-08-22 y nunca carga el saldo con el que arranco la ventana. stock.quant se lee unicamente para SKU y nombre; su cantidad a mano jamas se usa."
+    },
+    "inventario_unidades_totales": {
+      "valor": null,
+      "tolerancia_pct": 1,
+      "unidad": "unidades",
+      "fuente": "PENDIENTE DE CAPTURA — Odoo > Inventario > Informes > Existencia > pie de la columna \"Cantidad a mano\" (sin filtros)",
+      "fecha_captura": null,
+      "nota": "Sin esta cifra no hay forma de saber cuanto se desvia el catalogo completo, solo el producto testigo."
+    },
+    "inventario_valor_costo_total": {
+      "valor": null,
+      "tolerancia_pct": 1,
+      "unidad": "GTQ",
+      "fuente": "PENDIENTE DE CAPTURA — Odoo > Inventario > Informes > Valoracion de inventario > pie de la columna \"Valor\"",
+      "fecha_captura": null,
+      "nota": "La app lo deriva como existencia x costo_unitario, asi que arrastra el mismo error de saldo inicial."
+    },
+    "inventario_skus_bajo_minimo": {
+      "valor": null,
+      "tolerancia_pct": 0,
+      "unidad": "SKU",
+      "fuente": "PENDIENTE DE CAPTURA — Odoo > Inventario > Configuracion > Reglas de reabastecimiento > contador de reglas con cantidad a mano por debajo del minimo",
+      "fecha_captura": null,
+      "nota": "Hoy la app dice 547 de 751 (73%) porque stock_minimo esta hardcodeado en 0 (scripts/importar-inventario-odoo.mjs:119 y :245) y la regla degenero a existencia <= 0. Junto con esta cifra hay que traer los stock_minimo reales."
+    },
+    "cxc_saldo_vencido_total": {
+      "valor": null,
+      "tolerancia_pct": 0.5,
+      "unidad": "GTQ",
+      "fuente": "PENDIENTE DE CAPTURA — Odoo > Contabilidad > Informes > Cuentas por cobrar > Vencido por cobrar > pie de la columna \"Total\"",
+      "fecha_captura": null,
+      "nota": "Ya hay un import parcial en saldos_odoo (scripts/importar-saldos-odoo.mjs). Falta la cifra declarada de Odoo a la fecha de corte para cerrar el circulo. lib/verificacionOdoo.ts explica por que no va a dar exacto."
+    },
+    "ventas_margen_bruto": {
+      "valor": null,
+      "tolerancia_pct": 1,
+      "unidad": "GTQ",
+      "fuente": "PENDIENTE DE CAPTURA — Odoo > Ventas > Informes > Ventas > medida \"Margen\" sobre pedidos confirmados",
+      "fecha_captura": null,
+      "nota": "El margen que muestra la app se calcula sobre el total inflado (sin descuento) y contra costo_unitario del producto, no contra el costo del movimiento. Es esperable que no cuadre hasta que exista la columna de descuento."
+    }
+  }
+}

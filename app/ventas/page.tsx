@@ -1,9 +1,24 @@
 "use client";
 
-// M8 — Ventas (Paso 11). El total de cada venta es Σ(cantidad × precio) de sus
-// líneas — nunca un número tecleado. La franja de cuadre compara vendido contra
-// facturado: cuadran por construcción, y si algún día difieren, se muestra el
-// monto exacto del descuadre, no un booleano mudo.
+// M8 — Ventas (Paso 11).
+//
+// Regla de procedencia (2026-08-23): cada número declara de qué capa viene.
+//   TOTAL VENDIDO  -> ventas.total_odoo_referencia (capa "hecho", descuento ya
+//                    aplicado por Odoo). Solo pedidos en estado "sale".
+//   A precio de lista -> Sigma(cantidad x precio) de las líneas (capa
+//                    "composicion"). El export de líneas NO trae la columna
+//                    descuento, así que esa suma no es lo vendido, y todo lo
+//                    que salga de ella se rotula "a precio de lista".
+// El tipo Cifra<C> (lib/types.ts) impide sumar o dividir entre capas.
+//
+// El MARGEN BRUTO se retiró de esta página. Con el descuento ausente, el
+// "margen" que salía de las líneas era precio de lista - costo: no un margen
+// sesgado, sino otra magnitud con el nombre equivocado. Vuelve cuando el
+// export traiga el descuento.
+//
+// La franja de cuadre compara vendido contra facturado y queda como estaba:
+// son poblaciones distintas (pedidos contra facturas) y esa comparación es la
+// que quiere hacer.
 //
 // Reestructuración (M6): mismo esqueleto de "/" y "/aging". De arriba abajo:
 // Encabezado con menú interno y BarraUsuario → el motor de argumentación
@@ -19,7 +34,16 @@ import { useState } from "react";
 import { SkeletonPagina } from "@/components/Basicos";
 import { BannerFicticioPremium, KpiPremiumCard } from "@/components/ResumenPremium";
 import { fmtMoneda } from "@/lib/calculos";
-import { cadenaDeFactura, cuadreVentasFacturacion, hayCadena, ventasConTotal, vinculoVentaFacturaDisponible } from "@/lib/cadena";
+import {
+  brechaEntreCapas,
+  cadenaDeFactura,
+  cuadreVentasFacturacion,
+  hayCadena,
+  totalAPrecioDeLista,
+  totalVendidoReferencia,
+  ventasConTotal,
+  vinculoVentaFacturaDisponible,
+} from "@/lib/cadena";
 import { argumentoVentas } from "@/lib/argumento";
 import { useApp } from "@/lib/store";
 import { Encabezado } from "@/components/Encabezado";
@@ -59,18 +83,26 @@ export default function PaginaVentas() {
 
   const argumento = argumentoVentas(dataset);
   const ventas = ventasConTotal(dataset);
-  const totalVendido = ventas.reduce((s, v) => s + v.total, 0);
-  const margenTotal = ventas.reduce((s, v) => s + v.margen, 0);
+
+  // Capa "hecho": el total vendido. Sale de la referencia de Odoo, no de las líneas.
+  const vendido = totalVendidoReferencia(dataset);
+  // Capa "composicion": todo lo reconstruido desde las líneas, a precio de lista.
+  const lista = totalAPrecioDeLista(dataset);
+  // La única lectura que cruza las dos capas — y lo que produce es la distancia entre ellas.
+  const brecha = brechaEntreCapas(dataset);
+
   const cuadre = cuadreVentasFacturacion(dataset);
   const cadena = cadenaDeFactura(dataset, facturaCruce, fmt);
   const facturasConVenta = dataset.facturas.filter((f) => f.id_venta);
   const vinculoDisponible = vinculoVentaFacturaDisponible(dataset);
 
-  // ── Las cifras de los cuatro anillos — las mismas que arma el argumento. ──
+  // ── Las cifras de los anillos ──
+  // La venta líder sale de líneas, así que su reparto se calcula contra el
+  // total de líneas: numerador y denominador de la MISMA capa. El tipo no
+  // dejaría hacerlo de otra forma (porcentajeDe exige la misma Cifra<C>).
   const mayorVenta = [...ventas].sort((a, b) => b.total - a.total)[0] ?? null;
-  const pctMayorVenta = mayorVenta && totalVendido > 0 ? (mayorVenta.total / totalVendido) * 100 : 0;
-  const mayorMargen = [...ventas].sort((a, b) => b.margen - a.margen)[0] ?? null;
-  const pctMayorMargen = mayorMargen && margenTotal > 0 ? (mayorMargen.margen / margenTotal) * 100 : 0;
+  const pctMayorVenta = mayorVenta ? mayorVenta.totalLista.porcentajeDe(lista.total) ?? 0 : 0;
+  const ticketPromedioLista = lista.total.entre(lista.ventas);
 
   return (
     <div className="space-y-6">
@@ -83,30 +115,36 @@ export default function PaginaVentas() {
           argumento nunca es null acá porque ya se filtró !hayCadena arriba. */}
       {argumento && (
         <section id="sec-argumento" className="scroll-mt-24">
+          <p className="mb-2 px-1 text-[11.5px] leading-snug text-[#85878c]">
+            Aviso de procedencia: el recorrido de abajo todavía arma sus cifras desde las líneas
+            (capa composición, a precio de lista), incluido lo que llama margen. El total vendido
+            de esta página, en cambio, sale de la referencia de Odoo. Mientras la banda de brecha
+            esté visible, esas dos lecturas no son comparables.
+          </p>
           <RecorridoArgumental
             rotulo="El caso de las ventas"
             arg={argumento}
             agentes={<FilaAgentes dataset={dataset} fechaCorte={fechaCorte} agentes={AGENTES_VENTAS} />}
             kpis={[
               {
-                etiqueta: "vendido · cuadre con lo facturado",
+                etiqueta: "vendido a precio de lista · cuadre con lo facturado",
                 valor: fmt(cuadre.totalVendido),
                 pct: cuadre.totalVendido > 0 ? Math.min(100, (cuadre.totalFacturado / cuadre.totalVendido) * 100) : 0,
               },
               {
-                etiqueta: "venta líder · de lo vendido",
+                etiqueta: "venta líder · del total a precio de lista",
                 valor: mayorVenta ? fmt(mayorVenta.total) : "—",
                 pct: pctMayorVenta,
               },
               {
-                etiqueta: "mayor margen · del margen total",
-                valor: mayorMargen ? fmt(mayorMargen.margen) : "—",
-                pct: pctMayorMargen,
+                etiqueta: "total vendido · referencia Odoo (capa hecho)",
+                valor: fmt(vendido.total.valorParaMostrar()),
+                pct: 100,
               },
               {
-                etiqueta: "margen bruto · sobre lo vendido",
-                valor: fmt(margenTotal),
-                pct: totalVendido > 0 ? (margenTotal / totalVendido) * 100 : 0,
+                etiqueta: "brecha líneas vs referencia · del total vendido",
+                valor: fmt(brecha.brecha),
+                pct: Math.min(100, Math.abs(brecha.brechaPct ?? 0)),
               },
             ]}
           />
@@ -134,15 +172,56 @@ export default function PaginaVentas() {
             )}
           </div>
 
+          {/* La brecha entre capas, MEDIDA. No es una advertencia redactada: son
+              los dos totales y su distancia. Desaparece sola cuando la brecha
+              cae bajo la tolerancia (0.1% de la referencia) — nadie la borra. */}
+          {!brecha.dentroDeTolerancia && (
+            <div className="entrada-suave mt-4 rounded-tarjeta border border-amber-200 bg-amber-50 px-5 py-4 text-sm text-amber-900">
+              <p className="font-semibold">
+                Dos capas, dos totales — brecha de {fmt(brecha.brecha)}
+                {brecha.brechaPct !== null && <> ({Math.round(brecha.brechaPct)}% de la referencia)</>}
+              </p>
+              <div className="mt-2 grid gap-x-8 gap-y-1 text-[12.5px] sm:grid-cols-2">
+                <p>
+                  <b>Líneas (a precio de lista):</b>{" "}
+                  <span className="tabular-nums">{fmt(brecha.lista)}</span> — {brecha.lineas} líneas de {brecha.ventas} pedidos
+                </p>
+                <p>
+                  <b>Referencia Odoo (hecho):</b>{" "}
+                  <span className="tabular-nums">{fmt(brecha.referencia)}</span> — {vendido.pedidos} pedidos
+                </p>
+              </div>
+              <p className="mt-2 text-[12.5px] leading-snug">
+                Causa conocida: el export de líneas de Odoo (sale.order.line) no trae la columna
+                descuento — no existe ni en el esquema ni en los datos. Por eso las líneas quedan a
+                precio de lista y suman de más. El descuento NO se reconstruye acá: sólo una parte
+                de los pedidos cae en escalones limpios, y rellenar el resto sería inventar un
+                descuento que nadie otorgó. Esta banda se apaga sola cuando la brecha baje de{" "}
+                {fmt(brecha.tolerancia)}.
+              </p>
+            </div>
+          )}
+
           <div className="mt-4 grid grid-cols-2 gap-4 lg:grid-cols-4">
-            <KpiPremiumCard etiqueta="Total vendido" valor={fmt(totalVendido)} nota={`${ventas.length} ventas confirmadas`} variante="soft" />
             <KpiPremiumCard
-              etiqueta="Margen bruto"
-              valor={fmt(margenTotal)}
-              nota={`${totalVendido > 0 ? Math.round((margenTotal / totalVendido) * 100) : 0}% — sin costo por línea se vende sin saber si se gana`}
+              etiqueta="Total vendido"
+              valor={fmt(vendido.total.valorParaMostrar())}
+              nota={`${vendido.pedidos} pedidos en estado sale · ventas.total_odoo_referencia (descuento ya aplicado por Odoo)`}
+              variante="soft"
+            />
+            <KpiPremiumCard
+              etiqueta="A precio de lista"
+              valor={fmt(lista.total.valorParaMostrar())}
+              tono={brecha.dentroDeTolerancia ? "normal" : "alerta"}
+              nota={`Suma de ${lista.lineas} líneas (cantidad × precio). No es lo vendido: el export no trae descuento. El margen bruto se retiró por lo mismo — precio de lista menos costo no es margen.`}
               variante="cool"
             />
-            <KpiPremiumCard etiqueta="Ticket promedio" valor={fmt(ventas.length ? totalVendido / ventas.length : 0)} nota="total ÷ cantidad de ventas" variante="soft" />
+            <KpiPremiumCard
+              etiqueta="Ticket promedio a precio de lista"
+              valor={ticketPromedioLista ? fmt(ticketPromedioLista.valorParaMostrar()) : "—"}
+              nota="líneas ÷ cantidad de pedidos — misma capa arriba y abajo de la división"
+              variante="soft"
+            />
             <KpiPremiumCard
               etiqueta="Ventas con factura"
               valor={`${ventas.filter((v) => v.id_factura).length}/${ventas.length}`}

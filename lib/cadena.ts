@@ -6,9 +6,18 @@
 //   cuadre      = vendido − facturado           (si difieren, se muestra el monto)
 // Un número guardado puede contradecir a su sujeto; uno derivado, no.
 //
+// Corrección 2026-08-23 — "total venta = Σ cantidad × precio" es verdad sólo
+// si las líneas traen el descuento. En ESTE export de Odoo no lo traen: la
+// columna descuento no existe ni en el esquema ni en los datos. Σ líneas es
+// entonces el pedido A PRECIO DE LISTA (capa "composicion"), y el total
+// vendido sale de ventas.total_odoo_referencia (capa "hecho"). Las dos capas
+// se distinguen en el TIPO con `Cifra<C>` (ver bloque PROCEDENCIA en
+// lib/types.ts): mezclarlas es un error de compilación, no de disciplina.
+//
 // ⚠️ Fórmulas PENDIENTES DE VALIDACIÓN POR FINANZAS, como todo el prototipo.
 
 import { nombreDeCliente, saldoPendiente } from "./calculos";
+import { Cifra } from "./types";
 import type { Dataset, MovimientoInventario, Producto } from "./types";
 
 const redondear2 = (n: number) => Math.round(n * 100) / 100;
@@ -70,10 +79,23 @@ export interface VentaConTotal {
   cliente: string;
   fecha: string;
   lineas: { producto: string; sku: string; cantidad: number; precio: number; importe: number; costo: number }[];
+  /**
+   * ⚠ Capa "composicion" — Σ(cantidad × precio_unitario) de las líneas, es
+   * decir el pedido A PRECIO DE LISTA. El export de líneas de Odoo no trae la
+   * columna descuento, así que esto NO es lo vendido. Queda como `number`
+   * suelto sólo porque lo consumen módulos que no se tocan en este cambio
+   * (lib/argumento.ts, components/Agentes.tsx). Todo consumo NUEVO debe usar
+   * `totalLista` / `totalReferencia`, que llevan la capa en el tipo.
+   */
   total: number;
   costoTotal: number;
+  /** ⚠ Capa "composicion": precio de lista − costo. NO es margen comercial: el descuento no está restado. */
   margen: number;
   margenPct: number | null;
+  /** Capa "composicion", tipada: el mismo `total`, pero imposible de mezclar con la capa "hecho". */
+  totalLista: Cifra<"composicion">;
+  /** Capa "hecho": lo que Odoo cerró para este pedido. null si el export no lo trajo. */
+  totalReferencia: Cifra<"hecho"> | null;
   id_factura: string | null;
 }
 
@@ -109,11 +131,111 @@ export function ventasConTotal(d: Dataset): VentaConTotal[] {
         total,
         costoTotal,
         margen,
+        totalLista: Cifra.composicion(total),
+        totalReferencia: v.total_referencia ?? null,
         margenPct: total > 0 ? redondear2((margen / total) * 100) : null,
         id_factura: d.facturas.find((f) => f.id_venta === v.id_venta)?.id_factura ?? null,
       };
     })
     .sort((a, b) => b.fecha.localeCompare(a.fecha));
+}
+
+// ── Las dos capas, cada una con su nombre ───────────────────────────────────
+//
+// Ver el bloque PROCEDENCIA en lib/types.ts. Acá viven las dos únicas maneras
+// de totalizar ventas, cada una devolviendo su capa en el tipo, más la única
+// función autorizada a poner las dos en la misma frase.
+
+export interface TotalHecho {
+  /** Σ ventas.total_odoo_referencia — descuento ya aplicado por Odoo. */
+  total: Cifra<"hecho">;
+  /** Pedidos que entraron en la suma. */
+  pedidos: number;
+  /** Pedidos SIN total de referencia en el export: no se inventa un total para ellos, se cuentan aparte. */
+  pedidosSinReferencia: number;
+}
+
+/** TOTAL VENDIDO. La cifra correcta ya estaba en la base; no hacía falta ningún export nuevo. */
+export function totalVendidoReferencia(d: Dataset): TotalHecho {
+  const ventas = d.ventas ?? [];
+  const conRef = ventas.filter((v) => v.total_referencia != null);
+  return {
+    total: Cifra.sumar("hecho", conRef.map((v) => v.total_referencia as Cifra<"hecho">)),
+    pedidos: conRef.length,
+    pedidosSinReferencia: ventas.length - conRef.length,
+  };
+}
+
+export interface TotalComposicion {
+  /** Σ(cantidad × precio_unitario) — el pedido a PRECIO DE LISTA, sin descuento. */
+  total: Cifra<"composicion">;
+  ventas: number;
+  lineas: number;
+}
+
+/** Lo que se puede reconstruir desde las líneas. Se rotula siempre "a precio de lista". */
+export function totalAPrecioDeLista(d: Dataset): TotalComposicion {
+  const filas = ventasConTotal(d);
+  return {
+    total: Cifra.sumar("composicion", filas.map((v) => v.totalLista)),
+    ventas: filas.length,
+    lineas: filas.reduce((s, v) => s + v.lineas.length, 0),
+  };
+}
+
+/**
+ * Tolerancia de la brecha: 0.1% del total de referencia (mínimo un centavo).
+ * Por debajo de eso, líneas y referencia describen el mismo hecho y la banda
+ * de brecha no tiene nada que decir.
+ */
+export function toleranciaBrecha(referencia: number): number {
+  return Math.max(0.01, Math.abs(referencia) * 0.001);
+}
+
+export interface BrechaCapas {
+  /** Σ líneas, a precio de lista (capa "composicion"). */
+  lista: number;
+  /** Σ total_odoo_referencia (capa "hecho"). */
+  referencia: number;
+  /** lista − referencia. Positiva = las líneas cobran de más porque el descuento no está restado. */
+  brecha: number;
+  /** % de la referencia que representa la brecha. */
+  brechaPct: number | null;
+  tolerancia: number;
+  /** true = las dos capas ya describen el mismo hecho; la banda de la UI debe desaparecer SOLA. */
+  dentroDeTolerancia: boolean;
+  ventas: number;
+  lineas: number;
+}
+
+/**
+ * LA ÚNICA función autorizada a cruzar capas — y no produce una magnitud
+ * mezclada: produce la DISTANCIA entre las dos, que es exactamente lo que hay
+ * que mirar. Al 2026-08-23 vale ~6.87 millones y su causa es conocida: el
+ * export de sale.order.line no trae la columna descuento, así que las líneas
+ * quedan a precio de lista.
+ *
+ * Cuando el export traiga el descuento, la brecha caerá bajo la tolerancia y
+ * `dentroDeTolerancia` pasará a true sin que nadie edite nada: la banda de la
+ * UI se apaga sola. No hay ningún aviso que haya que acordarse de borrar.
+ */
+export function brechaEntreCapas(d: Dataset): BrechaCapas {
+  const composicion = totalAPrecioDeLista(d);
+  const hecho = totalVendidoReferencia(d);
+  const lista = composicion.total.valorParaMostrar();
+  const referencia = hecho.total.valorParaMostrar();
+  const brecha = redondear2(lista - referencia);
+  const tolerancia = toleranciaBrecha(referencia);
+  return {
+    lista,
+    referencia,
+    brecha,
+    brechaPct: referencia === 0 ? null : (brecha / referencia) * 100,
+    tolerancia,
+    dentroDeTolerancia: Math.abs(brecha) <= tolerancia,
+    ventas: composicion.ventas,
+    lineas: composicion.lineas,
+  };
 }
 
 // ── El cuadre: la alarma de la juntura ──────────────────────────────────────
@@ -126,7 +248,12 @@ export interface Cuadre {
   cuadra: boolean;
 }
 
-/** Vendido (Σ líneas) contra facturado (Σ monto_original, sin anuladas). Cuadran por construcción; si no, la cadena se rompió y se dice dónde. */
+/**
+ * Vendido (Σ líneas, capa "composicion") contra facturado (Σ monto_original,
+ * sin anuladas). Se deja EXACTAMENTE como estaba: compara dos poblaciones
+ * distintas (pedidos contra facturas) y esa comparación es la que quiere hacer.
+ * No se le cambia la fuente ni se le aplica la regla de procedencia acá.
+ */
 export function cuadreVentasFacturacion(d: Dataset): Cuadre {
   const totalVendido = redondear2(
     ventasConTotal(d).reduce((s, v) => s + v.total, 0)

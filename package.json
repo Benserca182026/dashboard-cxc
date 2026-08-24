@@ -8,7 +8,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "test": "tsx scripts/test-calculos.ts && tsx scripts/test-kpis.ts && tsx scripts/test-cadena.ts && tsx scripts/test-argumento.ts"
+    "test": "tsx scripts/test-calculos.ts && tsx scripts/test-kpis.ts && tsx scripts/test-cadena.ts && tsx scripts/test-argumento.ts && node verificacion/linea-base.mjs && tsx scripts/test-cifras-control.ts"
   },
   "dependencies": {
     "next": "14.2.35",

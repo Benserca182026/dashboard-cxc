@@ -26,6 +26,97 @@ import { Encabezado } from "@/components/Encabezado";
 import { AGENTES_INVENTARIO, FilaAgentes } from "@/components/Agentes";
 import { LienzoConAgentes, RecorridoArgumental } from "@/components/Argumento";
 
+// ── LO QUE LA PANTALLA TIENE QUE CONFESAR ───────────────────────────────────
+// Tres cifras de este módulo están contaminadas por cómo se importó el dato de
+// Odoo, no por un error de fórmula. Mientras el export que falta no exista, la
+// única salida honesta es rotularlas: que quien mira sepa que el número no es
+// la existencia real y por qué. Las constantes viven acá arriba para que el
+// texto de pantalla y este comentario no se separen nunca.
+//
+//  1. EXISTENCIA. Se calcula sumando los movimientos desde el 2025-08-22 y
+//     nada más. El saldo que había en bodega ESE día no entra: `stock.quant`
+//     se lee sólo para sacar el SKU y el nombre, la cantidad a mano nunca se
+//     usa. Lo que la columna muestra es flujo neto de una ventana, no stock.
+//  2. MÍNIMO. `stock_minimo` quedó fijo en 0 para los 751 productos
+//     (scripts/importar-inventario-odoo.mjs:119 y :245). Con el mínimo en 0,
+//     la regla "bajoMinimo" degeneró en "existencia <= 0" y marca 547 SKU.
+//  3. VALOR A COSTO. El total incluye 280 productos con existencia negativa
+//     que restan 872,681.75; por eso da −70.9 % contra el valor real.
+const FECHA_INICIO_VENTANA = "2025-08-22";
+const TOTAL_SKU_AUDITADOS = 751;
+const SKU_BAJO_MINIMO_AUDITADOS = 547;
+const SKU_TESTIGO = "ED-11.7.3";
+const TESTIGO_CALCULADO = -149;
+const TESTIGO_REAL_ODOO = 658;
+const PRODUCTOS_NEGATIVOS = 280;
+const RESTA_NEGATIVOS = "872,681.75";
+
+const AVISO_EXISTENCIA =
+  `La columna "existencia" NO es el stock que hay en bodega: es el flujo neto ` +
+  `de una ventana. Suma únicamente los movimientos registrados desde el ` +
+  `${FECHA_INICIO_VENTANA} y no incluye el saldo inicial que ya existía ese ` +
+  `día, porque ese saldo no vino en la importación. Por eso hay existencias ` +
+  `negativas: no significan faltante, significan que salió más de lo que esta ` +
+  `ventana alcanzó a ver entrar.`;
+
+const AVISO_MINIMO =
+  `El "mínimo" está en 0 para los ${TOTAL_SKU_AUDITADOS} productos — la ` +
+  `importación nunca trajo ese campo. Como el mínimo es 0, la regla "bajo ` +
+  `mínimo" hoy significa en realidad "existencia ≤ 0", y por eso marca ` +
+  `${SKU_BAJO_MINIMO_AUDITADOS} de ${TOTAL_SKU_AUDITADOS} SKU. No son ` +
+  `${SKU_BAJO_MINIMO_AUDITADOS} productos por reponer.`;
+
+const AVISO_VALOR =
+  `El valor a costo suma también los ${PRODUCTOS_NEGATIVOS} productos con ` +
+  `existencia negativa, que restan ${RESTA_NEGATIVOS}. El total mostrado ` +
+  `queda ~70.9 % por debajo del valor real del inventario.`;
+
+const AVISO_TESTIGO =
+  `Caso testigo: ${SKU_TESTIGO} figura acá con ${TESTIGO_CALCULADO} unidades ` +
+  `cuando en Odoo tiene ${TESTIGO_REAL_ODOO} reales. Es el número que manda ` +
+  `obrar: ordenaría reponer algo que ya está en bodega. No se ordene ` +
+  `reposición desde esta pantalla.`;
+
+/** Bloque de advertencia. Va arriba de todo lo que muestra existencias, con
+ *  las cifras dentro del texto: alguien que no leyó la auditoría tiene que
+ *  poder entender, leyendo esto solo, que lo que ve no es la existencia. */
+function AvisoInventarioContaminado() {
+  return (
+    <div
+      className="entrada-suave rounded-tarjeta border px-4 py-3.5"
+      style={{ borderColor: "rgba(192,57,43,.28)", background: "rgba(192,57,43,.055)" }}
+      role="note"
+    >
+      <p className="text-[11px] font-bold uppercase tracking-[0.07em]" style={{ color: "#c0392b" }}>
+        ⚠ Cifras no auditables — leer antes de usar estos números
+      </p>
+      <ul className="mt-2 space-y-1.5 text-[11.5px] leading-relaxed text-[#5b5e64]">
+        <li>
+          <span className="font-semibold text-tinta">Existencia. </span>
+          {AVISO_EXISTENCIA}
+        </li>
+        <li>
+          <span className="font-semibold text-tinta">Bajo mínimo. </span>
+          {AVISO_MINIMO}
+        </li>
+        <li>
+          <span className="font-semibold text-tinta">Valor a costo. </span>
+          {AVISO_VALOR}
+        </li>
+        <li>
+          <span className="font-semibold text-tinta">Qué tan lejos queda. </span>
+          {AVISO_TESTIGO}
+        </li>
+      </ul>
+      <p className="mt-2 text-[10.5px] leading-snug text-[#85878c]">
+        Las fórmulas no están mal: les falta el saldo inicial y el campo de mínimo,
+        que dependen de un export de Odoo que todavía no existe. Hasta entonces estos
+        números sirven para ver movimiento, no para decidir compras.
+      </p>
+    </div>
+  );
+}
+
 const SECCIONES_SIN_CADENA = [{ id: "sec-aviso", etiqueta: "Aviso" }];
 const SECCIONES = [
   { id: "sec-argumento", etiqueta: "El caso" },
@@ -79,6 +170,10 @@ export default function PaginaInventario() {
           general. */}
       <Encabezado titulo="Inventario" secciones={SECCIONES} dataset={dataset} modulo="inventario" />
 
+      {/* El aviso va PRIMERO, antes de cualquier cifra. Si estuviera al pie,
+          quien mira ya habría creído los números de arriba. */}
+      <AvisoInventarioContaminado />
+
       {/* El motor de argumentación del módulo: ¿el total dice algo, qué está
           por faltar, con qué urgencia, y qué se sigue de eso? argumento nunca
           es null acá porque ya se filtró !hayCadena arriba. */}
@@ -93,23 +188,33 @@ export default function PaginaInventario() {
                 etiqueta: "SKU líder por valor · del valor total",
                 valor: mayorValor ? fmt(mayorValor.valorCosto) : "—",
                 pct: pctMayorValor,
+                advertencia: `Proporción sobre un total contaminado: incluye ${PRODUCTOS_NEGATIVOS} SKU con existencia negativa que restan ${RESTA_NEGATIVOS}.`,
               },
               {
                 etiqueta: "bajo mínimo · de los SKU",
                 valor: `${bajos.length} de ${stock.length}`,
                 pct: stock.length > 0 ? (bajos.length / stock.length) * 100 : 0,
+                advertencia: `El mínimo es 0 en los ${TOTAL_SKU_AUDITADOS} productos, así que "bajo mínimo" hoy es "existencia ≤ 0" (${SKU_BAJO_MINIMO_AUDITADOS} de ${TOTAL_SKU_AUDITADOS}). No son productos por reponer.`,
               },
               {
+                // El Math.min(100, …) que había acá era el mismo engaño que el
+                // clamp del anillo, un piso más arriba: tapaba un cociente
+                // desbordado antes de que el anillo pudiera mostrarlo. El
+                // recorte ahora es sólo del DIBUJO, dentro de <Anillo>.
                 etiqueta: critico ? "existencia del urgente · del mínimo" : "sin producto urgente",
                 valor: critico ? `${critico.existencia} u (mín. ${critico.producto.stock_minimo})` : "—",
                 pct: critico && critico.producto.stock_minimo > 0
-                  ? Math.min(100, (critico.existencia / critico.producto.stock_minimo) * 100)
+                  ? (critico.existencia / critico.producto.stock_minimo) * 100
                   : 0,
+                advertencia: critico
+                  ? `Con el mínimo en 0 este porcentaje no significa nada. La existencia tampoco es real: ${SKU_TESTIGO}, p. ej., figura en ${TESTIGO_CALCULADO} u y en Odoo tiene ${TESTIGO_REAL_ODOO}.`
+                  : undefined,
               },
               {
                 etiqueta: "valor en riesgo · del valor total",
                 valor: fmt(valorEnRiesgo),
                 pct: valorTotal > 0 ? (valorEnRiesgo / valorTotal) * 100 : 0,
+                advertencia: `Negativo y fuera de escala: el numerador acumula existencias negativas, que son ventana sin saldo inicial (desde ${FECHA_INICIO_VENTANA}), no faltantes.`,
               },
             ]}
           />
@@ -120,16 +225,16 @@ export default function PaginaInventario() {
           existencia sigue siendo la suma exacta de sus movimientos. */}
       <section id="sec-existencias" className="scroll-mt-24">
         <LienzoConAgentes
-          titulo="Existencias por producto"
+          titulo={`Existencias por producto — flujo neto desde ${FECHA_INICIO_VENTANA}, sin saldo inicial`}
           agentes={<FilaAgentes dataset={dataset} fechaCorte={fechaCorte} agentes={AGENTES_INVENTARIO} />}
         >
           <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
             <KpiPremiumCard etiqueta="Productos" valor={String(stock.length)} nota="en catálogo ficticio" variante="soft" />
             <KpiPremiumCard
-              etiqueta="Bajo mínimo"
+              etiqueta="Bajo mínimo — en realidad “existencia ≤ 0”"
               valor={String(bajos.length)}
               tono={bajos.length > 0 ? "critico" : "normal"}
-              nota={bajos.length ? bajos.map((b) => b.producto.sku).join(", ") : "ninguno"}
+              nota={`mínimo = 0 en los ${TOTAL_SKU_AUDITADOS} productos, así que la regla degeneró a "existencia ≤ 0" y marca ${SKU_BAJO_MINIMO_AUDITADOS} de ${TOTAL_SKU_AUDITADOS}; no son productos por reponer`}
               variante="warm"
             />
             <KpiPremiumCard
@@ -139,11 +244,25 @@ export default function PaginaInventario() {
               nota="toda salida debe decir qué venta la produjo"
               variante="cool"
             />
-            <KpiPremiumCard etiqueta="Valor a costo" valor={fmt(valorTotal)} nota="derivado, no almacenado" variante="soft" />
+            <KpiPremiumCard
+              etiqueta="Valor a costo — ~70.9 % por debajo del real"
+              valor={fmt(valorTotal)}
+              tono="alerta"
+              nota={`derivado, no almacenado; suma ${PRODUCTOS_NEGATIVOS} productos con existencia negativa que restan ${RESTA_NEGATIVOS}`}
+              variante="soft"
+            />
           </div>
 
           <p className="mb-2 mt-5 text-[11.5px] leading-snug text-[#85878c]">
-            Clic en un producto abre su kardex — el desglose que ES la existencia.
+            Clic en un producto abre su kardex — el desglose que ES esta cifra. Ojo:{" "}
+            <span className="font-semibold" style={{ color: "#c0392b" }}>
+              la columna no es la existencia en bodega.
+            </span>{" "}
+            Es la suma de los movimientos desde el {FECHA_INICIO_VENTANA} y no incluye el
+            saldo que ya había ese día, porque ese saldo no vino en la importación. Un
+            número negativo no es faltante: es una salida cuya entrada quedó fuera de la
+            ventana. Caso testigo: {SKU_TESTIGO} figura acá en {TESTIGO_CALCULADO} u y en
+            Odoo tiene {TESTIGO_REAL_ODOO} reales.
           </p>
 
           <div className="space-y-2.5">
@@ -171,8 +290,18 @@ export default function PaginaInventario() {
                     >
                       {s.existencia} u
                       {s.bajoMinimo && (
-                        <span className="ml-1.5 rounded-pastilla bg-red-600 px-2 py-0.5 text-[9px] font-bold uppercase text-white">
-                          ▲ bajo mín. {s.producto.stock_minimo}
+                        <span
+                          className="ml-1.5 rounded-pastilla bg-red-600 px-2 py-0.5 text-[9px] font-bold uppercase text-white"
+                          title={`El mínimo llegó en 0 desde la importación (los ${TOTAL_SKU_AUDITADOS} productos), así que esta marca sólo dice "existencia ≤ 0"`}
+                        >
+                          ▲ mín. {s.producto.stock_minimo} — la marca sólo dice “≤ 0”
+                        </span>
+                      )}
+                      {s.producto.sku === SKU_TESTIGO && (
+                        <span className="mt-1 block text-[9.5px] font-semibold leading-snug text-red-600">
+                          ⚠ Verificado contra Odoo: acá {TESTIGO_CALCULADO} u, en bodega{" "}
+                          {TESTIGO_REAL_ODOO} u reales. La diferencia es el saldo previo al{" "}
+                          {FECHA_INICIO_VENTANA}, que no se importó.
                         </span>
                       )}
                     </span>
@@ -190,7 +319,12 @@ export default function PaginaInventario() {
                     <div className="border-t border-black/[.06] px-4 py-3">
                       <p className="etiqueta-fase mb-2 uppercase">
                         <span className="mr-1 opacity-50">◆</span>
-                        Kardex — los movimientos que suman la existencia
+                        Kardex — los movimientos que suman la cifra
+                      </p>
+                      <p className="mb-2 text-[10.5px] leading-snug" style={{ color: "#c0392b" }}>
+                        Falta la primera fila: el saldo inicial al {FECHA_INICIO_VENTANA}. El
+                        kardex arranca ahí porque la importación no trajo la existencia previa,
+                        así que este total es flujo de la ventana, no lo que hay en bodega.
                       </p>
                       <table className="w-full text-xs">
                         <thead>
@@ -215,7 +349,10 @@ export default function PaginaInventario() {
                             </tr>
                           ))}
                           <tr className="border-t border-borde/60 font-bold">
-                            <td className="py-1.5 pr-3" colSpan={3}>Existencia (suma exacta de las filas)</td>
+                            <td className="py-1.5 pr-3" colSpan={3}>
+                              Flujo neto desde el {FECHA_INICIO_VENTANA} (suma exacta de las
+                              filas) — no es la existencia: falta el saldo inicial
+                            </td>
                             <td className={`py-1.5 text-right tabular-nums ${s.bajoMinimo ? "text-red-600" : ""}`}>{s.existencia} u</td>
                           </tr>
                         </tbody>

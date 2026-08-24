@@ -133,20 +133,57 @@ export interface KpiPie {
   etiqueta: string;
   valor: string;
   nota?: string;
-  /** Proporción que dibuja el anillo, 0–100. Es lo que la etapa AFIRMA, no un
-   *  adorno: el 45% al día se ve como 45% de anillo lleno. */
+  /** Proporción que dibuja el anillo. Lo esperable es 0–100, pero NO se
+   *  fuerza: si la fórmula produce −113.8 el anillo lo muestra como −113.8 %
+   *  y se marca fuera de escala. Recortar el número escondía el problema. */
   pct?: number;
+  /** Advertencia sobre la PROCEDENCIA de la cifra: qué le falta al dato para
+   *  ser lo que su etiqueta promete. Se imprime junto al valor, siempre
+   *  visible, porque un número contaminado sin rótulo se lee como bueno. */
+  advertencia?: string;
 }
 
 /** Anillo de proporción. El mismo en las cuatro tarjetas, porque las cuatro
  *  afirman una parte de un todo — cambiar de forma en cada una obligaría a
- *  releer el gráfico cada vez. */
+ *  releer el gráfico cada vez.
+ *
+ *  EL CLAMP SE FUE DEL NÚMERO. Antes esta función hacía
+ *  `Math.max(0, Math.min(100, pct))` y usaba ese resultado para las DOS cosas:
+ *  el arco y la cifra del centro. Consecuencia: un −113.8% se leía "0%", es
+ *  decir, un déficit mayor que el total se mostraba como si no pasara nada.
+ *  Ahora el recorte es SÓLO del dibujo — un anillo no puede dar más de una
+ *  vuelta ni girar al revés — y el número del centro se imprime tal cual, con
+ *  su signo. Cuando el valor se sale de 0–100 el anillo se marca (trazo
+ *  punteado + color de alarma) para que no se confunda un arco lleno "real"
+ *  con uno recortado, y aparece el rótulo "fuera de escala" bajo la cifra. */
 function Anillo({ pct, oscuro }: { pct: number; oscuro?: boolean }) {
   const R = 30;
   const C = 2 * Math.PI * R;
-  const cubierto = Math.max(0, Math.min(100, pct));
+  const finito = Number.isFinite(pct);
+  /** Sólo para DIBUJAR: el arco vive obligadamente entre 0 y 100. */
+  const cubierto = finito ? Math.max(0, Math.min(100, pct)) : 0;
+  /** El número NO se recorta. Los que caen en rango se siguen viendo como
+   *  antes (entero); los que se salen conservan el decimal, porque ahí la
+   *  magnitud exacta es justamente la noticia (−113.8, no "−114"). */
+  const enRango = finito && pct >= 0 && pct <= 100;
+  const texto = !finito
+    ? "s/d"
+    : enRango
+      ? `${Math.round(pct)}%`
+      : `${pct.toFixed(1)}%`;
+  // El círculo interior mide ~52 px de ancho útil: una cifra larga con signo
+  // no entra a 16 px. Se achica en vez de desbordar la tarjeta.
+  const tam = texto.length <= 4 ? 16 : texto.length <= 6 ? 13 : 11;
+  const alarma = oscuro ? "#ffb4a8" : "#c0392b";
   return (
-    <svg width="78" height="78" viewBox="0 0 78 78" aria-hidden className="shrink-0">
+    <svg
+      width="78"
+      height="78"
+      viewBox="0 0 78 78"
+      role="img"
+      aria-label={`${texto}${enRango ? "" : " — fuera de la escala 0–100 %; el anillo está recortado"}`}
+      className="shrink-0"
+    >
       <circle
         cx="39"
         cy="39"
@@ -160,22 +197,43 @@ function Anillo({ pct, oscuro }: { pct: number; oscuro?: boolean }) {
         cy="39"
         r={R}
         fill="none"
-        stroke={oscuro ? "#ffffff" : "#3f4249"}
+        stroke={enRango ? (oscuro ? "#ffffff" : "#3f4249") : alarma}
         strokeWidth="8"
         strokeLinecap="round"
-        strokeDasharray={`${(C * cubierto) / 100} ${C}`}
+        strokeDasharray={
+          enRango
+            ? `${(C * cubierto) / 100} ${C}`
+            : // Recortado: el trazo punteado avisa que lo que se ve no es la
+              // medida completa. Si el valor es negativo no hay arco que
+              // dibujar, y queda sólo el aro de fondo con el número en rojo.
+              `3 4`
+        }
         transform="rotate(-90 39 39)"
+        opacity={enRango ? 1 : cubierto === 0 ? 0.35 : 1}
       />
       <text
         x="39"
-        y="43"
+        y={enRango ? 43 : 39}
         textAnchor="middle"
-        fontSize="16"
+        fontSize={tam}
         fontWeight="700"
-        fill={oscuro ? "#ffffff" : "#16181d"}
+        fill={enRango ? (oscuro ? "#ffffff" : "#16181d") : alarma}
       >
-        {Math.round(cubierto)}%
+        {texto}
       </text>
+      {!enRango && (
+        <text
+          x="39"
+          y="51"
+          textAnchor="middle"
+          fontSize="7"
+          fontWeight="700"
+          letterSpacing="0.04em"
+          fill={alarma}
+        >
+          FUERA DE ESCALA
+        </text>
+      )}
     </svg>
   );
 }
@@ -232,6 +290,14 @@ function Columna({ etapa, indice, activa, onElegir, kpi }: {
               >
                 {kpi.valor}
               </span>
+              {kpi.advertencia && (
+                <span
+                  className="mt-1 block text-[9px] font-semibold leading-[1.35]"
+                  style={{ color: esConclusion ? "#ffb4a8" : "#c0392b" }}
+                >
+                  ⚠ {kpi.advertencia}
+                </span>
+              )}
             </span>
           </span>
         )}

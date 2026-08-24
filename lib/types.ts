@@ -111,7 +111,19 @@ export interface Venta {
   id_venta: string;
   id_cliente: string;
   fecha_venta: string;
-  /** El total NO se guarda: es Σ(cantidad × precio) de sus líneas. */
+  /**
+   * Capa "hecho": el total que Odoo cerró para este pedido
+   * (ventas.total_odoo_referencia), con el descuento YA aplicado.
+   * Opcional: un CSV solo-CxC o el dataset demo no lo traen.
+   *
+   * Nota histórica: acá decía "el total NO se guarda: es Σ(cantidad × precio)
+   * de sus líneas". Eso es cierto para un modelo donde las líneas traen el
+   * descuento. En ESTE export de Odoo no lo traen, así que Σ líneas es el
+   * pedido a precio de lista — otra magnitud, no el total vendido.
+   */
+  total_referencia?: Cifra<"hecho"> | null;
+  /** Estado del pedido tal como lo escribió Odoo ("sale", "draft", "sent", "Cancelado"). */
+  estado_odoo?: string | null;
 }
 
 export interface VentaLinea {
@@ -154,6 +166,109 @@ export interface Dataset {
   ventas?: Venta[];
   ventaLineas?: VentaLinea[];
   movimientosInventario?: MovimientoInventario[];
+}
+
+// ── PROCEDENCIA — de qué capa viene cada número (2026-08-23) ────────────────
+//
+// El sistema tiene DOS capas de números sobre ventas, y NO son la misma cosa:
+//
+//   "hecho"        el pedido tal como Odoo lo cerró — ventas.total_odoo_referencia.
+//                  Ya trae aplicado el descuento realmente otorgado.
+//   "composicion"  lo que se reconstruye sumando líneas (cantidad × precio_unitario).
+//                  El export de líneas NO trae la columna descuento: esa suma es
+//                  el pedido A PRECIO DE LISTA, no lo vendido.
+//
+// Sobre los datos reales al 2026-08-23 las dos capas difieren en Q6,866,617.56
+// (26,159,040.47 de líneas contra 19,292,422.91 de referencia, pedidos en
+// estado "sale"). Un número que divida numerador de una capa entre denominador
+// de la otra no está sesgado: NO SIGNIFICA NADA.
+//
+// Por eso el número no viaja como `number` suelto sino dentro de `Cifra<C>`,
+// que lleva su capa en el TIPO. Sumar, restar o comparar exige la misma capa;
+// mezclarlas no es un error de disciplina que alguien deba recordar, es un
+// error de compilación. El valor crudo vive en un campo privado (#valor): no
+// se puede leer sin pasar por `valorParaMostrar()`, que existe únicamente para
+// formatear en pantalla.
+//
+// La ÚNICA comparación legítima entre capas es medir la brecha entre ellas, y
+// vive en una sola función con nombre propio: `brechaEntreCapas()` en
+// lib/cadena.ts. Si aparece una segunda, es un bug.
+
+export type Capa = "hecho" | "composicion";
+
+export class Cifra<C extends Capa> {
+  readonly capa: C;
+  #valor: number;
+
+  /**
+   * Fantasma. Nunca existe en runtime; está para que la capa sea INVARIANTE:
+   * sin él, `Cifra<"hecho">` sería asignable a `Cifra<"hecho" | "composicion">`
+   * y una lista mixta compilaría. Con él, no.
+   */
+  declare readonly _capaInvariante?: (c: C) => C;
+
+  private constructor(capa: C, valor: number) {
+    this.capa = capa;
+    this.#valor = Math.round(valor * 100) / 100;
+  }
+
+  /** Capa "hecho": derivado de ventas.total_odoo_referencia. */
+  static hecho(valor: number): Cifra<"hecho"> {
+    return new Cifra("hecho", valor);
+  }
+
+  /** Capa "composicion": derivado de líneas (cantidad × precio de lista). */
+  static composicion(valor: number): Cifra<"composicion"> {
+    return new Cifra("composicion", valor);
+  }
+
+  static cero<C2 extends Capa>(capa: C2): Cifra<C2> {
+    return new Cifra(capa, 0);
+  }
+
+  /** Suma una lista homogénea. La capa se declara explícita para que la lista vacía siga teniendo procedencia. */
+  static sumar<C2 extends Capa>(capa: C2, cifras: readonly Cifra<C2>[]): Cifra<C2> {
+    let acumulado = 0;
+    for (const c of cifras) acumulado += c.#valor;
+    return new Cifra(capa, acumulado);
+  }
+
+  mas(otra: Cifra<C>): Cifra<C> {
+    return new Cifra(this.capa, this.#valor + otra.#valor);
+  }
+
+  menos(otra: Cifra<C>): Cifra<C> {
+    return new Cifra(this.capa, this.#valor - otra.#valor);
+  }
+
+  /** Reparto porcentual DENTRO de una misma capa. null si la base es 0. */
+  porcentajeDe(base: Cifra<C>): number | null {
+    if (base.#valor === 0) return null;
+    return (this.#valor / base.#valor) * 100;
+  }
+
+  /** Promedio dentro de la capa (p. ej. ticket promedio). null si n <= 0. */
+  entre(n: number): Cifra<C> | null {
+    if (n <= 0) return null;
+    return new Cifra(this.capa, this.#valor / n);
+  }
+
+  mayorQue(otra: Cifra<C>): boolean {
+    return this.#valor > otra.#valor;
+  }
+
+  esCero(): boolean {
+    return this.#valor === 0;
+  }
+
+  /**
+   * Salida a `number`. Existe SOLO para formatear en pantalla o para medir la
+   * brecha entre capas en `brechaEntreCapas()`. Usarlo para volver a calcular
+   * (dividir, sumar) tira por la borda toda la garantía de arriba.
+   */
+  valorParaMostrar(): number {
+    return this.#valor;
+  }
 }
 
 export type BucketAging = "actual" | "1-30" | "31-60" | "61-90" | "90+";

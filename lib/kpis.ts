@@ -129,6 +129,28 @@ export interface ResultadoEfectividad {
    * poblaciones sin cruzarlas (caja recibida en el período) — ésta mide
    * cobrabilidad real de lo que venció, factura por factura. null en el mismo
    * caso 0/0 que efectividadPct.
+   *
+   * ⚠️ RETIRADA DE LA INTERFAZ (no borrada). Sobre datos reales vale 0% SIEMPRE:
+   *   1. scripts/importar-pagos-odoo.mjs:147 escribe `id_factura: null` para
+   *      TODOS los pagos (marcado "deliberado": la conciliación pago↔factura es
+   *      un paso aparte).
+   *   2. pagosAplicados() (lib/calculos.ts:26) cruza justamente por id_factura.
+   *   3. Por lo tanto no encuentra nunca un pago y cobradoCohorte da 0.
+   * En pantalla eso se veía como dos números contradictorios pegados en la misma
+   * frase de la tarjeta de Efectividad, así que la línea se quitó de
+   * components/KpisGestion.tsx. El cálculo sigue vivo y testeado a propósito.
+   *
+   * QUÉ LA REACTIVA: reimportar pagos desde Odoo con `id_factura` poblado (y su
+   * estado_aplicacion real, hoy fijado en "no_aplicado" por la misma razón).
+   * Con eso, este número vuelve a ser el mejor de los dos y se re-muestra.
+   *
+   * DÓNDE ESTÁ HOY LA COBRANZA REAL: no en `pagos`, sino en notas de crédito
+   * SINTÉTICAS `REC-<id_factura>` que lib/datosReales.ts:189-205 fabrica a
+   * partir de (monto_original − saldo_pendiente_odoo). Es decir: la cobranza
+   * entra por el camino que esta fórmula ignora. Cualquier arreglo apurado que
+   * sume esas notas aquí estaría midiendo "reconciliación en Odoo", no "cobro
+   * dentro de la cohorte", y volvería a mezclar poblaciones — por eso se retiró
+   * en lugar de parchearse.
    */
   efectividadCohortePct: number | null;
   ventanaDias: number;
@@ -186,6 +208,22 @@ export function efectividadCobro(dataset: Dataset, fechaCorte: string, ventanaDi
   // que a ELLA se le cobró (cualquier fecha de pago), topado a su propio
   // monto — así un pago que cancela una factura vieja no infla el número de
   // lo que venció ahora.
+  //
+  // ⚠️ NO SE MUESTRA EN LA INTERFAZ. Ver el comentario largo de
+  // `efectividadCohortePct` en ResultadoEfectividad: con los pagos importados
+  // con id_factura en null, esto da 0 sobre datos reales. Se conserva el
+  // cálculo (y su lugar en el resultado) para que reactivarlo sea volver a
+  // pintarlo, no volver a escribirlo.
+  //
+  // ⚠️ FUGA TEMPORAL CONOCIDA (independiente de lo anterior, y que también
+  // habrá que resolver antes de re-mostrar esto): pagosAplicados()
+  // (lib/calculos.ts:21-29) NO filtra por fecha de corte — suma todos los pagos
+  // aplicados a la factura, incluidos los POSTERIORES al corte. Y el corte es
+  // editable por el usuario en la interfaz. Al retroceder la fecha, la cohorte
+  // cuenta cobros que en ese momento todavía no habían ocurrido, y puede
+  // superar el 100% de lo que "vencía". El tope Math.min(..., monto_original)
+  // de abajo limita el daño por factura, pero no lo corrige: lo que falta es un
+  // pagosAplicadosHasta(factura, pagos, fechaCorte).
   const facturasQueVencianCompletas = dataset.facturas.filter(
     (f) =>
       f.estado_factura !== "anulada" &&
