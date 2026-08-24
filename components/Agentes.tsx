@@ -13,17 +13,97 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { calcularAging, diasAtraso, disputaActiva, estadoFacturaDerivado, fmtMoneda, nombreDeCliente } from "@/lib/calculos";
+import type { ResultadoAging } from "@/lib/calculos";
 import { antiguedadPonderada, calcularDso, concentracionRiesgo } from "@/lib/kpis";
+import type { ResultadoAntiguedad, ResultadoConcentracion, ResultadoDso } from "@/lib/kpis";
 import { hayCadena, salidasSinVenta, stockPorProducto, ventasConTotal } from "@/lib/cadena";
 import { forecastSimulado, prioridadSimulada } from "@/lib/simulados";
 import type { Dataset } from "@/lib/types";
 
-interface Hallazgo {
+// ── El tipo de un hallazgo: TRES estados, no dos ──────────────────────────
+//
+// Antes esto era `{ hay: boolean; texto: string }`, y ese booleano era la causa
+// raíz de todo lo que fallaba acá abajo. La realidad de un agente tiene TRES
+// estados y el tipo sólo sabía representar dos:
+//
+//   a) encontré algo
+//   b) miré y no había nada          ← legítimo, y vale tanto como (a)
+//   c) NO PUDE MIRAR: el dato no existe
+//
+// Con dos estados, (b) y (c) colapsan en el mismo `false`. Por eso el pie de la
+// ventana afirmaba "el agente miró y no encontró" TAMBIÉN cuando el agente no
+// había mirado nada — una frase falsa la mitad de las veces. Una unión
+// discriminada hace imposible seguir confundiéndolos.
+
+/** Una entrada de la fórmula: el número que entró, y con qué nombre entró. */
+export interface EntradaEvidencia {
+  nombre: string;
+  valor: number | string;
+  unidad?: string;
+}
+
+/** De dónde salió el dato. Una cuenta sin origen declarado no es evidencia:
+ *  es una afirmación. */
+export interface Procedencia {
+  /** Qué alimentó el cálculo (modelo de origen o función de lib/). */
+  modelo: string;
+  /** Qué quedó afuera, y por qué. */
+  filtro: string;
+  /** A qué fecha se midió. */
+  corte: string;
+  /** Adónde ir a verlo, si hay adónde. */
+  enlace?: string;
+}
+
+export interface Evidencia {
+  /** La fórmula tal como se aplica. */
+  expresion: string;
+  /** Los valores concretos que entraron en esa fórmula. */
+  entradas: EntradaEvidencia[];
+  procedencia: Procedencia;
+}
+
+export interface FilaRanking {
+  id: string;
+  etiqueta: string;
+  valor: number;
+  pct: number;
+}
+
+/** Las filas MÁS el total contra el que se calculó cada pct. El denominador va
+ *  explícito: un porcentaje sin denominador declarado es exactamente lo que
+ *  este proyecto lleva una tanda entera sacando de la pantalla. */
+export interface Ranking {
+  filas: FilaRanking[];
+  total: number;
+  unidad?: string;
+}
+
+export type Hallazgo =
+  | { estado: "hallazgo"; texto: string; evidencia: Evidencia; ranking?: Ranking }
+  | { estado: "sin-hallazgo"; texto: string; evidencia: Evidencia }
+  | {
+      estado: "sin-dato";
+      /** Los tres campos son OBLIGATORIOS a propósito, no opcionales. Un campo
+       *  opcional que documenta una ausencia no se llena nunca. Así, un agente
+       *  que no puede mirar NO COMPILA hasta explicar qué le falta, qué se
+       *  pierde por no tenerlo, y cómo se llena: la mudez pasa a ser un error
+       *  de tipo en vez de un silencio. */
+      queFalta: string;
+      consecuencia: string;
+      comoSeLlena: string;
+    };
+
+/** La forma anterior. Los seis grupos de agentes de módulo (prioritarios,
+ *  seguimiento, ventas, inventario, forecast, datos) todavía la devuelven y no
+ *  se tocan en esta tanda: siguen compilando y funcionando sin cambios. Se
+ *  normalizan en el borde, en `normalizarHallazgo`. */
+export interface HallazgoLegado {
   hay: boolean;
   texto: string;
 }
 
-interface Agente {
+export interface Agente {
   id: string;
   glifo: string;
   nombre: string;
@@ -32,72 +112,271 @@ interface Agente {
    *  auditar sin abrir el código: si alguien discute el resultado, discute
    *  esta línea. */
   base: string;
+  mirar: (d: Dataset, corte: string) => Hallazgo | HallazgoLegado;
+}
+
+/** Un agente ya migrado: MIDE y REDACTA por separado.
+ *
+ *  Antes `mirar` hacía las dos cosas en la misma pasada, y por eso la evidencia
+ *  se calculaba y se tiraba: la función devolvía una frase y nada más. Separado,
+ *  `medir` produce la medición estructurada —que es lo que el drill-down
+ *  necesita— y `redactar` la convierte en prosa. `mirar` queda como la
+ *  composición de las dos, para que los consumidores no cambien. */
+export interface AgenteMedido<M> extends Agente {
+  medir: (d: Dataset, corte: string) => M;
+  redactar: (m: M) => Hallazgo;
   mirar: (d: Dataset, corte: string) => Hallazgo;
 }
 
-const AGENTES: Agente[] = [
-  {
+function definirAgente<M>(spec: Omit<AgenteMedido<M>, "mirar">): AgenteMedido<M> {
+  return { ...spec, mirar: (d, corte) => spec.redactar(spec.medir(d, corte)) };
+}
+
+/** Lleva cualquier hallazgo al tipo de tres estados.
+ *
+ *  Un agente no migrado no tiene evidencia estructurada, y eso NO se disimula:
+ *  su procedencia lo dice con todas las letras y sus entradas quedan vacías, de
+ *  modo que la ventana muestre "entradas no declaradas todavía" en vez de una
+ *  tabla inventada. La deuda se ve; no se rellena. */
+export function normalizarHallazgo(
+  h: Hallazgo | HallazgoLegado,
+  agente: Agente,
+  corte: string
+): Hallazgo {
+  if ("estado" in h) return h;
+  const evidencia: Evidencia = {
+    expresion: agente.base,
+    entradas: [],
+    procedencia: {
+      modelo: "dataset en memoria",
+      filtro: "agente sin migrar: no declara entradas ni filtro",
+      corte,
+    },
+  };
+  return h.hay
+    ? { estado: "hallazgo", texto: h.texto, evidencia }
+    : { estado: "sin-hallazgo", texto: h.texto, evidencia };
+}
+
+type Moneda = "GTQ" | "USD";
+const monedaDe = (d: Dataset): Moneda => (d.fuente === "odoo-real" ? "GTQ" : "USD");
+
+interface TramoMedido {
+  bucket: string;
+  part: number;
+  mayorSaldo: number;
+  total: number;
+}
+
+interface MedicionRastreador {
+  moneda: Moneda;
+  corte: string;
+  porTramo: TramoMedido[];
+  dominado:
+    | null
+    | { bucket: string; numero: string; mayorSaldo: number; total: number; part: number; ranking: Ranking };
+}
+
+export const AGENTES: Agente[] = [
+  definirAgente<MedicionRastreador>({
     id: "rastreador",
     glifo: "🔍",
     nombre: "Rastreador",
     pregunta: "¿Hay una sola factura sosteniendo un tramo entero?",
     base: "mayor saldo del tramo ÷ total del tramo · umbral 60%",
-    mirar: (d, corte) => {
-      const moneda = d.fuente === "odoo-real" ? "GTQ" : "USD";
-      const fmt = (n: number) => fmtMoneda(n, moneda);
+    medir: (d, corte) => {
+      const moneda = monedaDe(d);
       const a = calcularAging(d, corte);
+      const porTramo: TramoMedido[] = [];
+      let dominado: MedicionRastreador["dominado"] = null;
       for (const [bucket, total] of Object.entries(a.totalesPorBucket)) {
         // "actual" (al día) se excluye igual que en tramoDominado()
         // (lib/argumento.ts): que una sola factura sea la mayor parte de lo
         // que YA está al día no es una señal de riesgo de cobranza.
         if (total <= 0 || bucket === "actual") continue;
         const enTramo = a.clasificadas.filter((c) => c.bucket === bucket);
-        const mayor = [...enTramo].sort((x, y) => y.saldo - x.saldo)[0];
+        // Este orden YA se calculaba y se descartaba: sólo se usaba [0] para
+        // sacar `mayor` y el resto se tiraba. El ranking no se computa acá, se
+        // deja de perder.
+        const ordenado = [...enTramo].sort((x, y) => y.saldo - x.saldo);
+        const mayor = ordenado[0];
         if (!mayor) continue;
         const part = (mayor.saldo / total) * 100;
-        if (part >= 60) {
-          return {
-            hay: true,
-            texto: `${mayor.factura.numero_factura} es el ${Math.round(part)}% del tramo ${bucket} (${fmt(mayor.saldo)} de ${fmt(total)}). El tramo describe una factura, no una tendencia.`,
+        porTramo.push({ bucket, part, mayorSaldo: mayor.saldo, total });
+        if (part >= 60 && !dominado) {
+          dominado = {
+            bucket,
+            numero: mayor.factura.numero_factura,
+            mayorSaldo: mayor.saldo,
+            total,
+            part,
+            ranking: {
+              total,
+              unidad: moneda,
+              filas: ordenado.slice(0, 10).map((c) => ({
+                id: c.factura.id_factura,
+                etiqueta: c.factura.numero_factura,
+                valor: c.saldo,
+                pct: (c.saldo / total) * 100,
+              })),
+            },
           };
         }
       }
-      return { hay: false, texto: "Ningún tramo está dominado por una sola factura. El atraso está repartido." };
+      return { moneda, corte, porTramo, dominado };
     },
-  },
-  {
+    redactar: (m) => {
+      const fmt = (n: number) => fmtMoneda(n, m.moneda);
+      const procedencia: Procedencia = {
+        modelo: "facturas → calcularAging(dataset, corte)",
+        filtro: "tramos con total > 0; se excluye el tramo «actual»",
+        corte: m.corte,
+      };
+      if (m.dominado) {
+        const x = m.dominado;
+        return {
+          estado: "hallazgo",
+          texto: `${x.numero} es el ${Math.round(x.part)}% del tramo ${x.bucket} (${fmt(x.mayorSaldo)} de ${fmt(x.total)}). El tramo describe una factura, no una tendencia.`,
+          evidencia: {
+            expresion: "mayor saldo del tramo ÷ total del tramo · umbral 60%",
+            entradas: [
+              { nombre: "tramo", valor: x.bucket },
+              { nombre: "mayor saldo del tramo", valor: x.mayorSaldo, unidad: m.moneda },
+              { nombre: "total del tramo", valor: x.total, unidad: m.moneda },
+              { nombre: "participación", valor: x.part, unidad: "%" },
+              { nombre: "umbral", valor: 60, unidad: "%" },
+            ],
+            procedencia,
+          },
+          ranking: x.ranking,
+        };
+      }
+      return {
+        estado: "sin-hallazgo",
+        texto: "Ningún tramo está dominado por una sola factura. El atraso está repartido.",
+        evidencia: {
+          expresion: "mayor saldo del tramo ÷ total del tramo · umbral 60%",
+          entradas: [
+            ...m.porTramo.map((t) => ({
+              nombre: `participación del mayor en ${t.bucket}`,
+              valor: t.part,
+              unidad: "%",
+            })),
+            { nombre: "umbral", valor: 60, unidad: "%" },
+          ],
+          procedencia,
+        },
+      };
+    },
+  }),
+  definirAgente<{ moneda: Moneda; corte: string; c: ResultadoConcentracion }>({
     id: "balanza",
     glifo: "⚖",
     nombre: "Balanza",
     pregunta: "¿Un cliente concentra el riesgo?",
     base: "mayor saldo por cliente ÷ saldo total · umbral 35%",
-    mirar: (d, corte) => {
-      const moneda = d.fuente === "odoo-real" ? "GTQ" : "USD";
+    medir: (d, corte) => ({ moneda: monedaDe(d), corte, c: concentracionRiesgo(d, corte) }),
+    redactar: ({ moneda, corte, c }) => {
       const fmt = (n: number) => fmtMoneda(n, moneda);
-      const c = concentracionRiesgo(d, corte);
+      const procedencia: Procedencia = {
+        modelo: "facturas → concentracionRiesgo(dataset, corte)",
+        filtro: "incluye el saldo no clasificable: la deuda sin fecha sigue siendo riesgo de quien la debe",
+        corte,
+      };
+      // `porCliente` ya venía ordenado de mayor a menor y con su pct calculado.
+      // Antes se descartaba entero y sólo se usaba `mayorCliente`.
+      const ranking: Ranking = {
+        total: c.saldoTotal,
+        unidad: moneda,
+        filas: c.porCliente.slice(0, 10).map((x) => ({
+          id: x.id_cliente,
+          etiqueta: x.nombre,
+          valor: x.saldo,
+          pct: x.pct,
+        })),
+      };
+      const entradas: EntradaEvidencia[] = [
+        { nombre: "mayor saldo por cliente", valor: c.mayorCliente?.saldo ?? 0, unidad: moneda },
+        { nombre: "saldo total", valor: c.saldoTotal, unidad: moneda },
+        { nombre: "concentración", valor: c.mayorPct ?? 0, unidad: "%" },
+        { nombre: "umbral", valor: 35, unidad: "%" },
+        { nombre: "clientes con saldo", valor: c.porCliente.length },
+      ];
       if ((c.mayorPct ?? 0) >= 35) {
         return {
-          hay: true,
+          estado: "hallazgo",
           texto: `${c.mayorCliente?.nombre} tiene el ${c.mayorPct}% de la cartera (${fmt(c.mayorCliente?.saldo ?? 0)} de ${fmt(c.saldoTotal)}). El promedio lo describe a él, no al conjunto.`,
+          evidencia: { expresion: "mayor saldo por cliente ÷ saldo total · umbral 35%", entradas, procedencia },
+          ranking,
         };
       }
-      return { hay: false, texto: `Mayor cliente: ${c.mayorPct}%, bajo el umbral de 35%. Nadie concentra el riesgo.` };
+      return {
+        estado: "sin-hallazgo",
+        texto: `Mayor cliente: ${c.mayorPct}%, bajo el umbral de 35%. Nadie concentra el riesgo.`,
+        evidencia: { expresion: "mayor saldo por cliente ÷ saldo total · umbral 35%", entradas, procedencia },
+        ranking,
+      };
     },
-  },
-  {
+  }),
+  definirAgente<{ moneda: Moneda; corte: string; dso: ResultadoDso; ant: ResultadoAntiguedad }>({
     id: "cronometro",
     glifo: "◷",
     nombre: "Cronómetro",
     pregunta: "¿El promedio simple esconde facturas grandes y viejas?",
     base: "Σ(saldo × días) ÷ Σ(saldo) contra promedio simple · brecha ≥ 3 d",
-    mirar: (d, corte) => {
-      const dso = calcularDso(d, corte);
-      const ant = antiguedadPonderada(d, corte);
+    medir: (d, corte) => ({
+      moneda: monedaDe(d),
+      corte,
+      dso: calcularDso(d, corte),
+      ant: antiguedadPonderada(d, corte),
+    }),
+    redactar: ({ moneda, corte, dso, ant }) => {
+      // ÉSTE es el caso (c) del comentario de arriba: no es que el agente haya
+      // mirado y no encontrara nada — es que NO PUDO MIRAR. Sin facturas
+      // clasificadas no hay antigüedad que promediar. Con el tipo viejo esto
+      // devolvía `hay: false` y la ventana lo anunciaba como "el agente miró y
+      // no encontró", que era falso.
       if (ant.ponderada === null || ant.simple === null) {
-        return { hay: false, texto: "No hay facturas clasificadas: la antigüedad no se puede promediar. No se inventa un valor." };
+        return {
+          estado: "sin-dato",
+          queFalta: "No hay ninguna factura clasificada en el aging al corte declarado: sin facturas con saldo y fecha de vencimiento, no hay antigüedad que promediar.",
+          consecuencia: "No se puede decir si el promedio simple esconde facturas grandes y viejas. No se inventa un valor: un promedio sobre cero facturas no es 0 días, es ninguna respuesta.",
+          comoSeLlena: "Con facturas abiertas con fecha de vencimiento al corte. Si las hay en Odoo y acá no aparecen, el problema es de importación, no de cálculo: revisar scripts/importar-facturas-odoo.mjs y el corte usado.",
+        };
       }
       const brecha = Math.abs(ant.ponderada - ant.simple);
-      const conDso = dso.dso === null ? "DSO no calculable (no hubo facturación en la ventana)" : `DSO ${dso.dso.toFixed(2)} d`;
+      const conDso =
+        dso.dso === null ? "DSO no calculable (no hubo facturación en la ventana)" : `DSO ${dso.dso.toFixed(2)} d`;
+      const procedencia: Procedencia = {
+        modelo: "facturas → antiguedadPonderada() y calcularDso()",
+        filtro: "sólo facturas clasificadas en el aging (con saldo y fecha de vencimiento)",
+        corte,
+      };
+      const entradas: EntradaEvidencia[] = [
+        { nombre: "antigüedad ponderada", valor: Number(ant.ponderada.toFixed(2)), unidad: "d" },
+        { nombre: "promedio simple", valor: Number(ant.simple.toFixed(2)), unidad: "d" },
+        { nombre: "brecha", valor: Number(brecha.toFixed(2)), unidad: "d" },
+        { nombre: "umbral", valor: 3, unidad: "d" },
+        { nombre: "Σ(saldo × días)", valor: ant.totalPonderado },
+        { nombre: "Σ(saldo)", valor: ant.saldoTotal, unidad: moneda },
+        { nombre: "facturas clasificadas", valor: ant.filas.length },
+        { nombre: "DSO", valor: dso.dso === null ? "no calculable" : Number(dso.dso.toFixed(2)), unidad: "d" },
+      ];
+      // `ant.filas` ya traía cada factura con su saldo, sus días y su aporte
+      // saldo×días. El agente lo descartaba entero.
+      const ranking: Ranking = {
+        total: ant.totalPonderado,
+        unidad: `${moneda}×d`,
+        filas: [...ant.filas]
+          .sort((x, y) => y.aporte - x.aporte)
+          .slice(0, 10)
+          .map((f) => ({
+            id: f.id_factura,
+            etiqueta: `${f.numero} · ${f.dias} d`,
+            valor: f.aporte,
+            pct: ant.totalPonderado > 0 ? (f.aporte / ant.totalPonderado) * 100 : 0,
+          })),
+      };
       if (brecha >= 3) {
         // El signo de (ponderada − simple) importa: ponderar por saldo le da
         // más peso a las facturas grandes. Si eso SUBE el promedio,
@@ -111,32 +390,69 @@ const AGENTES: Agente[] = [
           ? "Las facturas grandes son más viejas que las chicas."
           : "Las facturas chicas son más viejas que las grandes — el saldo grande está concentrado en lo más reciente.";
         return {
-          hay: true,
+          estado: "hallazgo",
           texto: `Ponderada ${ant.ponderada.toFixed(2)} d contra promedio simple ${ant.simple.toFixed(2)} d: ${brecha.toFixed(2)} días de brecha. ${lectura} ${conDso}.`,
+          evidencia: { expresion: "Σ(saldo × días) ÷ Σ(saldo) contra promedio simple · brecha ≥ 3 d", entradas, procedencia },
+          ranking,
         };
       }
-      return { hay: false, texto: `Ponderada ${ant.ponderada.toFixed(2)} d y promedio simple ${ant.simple.toFixed(2)} d casi coinciden: el tamaño no distorsiona la antigüedad.` };
+      return {
+        estado: "sin-hallazgo",
+        texto: `Ponderada ${ant.ponderada.toFixed(2)} d y promedio simple ${ant.simple.toFixed(2)} d casi coinciden: el tamaño no distorsiona la antigüedad.`,
+        evidencia: { expresion: "Σ(saldo × días) ÷ Σ(saldo) contra promedio simple · brecha ≥ 3 d", entradas, procedencia },
+        ranking,
+      };
     },
-  },
-  {
+  }),
+  definirAgente<{ moneda: Moneda; corte: string; a: ResultadoAging }>({
     id: "sello",
     glifo: "✓",
     nombre: "Sello",
     pregunta: "¿Hay saldo que el aging no puede clasificar?",
     base: "facturas con saldo y sin fecha de vencimiento",
-    mirar: (d, corte) => {
-      const moneda = d.fuente === "odoo-real" ? "GTQ" : "USD";
+    medir: (d, corte) => ({ moneda: monedaDe(d), corte, a: calcularAging(d, corte) }),
+    redactar: ({ moneda, corte, a }) => {
       const fmt = (n: number) => fmtMoneda(n, moneda);
-      const a = calcularAging(d, corte);
+      const procedencia: Procedencia = {
+        modelo: "facturas → calcularAging(dataset, corte).excluidas",
+        filtro: "facturas con saldo > 0 y fecha_vencimiento nula; nunca se inventa una fecha",
+        corte,
+      };
+      const entradas: EntradaEvidencia[] = [
+        { nombre: "saldo no clasificable", valor: a.saldoNoClasificable, unidad: moneda },
+        { nombre: "facturas fuera del aging", valor: a.excluidas.length },
+        { nombre: "saldo clasificado", valor: a.totalClasificado, unidad: moneda },
+        { nombre: "facturas clasificadas", valor: a.clasificadas.length },
+      ];
       if (a.saldoNoClasificable > 0) {
+        // `excluidas` ya estaba calculada: se usaba sólo para contar `.length`.
+        const ranking: Ranking = {
+          total: a.saldoNoClasificable,
+          unidad: moneda,
+          filas: [...a.excluidas]
+            .sort((x, y) => y.saldo - x.saldo)
+            .slice(0, 10)
+            .map((e) => ({
+              id: e.factura.id_factura,
+              etiqueta: e.factura.numero_factura,
+              valor: e.saldo,
+              pct: a.saldoNoClasificable > 0 ? (e.saldo / a.saldoNoClasificable) * 100 : 0,
+            })),
+        };
         return {
-          hay: true,
+          estado: "hallazgo",
           texto: `${fmt(a.saldoNoClasificable)} quedan FUERA del aging por fecha de vencimiento faltante (${a.excluidas.length} factura(s)). No se les inventa una fecha: se las declara.`,
+          evidencia: { expresion: "facturas con saldo y sin fecha de vencimiento", entradas, procedencia },
+          ranking,
         };
       }
-      return { hay: false, texto: "Todas las facturas con saldo tienen fecha de vencimiento. Nada queda fuera del aging." };
+      return {
+        estado: "sin-hallazgo",
+        texto: "Todas las facturas con saldo tienen fecha de vencimiento. Nada queda fuera del aging.",
+        evidencia: { expresion: "facturas con saldo y sin fecha de vencimiento", entradas, procedencia },
+      };
     },
-  },
+  }),
 ];
 
 // ── Agentes propios de cada módulo nuevo (paso M6 de la reestructuración) ──
@@ -623,9 +939,54 @@ export const NUM_AGENTES = AGENTES.length;
  *  frase dentro de la franja, donde rompía la alineación de la fila.
  *  `agentes` es opcional — sin él sigue contando sobre AGENTES (cartera),
  *  igual que siempre; cada módulo nuevo pasa su propia lista. */
+/** El vocabulario visual de los TRES estados, en un solo lugar, para que la
+ *  ficha y la ventana no puedan discrepar entre sí.
+ *
+ *  "sin dato" es azul frío y lleva "?": tenía que verse distinto de los otros
+ *  dos y no parecerse a una alarma, porque no es un error del sistema — es una
+ *  ausencia del dato. Un gris más lo habría vuelto a confundir con
+ *  "sin hallazgo", que es justamente lo que se está separando. */
+const PINTA: Record<
+  Hallazgo["estado"],
+  { anillo: string; insignia: string; glifo: string; etiqueta: string; fondoPastilla: string; textoPastilla: string }
+> = {
+  hallazgo: {
+    anillo: "#c2703a",
+    insignia: "#c2703a",
+    glifo: "!",
+    etiqueta: "hallazgo",
+    fondoPastilla: "rgba(194,112,58,.12)",
+    textoPastilla: "#a4551f",
+  },
+  "sin-hallazgo": {
+    anillo: "#c6cad2",
+    insignia: "#a8adb6",
+    glifo: "·",
+    etiqueta: "sin hallazgo",
+    fondoPastilla: "rgba(22,24,29,.06)",
+    textoPastilla: "#6b6f78",
+  },
+  "sin-dato": {
+    anillo: "#5b7a99",
+    insignia: "#5b7a99",
+    glifo: "?",
+    etiqueta: "sin dato",
+    fondoPastilla: "rgba(91,122,153,.14)",
+    textoPastilla: "#3f5a75",
+  },
+};
+
 export function contarHallazgos(dataset: Dataset, fechaCorte: string, agentes: Agente[] = AGENTES) {
+  // TRES conteos, no dos. Antes `con` contaba `.hay` y todo lo demás caía en el
+  // resto por descarte, mezclando "miró y no había" con "no pudo mirar". Son
+  // cosas distintas y se informan por separado: un agente sin dato NO es un
+  // hallazgo, pero tampoco es evidencia de que no haya nada. Contarlo como si
+  // lo fuera es afirmar tranquilidad donde sólo hay ceguera.
+  const estados = agentes.map((a) => normalizarHallazgo(a.mirar(dataset, fechaCorte), a, fechaCorte).estado);
   return {
-    con: agentes.filter((a) => a.mirar(dataset, fechaCorte).hay).length,
+    con: estados.filter((e) => e === "hallazgo").length,
+    sinHallazgo: estados.filter((e) => e === "sin-hallazgo").length,
+    sinDato: estados.filter((e) => e === "sin-dato").length,
     total: agentes.length,
   };
 }
@@ -643,7 +1004,13 @@ export function FilaAgentes({
   fechaCorte: string;
   agentes?: Agente[];
 }) {
-  const vistos = agentes.map((a) => ({ agente: a, hallazgo: a.mirar(dataset, fechaCorte) }));
+  // Se normaliza en el borde: de acá para adentro todo es el tipo de tres
+  // estados, venga de un agente migrado o de uno que todavía devuelve la forma
+  // vieja.
+  const vistos = agentes.map((a) => ({
+    agente: a,
+    hallazgo: normalizarHallazgo(a.mirar(dataset, fechaCorte), a, fechaCorte),
+  }));
 
   // Arranca cerrado: ahora el resultado abre una ventana sobre el tablero, y
   // abrirla sola al entrar sería tapar la pantalla sin que nadie lo pidiera.
@@ -672,9 +1039,9 @@ export function FilaAgentes({
                 title={`${agente.nombre} — ${agente.pregunta}`}
                 className="relative grid h-11 w-11 place-items-center rounded-full bg-white text-[16px] transition hover:z-10 hover:-translate-y-0.5 focus:outline-none focus-visible:-translate-y-0.5"
                 style={{
-                  // El anillo dice si ESE agente encontró algo, no es adorno.
+                  // El anillo dice en cuál de los TRES estados quedó ESE agente.
                   boxShadow: `0 0 0 2px #ffffff, 0 0 0 ${activo ? 4 : 3.5}px ${
-                    hallazgo.hay ? "#c2703a" : "#c6cad2"
+                    PINTA[hallazgo.estado].anillo
                   }, 0 ${activo ? 10 : 4}px ${activo ? 20 : 10}px -8px rgba(22,24,29,.35)`,
                   transform: activo ? "translateY(-2px)" : undefined,
                   zIndex: activo ? 20 : undefined,
@@ -684,9 +1051,9 @@ export function FilaAgentes({
                 <span
                   aria-hidden
                   className="absolute -bottom-0.5 -right-0.5 grid h-[15px] w-[15px] place-items-center rounded-full text-[9px] font-bold text-white"
-                  style={{ background: hallazgo.hay ? "#c2703a" : "#a8adb6", boxShadow: "0 0 0 1.5px #fff" }}
+                  style={{ background: PINTA[hallazgo.estado].insignia, boxShadow: "0 0 0 1.5px #fff" }}
                 >
-                  {hallazgo.hay ? "!" : "·"}
+                  {PINTA[hallazgo.estado].glifo}
                 </span>
               </button>
             );
@@ -799,13 +1166,12 @@ function VentanaAgente({
           </div>
           <span
             className="mt-0.5 shrink-0 rounded-pastilla px-2.5 py-1 text-[10px] font-semibold"
-            style={
-              hallazgo.hay
-                ? { background: "rgba(194,112,58,.12)", color: "#a4551f" }
-                : { background: "rgba(22,24,29,.06)", color: "#6b6f78" }
-            }
+            style={{
+              background: PINTA[hallazgo.estado].fondoPastilla,
+              color: PINTA[hallazgo.estado].textoPastilla,
+            }}
           >
-            {hallazgo.hay ? "hallazgo" : "sin hallazgo"}
+            {PINTA[hallazgo.estado].etiqueta}
           </span>
           <button
             onPointerDown={(e) => e.stopPropagation()}
@@ -817,25 +1183,185 @@ function VentanaAgente({
           </button>
         </div>
 
-        <div className="px-5 pb-5">
-          <p className="text-[13.5px] leading-relaxed text-tinta">{hallazgo.texto}</p>
+        <div className="max-h-[70vh] overflow-y-auto px-5 pb-5">
+          {hallazgo.estado === "sin-dato" ? (
+            <BloqueSinDato hallazgo={hallazgo} base={agente.base} />
+          ) : (
+            <>
+              <p className="text-[13.5px] leading-relaxed text-tinta">{hallazgo.texto}</p>
 
-          {/* La base a la vista: quien discuta el resultado, discute esta línea
-              y no el color de la ficha. */}
-          <p className="mt-3.5 inline-block rounded-[9px] bg-[rgba(22,24,29,.04)] px-2.5 py-1.5 font-mono text-[10.5px] text-[#7c808a]">
-            {agente.base}
-          </p>
+              {/* La base a la vista: quien discuta el resultado, discute esta línea
+                  y no el color de la ficha. Ahora además con los VALORES que
+                  entraron, que antes se calculaban y se tiraban. */}
+              <BloqueFormula evidencia={hallazgo.evidencia} />
+
+              {"ranking" in hallazgo && hallazgo.ranking ? (
+                <TablaRanking ranking={hallazgo.ranking} />
+              ) : null}
+
+              <BloqueProcedencia procedencia={hallazgo.evidencia.procedencia} />
+            </>
+          )}
 
           <p className="mt-3 text-[10.5px] leading-relaxed text-[#a0a2a6]">
-            {hallazgo.hay
+            {hallazgo.estado === "hallazgo"
               ? "Derivado del dataset al corte"
-              : "Sin hallazgo — y vale igual: el agente miró y no encontró"}
+              : hallazgo.estado === "sin-hallazgo"
+              ? "Sin hallazgo — y vale igual: el agente miró y no encontró"
+              : "Sin dato — el agente NO pudo mirar. Esto NO es evidencia de que no haya nada"}
             {" · "}corte {fechaCorte} · umbrales 🟡 pendientes de validación por Finanzas
             <br />
             Arrastrá desde el encabezado para moverla · Esc o clic fuera para cerrar
           </p>
         </div>
       </div>
+    </div>
+  );
+}
+
+// ── Las piezas del drill-down ─────────────────────────────────────────────
+//
+// No son un componente nuevo ni una ventana nueva: son el interior de la
+// ventana que ya existía. El fondo, el arrastre y el velo no se tocan.
+
+/** Un valor con su unidad. El dinero se formatea como dinero; lo demás, no. */
+function valorConUnidad(valor: number | string, unidad?: string): string {
+  if (typeof valor === "string") return unidad ? `${valor} ${unidad}` : valor;
+  if (unidad === "GTQ" || unidad === "USD") return fmtMoneda(valor, unidad);
+  const n = Number.isInteger(valor) ? valor.toLocaleString("es-GT") : valor.toLocaleString("es-GT", { maximumFractionDigits: 2 });
+  return unidad ? `${n} ${unidad}` : n;
+}
+
+/** La fórmula CON sus entradas. Antes sólo se mostraba la expresión: los
+ *  números que entraban en ella se calculaban y se descartaban, así que quien
+ *  quería auditar el resultado tenía que abrir el código. */
+function BloqueFormula({ evidencia }: { evidencia: Evidencia }) {
+  return (
+    <div className="mt-3.5">
+      <p className="inline-block rounded-[9px] bg-[rgba(22,24,29,.04)] px-2.5 py-1.5 font-mono text-[10.5px] text-[#7c808a]">
+        {evidencia.expresion}
+      </p>
+      {evidencia.entradas.length === 0 ? (
+        <p className="mt-2 text-[10.5px] leading-relaxed text-[#a0a2a6]">
+          Entradas no declaradas todavía: este agente aún no separa medición de
+          redacción. No se inventan — se declara que faltan.
+        </p>
+      ) : (
+        <dl className="mt-2 grid grid-cols-[1fr_auto] gap-x-4 gap-y-1">
+          {evidencia.entradas.map((e) => (
+            <div key={e.nombre} className="contents">
+              <dt className="text-[11px] text-[#7c808a]">{e.nombre}</dt>
+              <dd className="text-right font-mono text-[11px] tabular-nums text-tinta">
+                {valorConUnidad(e.valor, e.unidad)}
+              </dd>
+            </div>
+          ))}
+        </dl>
+      )}
+    </div>
+  );
+}
+
+/** El ranking. Sólo aparece cuando el agente lo tiene: una pregunta de conteo
+ *  ("¿hay facturas sin cliente?") no admite un top N, y fabricarle uno sería
+ *  inventar un orden donde no lo hay. */
+function TablaRanking({ ranking }: { ranking: Ranking }) {
+  if (ranking.filas.length === 0) return null;
+  return (
+    <div className="mt-3.5">
+      <p className="text-[10.5px] font-semibold uppercase tracking-wide text-[#8b8f98]">
+        Las {ranking.filas.length} mayores · sobre {valorConUnidad(ranking.total, ranking.unidad)}
+      </p>
+      <ul className="mt-1.5 space-y-1">
+        {ranking.filas.map((f) => (
+          <li key={f.id} className="grid grid-cols-[1fr_auto_auto] items-center gap-2">
+            <span className="truncate text-[11.5px] text-tinta" title={f.etiqueta}>
+              {f.etiqueta}
+            </span>
+            <span className="font-mono text-[11px] tabular-nums text-[#6b6f78]">
+              {valorConUnidad(f.valor, ranking.unidad)}
+            </span>
+            <span className="w-[46px] text-right font-mono text-[11px] tabular-nums text-[#8b8f98]">
+              {f.pct.toFixed(1)}%
+            </span>
+            <span className="col-span-3 h-[3px] rounded-full bg-[rgba(22,24,29,.06)]">
+              <span
+                className="block h-full rounded-full bg-[#c2703a]"
+                style={{ width: `${Math.max(0, Math.min(100, f.pct))}%` }}
+              />
+            </span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+/** De dónde vino el número. Sin esto, la fórmula flota. */
+function BloqueProcedencia({ procedencia }: { procedencia: Procedencia }) {
+  return (
+    <div className="mt-3.5 rounded-[9px] border border-[rgba(22,24,29,.07)] px-2.5 py-2">
+      <p className="text-[10.5px] font-semibold uppercase tracking-wide text-[#8b8f98]">Procedencia</p>
+      <dl className="mt-1 space-y-0.5 text-[11px] leading-relaxed">
+        <div className="flex gap-2">
+          <dt className="shrink-0 text-[#a0a2a6]">origen</dt>
+          <dd className="text-[#6b6f78]">{procedencia.modelo}</dd>
+        </div>
+        <div className="flex gap-2">
+          <dt className="shrink-0 text-[#a0a2a6]">filtro</dt>
+          <dd className="text-[#6b6f78]">{procedencia.filtro}</dd>
+        </div>
+        <div className="flex gap-2">
+          <dt className="shrink-0 text-[#a0a2a6]">corte</dt>
+          <dd className="font-mono text-[#6b6f78]">{procedencia.corte}</dd>
+        </div>
+        {procedencia.enlace ? (
+          <div className="flex gap-2">
+            <dt className="shrink-0 text-[#a0a2a6]">ver</dt>
+            <dd>
+              <a className="text-[#a4551f] underline" href={procedencia.enlace}>
+                {procedencia.enlace}
+              </a>
+            </dd>
+          </div>
+        ) : null}
+      </dl>
+    </div>
+  );
+}
+
+/** El tercer estado. No dice qué encontró: dice qué NO pudo mirar, qué se
+ *  pierde por eso, y cómo se llena. Los tres son obligatorios en el tipo
+ *  justamente para que esta pantalla nunca pueda quedar a medias. */
+function BloqueSinDato({
+  hallazgo,
+  base,
+}: {
+  hallazgo: Extract<Hallazgo, { estado: "sin-dato" }>;
+  base: string;
+}) {
+  const filas: { rotulo: string; texto: string }[] = [
+    { rotulo: "Qué falta", texto: hallazgo.queFalta },
+    { rotulo: "Qué se pierde", texto: hallazgo.consecuencia },
+    { rotulo: "Cómo se llena", texto: hallazgo.comoSeLlena },
+  ];
+  return (
+    <div>
+      <p className="text-[13.5px] leading-relaxed text-tinta">
+        El agente <b>no pudo mirar</b>. Esto no es un &quot;no hay nada&quot;: es que la
+        pregunta no se pudo responder con el dato disponible.
+      </p>
+      <div className="mt-3 space-y-2.5">
+        {filas.map((f) => (
+          <div key={f.rotulo}>
+            <p className="text-[10.5px] font-semibold uppercase tracking-wide text-[#3f5a75]">{f.rotulo}</p>
+            <p className="mt-0.5 text-[12px] leading-relaxed text-[#6b6f78]">{f.texto}</p>
+          </div>
+        ))}
+      </div>
+      <p className="mt-3.5 inline-block rounded-[9px] bg-[rgba(22,24,29,.04)] px-2.5 py-1.5 font-mono text-[10.5px] text-[#7c808a]">
+        {base}
+      </p>
     </div>
   );
 }
