@@ -727,39 +727,39 @@ export function argumentoVentas(dataset: Dataset): Argumento | null {
       dato: mayorVenta
         ? `${d(mayorVenta.total)} de ${d(totalVendido)} vendidos en ${ventas.length} venta(s)`
         : "—",
-      porque: "El total vendido es una suma: no dice si nace de muchas ventas parejas o de una sola grande.",
+      porque: "El vendido a precio de lista es una suma: no dice si nace de muchas ventas parejas o de una sola grande.",
       barras: ventas
         .slice(0, 4)
         .map((v) => ({ etiqueta: v.id_venta, valor: v.total, destacada: mayorVenta ? v.id_venta === mayorVenta.id_venta : false })),
     },
     {
       id: "v3",
-      fase: "¿El margen se concentra en una venta?",
+      fase: "¿La diferencia lista−costo se concentra en una venta?",
       tipo: margenConcentrado ? "hallazgo" : "premisa",
-      rotulo: margenConcentrado ? `${mayorMargen!.id_venta} · ${Math.round(pctMayorMargen)}%` : "Margen repartido",
+      rotulo: margenConcentrado ? `${mayorMargen!.id_venta} · ${Math.round(pctMayorMargen)}%` : "Diferencia repartida",
       titulo: margenConcentrado
-        ? `${mayorMargen!.id_venta} aporta el ${Math.round(pctMayorMargen)}% del margen bruto`
-        : "El margen bruto está repartido entre varias ventas",
-      dato: mayorMargen ? `${d(mayorMargen.margen)} de ${d(margenTotal)} de margen total` : "—",
+        ? `${mayorMargen!.id_venta} aporta el ${Math.round(pctMayorMargen)}% de la diferencia lista−costo`
+        : "La diferencia lista−costo está repartida entre varias ventas",
+      dato: mayorMargen ? `${d(mayorMargen.margen)} de ${d(margenTotal)} — no es margen: el descuento no está en el export` : "—",
       porque: margenConcentrado
-        ? `El margen total (${d(margenTotal)}) esconde que una sola venta sostiene la mayor parte: perderla pesa más que el promedio sugiere.`
-        : "Sin una venta dominante, el margen depende del conjunto y no de una operación puntual.",
+        ? `El total (${d(margenTotal)}) esconde que una sola venta sostiene la mayor parte: perderla pesa más que el promedio sugiere. Con el descuento ausente esta cifra está sobrestimada, pero la CONCENTRACIÓN sí es informativa: el sesgo es proporcional.`
+        : "Sin una venta dominante, la diferencia depende del conjunto y no de una operación puntual.",
     },
     {
       id: "vconclusion",
       fase: "Conclusión",
       tipo: "conclusion",
-      rotulo: !cuadre.cuadra ? "Revisar la cadena" : margenConcentrado ? `Cuidar ${mayorMargen!.id_venta}` : "Cartera de ventas sana",
+      rotulo: !cuadre.cuadra ? "Explicar la diferencia" : margenConcentrado ? `Cuidar ${mayorMargen!.id_venta}` : "Cartera de ventas sana",
       titulo: !cuadre.cuadra
-        ? "Revisar la cadena Ventas↔Inventario↔CxC antes que el total vendido"
+        ? "Explicar la diferencia vendido↔facturado antes que cualquier otra lectura"
         : margenConcentrado
-        ? `${mayorMargen!.id_venta} sostiene el margen: cuidar esa relación antes que el promedio`
-        : "Vendido, facturado y margen no dependen de un caso puntual",
+        ? `${mayorMargen!.id_venta} concentra la diferencia lista−costo: cuidar esa relación antes que el promedio`
+        : "Vendido y facturado no dependen de un caso puntual",
       dato: !cuadre.cuadra
-        ? `descuadre de ${d(Math.abs(cuadre.diferencia))}`
+        ? `diferencia de ${d(Math.abs(cuadre.diferencia))} entre dos poblaciones sin vínculo en el export`
         : margenConcentrado
-        ? `${mayorMargen!.id_venta}: ${d(mayorMargen!.margen)} de margen`
-        : `${ventas.length} venta(s), ninguna domina el margen`,
+        ? `${mayorMargen!.id_venta}: ${d(mayorMargen!.margen)} de diferencia lista−costo`
+        : `${ventas.length} venta(s), ninguna domina la diferencia`,
       porque:
         cuadre.cuadra && !margenConcentrado
           ? "Conclusión negativa y vale igual: no hay una venta ni un descuadre que exija acción hoy."
@@ -768,13 +768,18 @@ export function argumentoVentas(dataset: Dataset): Argumento | null {
   ];
 
   return {
-    titular: "Total vendido",
+    // OJO: este titular sale de las LÍNEAS (capa composición). El total vendido
+    // de la página sale de la referencia de Odoo (capa hecho) y es otro número.
+    // Llamar "total vendido" a los dos ponía dos cifras distintas con el mismo
+    // nombre en la misma pantalla, que es el error de unidad de análisis que
+    // este proyecto ya pagó caro una vez.
+    titular: "Vendido a precio de lista",
     valorTitular: d(totalVendido),
     lecturaIngenua:
-      "Leído solo, el total vendido sugiere una cartera de ventas pareja, sin saber si depende de una sola operación.",
+      "Leído solo, el vendido a precio de lista sugiere una cartera de ventas pareja, sin saber si depende de una sola operación. Y no es lo vendido: el export no trae descuento.",
     etapas,
     accion: !cuadre.cuadra
-      ? `Investigar el descuadre de ${d(Math.abs(cuadre.diferencia))}`
+      ? `Pedir el descuento de sale.order.line y el vínculo venta↔factura antes de interpretar la diferencia de ${d(Math.abs(cuadre.diferencia))}`
       : margenConcentrado
       ? `Dar seguimiento a la venta ${mayorMargen!.id_venta} (${mayorVenta?.cliente ?? ""})`
       : "Sin acción puntual pendiente",

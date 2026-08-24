@@ -168,7 +168,7 @@ export default function PaginaVentas() {
             {cuadre.cuadra ? (
               <>✓ <b>Ventas y facturación cuadran</b> — vendido {fmt(cuadre.totalVendido)} = facturado {fmt(cuadre.totalFacturado)}.</>
             ) : (
-              <>✗ <b>DESCUADRE de {fmt(Math.abs(cuadre.diferencia))}</b> — vendido {fmt(cuadre.totalVendido)} contra facturado {fmt(cuadre.totalFacturado)}. La cadena se rompió: hay ventas sin factura o facturas sin venta.</>
+              <>✗ <b>DIFERENCIA de {fmt(Math.abs(cuadre.diferencia))}</b> — vendido a precio de lista {fmt(cuadre.totalVendido)} contra facturado {fmt(cuadre.totalFacturado)}. No se sigue de acá que la cadena esté rota: son dos poblaciones distintas (pedidos y facturas) comparadas por agregado, y el vínculo venta↔factura no viene en el export, así que nadie puede emparejarlas. Buena parte de esta diferencia es el descuento ausente del lado vendido.</>
             )}
           </div>
 

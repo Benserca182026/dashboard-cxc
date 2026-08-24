@@ -20,8 +20,8 @@
 import { usePathname } from "next/navigation";
 
 const PENDIENTES = [
-  "Ventas: el total mostrado está por encima del real de Odoo (Q26,285,671.61 contra Q19,671,235.56). Falta restar la columna Descuento.",
-  "Inventario: la variación y las recomendaciones de reposición no son confiables. Falta el export de stock.quant.",
+  "Ventas: el total vendido ya sale de la referencia de Odoo y es confiable. Lo que no lo es todavía es el detalle por línea: sin la columna Descuento suma a precio de lista, y por eso la página muestra la brecha medida en vez de esconderla.",
+  "Inventario: la variación y las recomendaciones de reposición no son confiables. La existencia es flujo neto de la ventana exportada, sin saldo inicial, y el mínimo está en cero para los 751 productos. Faltan stock.quant y stock.warehouse.orderpoint.",
 ];
 
 export function AvisoPreliminar() {
@@ -48,8 +48,10 @@ export function AvisoPreliminar() {
         ))}
       </ul>
       <p className="mt-2 text-[12px] text-[#7c808a]">
-        No tomes decisiones sobre estos dos módulos hasta que se retire este
-        aviso. La moneda ya está correcta: todos los montos son quetzales.
+        Inventario no sostiene ninguna decisión hasta que se retire este aviso.
+        En Ventas, el total sí: lo que no sostiene decisiones es el detalle por
+        línea, rotulado en la página como &quot;a precio de lista&quot;. La moneda ya
+        está correcta: todos los montos son quetzales.
       </p>
     </aside>
   );
