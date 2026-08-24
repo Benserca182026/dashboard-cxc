@@ -9,7 +9,7 @@ import {
   BannerFicticioPremium,
   PanelAging,
 } from "@/components/ResumenPremium";
-import { calcularAging, fmtMoneda } from "@/lib/calculos";
+import { calcularAging } from "@/lib/calculos";
 import { concentracionRiesgo } from "@/lib/kpis";
 import { BUCKETS } from "@/lib/types";
 import { useApp } from "@/lib/store";
@@ -20,7 +20,7 @@ import { Encabezado } from "@/components/Encabezado";
 import { FilaAgentes } from "@/components/Agentes";
 
 export default function PaginaResumen() {
-  const { dataset, cargando, fechaCorte } = useApp();
+  const { dataset, cargando, fechaCorte, fmt } = useApp();
 
   if (cargando) return <SkeletonPagina />;
 
@@ -41,8 +41,10 @@ export default function PaginaResumen() {
   // todavía". Se muestra distinto para no confundir una cosa con la otra
   // (hallazgo confirmado por verificación 2026-08-19).
   const sinDatosDisputa = dataset.fuente === "odoo-real";
-  const moneda = dataset.fuente === "odoo-real" ? "GTQ" : "USD";
-  const fmt = (n: number) => fmtMoneda(n, moneda);
+  // El dinero lo pinta el formateador del store: es el ÚNICO lugar donde una
+  // cifra cambia de moneda, y lo hace al PINTAR. Todo lo de arriba (umbrales,
+  // porcentajes, comparaciones, cuadres) se calculó en la moneda de registro y
+  // no se entera de esta vista. Ver components/ControlMoneda.tsx.
 
   const SECCIONES = [
     { id: "sec-argumento", etiqueta: "El caso" },
@@ -79,14 +81,32 @@ export default function PaginaResumen() {
               valor: fmt(critico),
               pct: carteraTotal > 0 ? (critico / carteraTotal) * 100 : 0,
             },
+            // LA TARJETA QUE ANTES ERA MUDA. Decía "clientes con disputa · sin
+            // datos", ponía el literal "sin datos" como valor y —lo peor—
+            // mandaba pct: 0, con lo cual el anillo dibujaba un cero perfecto.
+            // Ese 0 no era un hueco: era una AFIRMACIÓN falsa, la de que
+            // ningún cliente tiene disputas. Ahora la tarjeta declara el hueco
+            // con los mismos tres campos que el popover de los agentes.
             {
-              etiqueta: sinDatosDisputa ? "clientes con disputa · sin datos" : "clientes con disputa",
-              valor: sinDatosDisputa ? "sin datos" : `${cuentasConDisputa} de ${dataset.clientes.length}`,
-              pct: sinDatosDisputa
-                ? 0
-                : dataset.clientes.length > 0
-                  ? (cuentasConDisputa / dataset.clientes.length) * 100
-                  : 0,
+              etiqueta: "clientes con disputa",
+              valor: sinDatosDisputa ? "" : `${cuentasConDisputa} de ${dataset.clientes.length}`,
+              ...(sinDatosDisputa
+                ? {
+                    sinDato: {
+                      queFalta:
+                        "La fuente de disputas. No está en Supabase, y el 2026-08-24 el Frente 1 confirmó que tampoco existe en Odoo: no hay modelo de disputa ni de reclamo.",
+                      consecuencia:
+                        "No se puede saber cuánta cartera está frenada por un reclamo. Un 0 acá afirmaría que no hay ninguno, que es distinto de no saberlo.",
+                      comoSeLlena:
+                        "Decidiendo primero dónde registrar los reclamos. El seguimiento de cobranza de Odoo (64 clientes) es lo más cercano, pero es gestión de cobro, no disputa.",
+                    },
+                  }
+                : {
+                    pct:
+                      dataset.clientes.length > 0
+                        ? (cuentasConDisputa / dataset.clientes.length) * 100
+                        : 0,
+                  }),
             },
           ]}
         />

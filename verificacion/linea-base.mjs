@@ -256,3 +256,15 @@ for (const p of pruebas) {
 console.log("\n" + "═".repeat(100));
 console.log(`RESULTADO: ${ok} pasan · ${pruebas.length - ok} fallan · de ${pruebas.length} pruebas corridas`);
 console.log("═".repeat(100));
+
+// Hasta 2026-08-24 este archivo imprimia "0 pasan · 15 fallan" y SALIA CON
+// CODIGO 0. Encadenado con `&&` en package.json, eso significaba que quince
+// comprobaciones en rojo se daban por buenas y no cortaban nada: fallaban en
+// silencio. Un fallo que no se ve no es una prueba.
+//
+// El codigo de salida ahora refleja lo que el propio informe acaba de decir.
+// Si esto pone el `npm test` en rojo, NO es una regresion: es la linea base
+// que siempre estuvo rota, ahora audible.
+if (ok < pruebas.length) {
+  process.exitCode = 1;
+}

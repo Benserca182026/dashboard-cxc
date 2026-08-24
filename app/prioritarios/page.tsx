@@ -16,7 +16,6 @@
 
 import { SkeletonPagina } from "@/components/Basicos";
 import { BannerFicticioPremium } from "@/components/ResumenPremium";
-import { fmtMoneda } from "@/lib/calculos";
 import { prioridadSimulada, SUPUESTOS_SCORING, type FilaPrioridad } from "@/lib/simulados";
 import { argumentoPrioritarios } from "@/lib/argumento";
 import { useApp } from "@/lib/store";
@@ -42,9 +41,11 @@ const SECCIONES = [
 ];
 
 export default function PaginaPrioritarios() {
-  const { dataset, cargando, fechaCorte } = useApp();
-  const moneda = dataset.fuente === "odoo-real" ? "GTQ" : "USD";
-  const fmt = (n: number) => fmtMoneda(n, moneda);
+  const { dataset, cargando, fechaCorte, fmt } = useApp();
+  // El dinero lo pinta el formateador del store: es el ÚNICO lugar donde una
+  // cifra cambia de moneda, y lo hace al PINTAR. Todo lo de arriba (umbrales,
+  // porcentajes, comparaciones, cuadres) se calculó en la moneda de registro y
+  // no se entera de esta vista. Ver components/ControlMoneda.tsx.
   const [busqueda, setBusqueda] = useState("");
   const [ordenPor, setOrdenPor] = useState<ClaveColumna | null>(null);
   const [direccion, setDireccion] = useState<DireccionOrden>(null);
@@ -178,16 +179,45 @@ export default function PaginaPrioritarios() {
               valor: `${filas.length} de ${totalClientes}`,
               pct: totalClientes > 0 ? (filas.length / totalClientes) * 100 : 0,
             },
-            {
-              etiqueta: "score del líder (simulado) · máx. 100",
-              valor: lider ? String(lider.scoreSimulado) : "—",
-              pct: lider?.scoreSimulado ?? 0,
-            },
-            {
-              etiqueta: "líder · del saldo priorizado",
-              valor: lider ? fmt(lider.saldoTotal) : "—",
-              pct: parteLider,
-            },
+            // Sin worklist no hay líder. El "—" con el anillo en 0% afirmaba un
+            // score de cero, que en esta escala es un valor legítimo — se leía
+            // como "hay un líder y su urgencia es nula", que es falso.
+            lider
+              ? {
+                  etiqueta: "score del líder (simulado) · máx. 100",
+                  valor: String(lider.scoreSimulado),
+                  pct: lider.scoreSimulado,
+                }
+              : {
+                  etiqueta: "score del líder (simulado) · máx. 100",
+                  valor: "",
+                  sinDato: {
+                    queFalta:
+                      "La worklist salió vacía al corte: no hay ninguna cuenta con saldo abierto, y por lo tanto no hay líder cuyo score mostrar.",
+                    consecuencia:
+                      "No hay urgencia que priorizar. Un score de 0 sobre 100 es un valor válido en esta escala, así que pintarlo afirmaría que existe una cuenta líder sin urgencia — y no existe ninguna cuenta.",
+                    comoSeLlena:
+                      "Con facturas abiertas al corte declarado. Si las hay en Odoo y acá no aparecen, revisar la importación y el corte usado.",
+                  },
+                },
+            lider
+              ? {
+                  etiqueta: "líder · del saldo priorizado",
+                  valor: fmt(lider.saldoTotal),
+                  pct: parteLider,
+                }
+              : {
+                  etiqueta: "líder · del saldo priorizado",
+                  valor: "",
+                  sinDato: {
+                    queFalta:
+                      "La worklist salió vacía al corte: no hay saldo priorizado ni cuenta que encabece el reparto.",
+                    consecuencia:
+                      "No se puede decir cuánto del saldo priorizado pesa el primero. Sin denominador, el porcentaje no es 0: no es ningún número.",
+                    comoSeLlena:
+                      "Con facturas abiertas con saldo al corte declarado.",
+                  },
+                },
             {
               etiqueta: "acción sugerida · confianza del score",
               valor: lider?.accionSugerida ?? "sin acción",

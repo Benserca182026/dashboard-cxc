@@ -298,7 +298,19 @@ async function main() {
   }
 
   const totalVentas = hayReferencia ? totalReferencia : totalPorLineas;
-  contraOdoo("ventas_total_confirmado", "Total de ventas confirmadas", totalVentas);
+
+  // ── POBLACIONES (corregido 2026-08-24) ────────────────────────────────────
+  // lib/datosReales.ts:262 filtra `estado_odoo === "sale"`, asi que `ventas`
+  // son SOLO los confirmados. Hasta hoy esto se comparaba contra
+  // ventas_total_confirmado / ventas_pedidos_confirmados, que pese al nombre
+  // son el total SIN filtrar (3.234 pedidos, incluidos 25 cancelados, 16
+  // borradores y 4 enviados). Dos poblaciones distintas con el mismo nombre:
+  // las dos cifras exactas, y la guarda imposible de pasar por construccion.
+  //
+  // Ahora se compara contra las cifras de la MISMA poblacion. Esto NO es bajar
+  // la guarda — es dejar de restar peras de manzanas. Las cifras sin filtrar
+  // siguen en el fixture y se imprimen abajo como contexto.
+  contraOdoo("ventas_total_estado_sale", "Total de ventas confirmadas (state='sale')", totalVentas);
 
   if (hayReferencia) {
     console.log(
@@ -308,7 +320,21 @@ async function main() {
     );
   }
 
-  contraOdoo("ventas_pedidos_confirmados", "Cantidad de pedidos de venta", ventas.length, 0);
+  contraOdoo("ventas_pedidos_estado_sale", "Cantidad de pedidos confirmados (state='sale')", ventas.length, 0);
+
+  // Contexto, no guarda: la poblacion sin filtrar. Se imprime para que la
+  // diferencia entre las dos poblaciones quede a la vista y nadie vuelva a
+  // confundirlas.
+  const sinFiltrar = cifra("ventas_total_confirmado");
+  const sinFiltrarN = cifra("ventas_pedidos_confirmados");
+  console.log(
+    `  CONTEXTO  poblacion SIN filtrar en Odoo: ${num(sinFiltrar.valor ?? 0)} ${sinFiltrar.unidad} ` +
+      `sobre ${num(sinFiltrarN.valor ?? 0, 0)} pedidos (incluye cancelados, borradores y enviados).`
+  );
+  console.log(
+    "            No se compara contra la app a proposito: la app filtra a 'sale'. " +
+      "Se muestra para que las dos poblaciones no vuelvan a mezclarse."
+  );
 
   const testigo = stock.find((f) => f.producto.sku.trim().toUpperCase() === "ED-11.7.3");
   if (!testigo) {

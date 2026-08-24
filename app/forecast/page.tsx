@@ -17,7 +17,6 @@
 
 import { SkeletonPagina } from "@/components/Basicos";
 import { BannerFicticioPremium } from "@/components/ResumenPremium";
-import { fmtMoneda } from "@/lib/calculos";
 import { forecastSimulado, SUPUESTOS_FORECAST } from "@/lib/simulados";
 import { argumentoForecast } from "@/lib/argumento";
 import { useApp } from "@/lib/store";
@@ -110,9 +109,11 @@ function rutaMonotona(pts: { x: number; y: number }[]): string {
 }
 
 export default function PaginaForecast() {
-  const { dataset, cargando, fechaCorte } = useApp();
-  const moneda = dataset.fuente === "odoo-real" ? "GTQ" : "USD";
-  const fmt = (n: number) => fmtMoneda(n, moneda);
+  const { dataset, cargando, fechaCorte, fmt } = useApp();
+  // El dinero lo pinta el formateador del store: es el ÚNICO lugar donde una
+  // cifra cambia de moneda, y lo hace al PINTAR. Todo lo de arriba (umbrales,
+  // porcentajes, comparaciones, cuadres) se calculó en la moneda de registro y
+  // no se entera de esta vista. Ver components/ControlMoneda.tsx.
   const [serieActiva, setSerieActiva] = useState<ClaveSerie | null>(null);
   const [semanaHover, setSemanaHover] = useState<number | null>(null);
   const svgRef = useRef<SVGSVGElement>(null);
@@ -190,11 +191,25 @@ export default function PaginaForecast() {
               valor: fmt(spread),
               pct: pctSpread,
             },
-            {
-              etiqueta: "semana del punto medio · de 13",
-              valor: semanaMitad !== null ? `semana ${semanaMitad}` : "—",
-              pct: semanaMitad !== null ? (semanaMitad / 13) * 100 : 0,
-            },
+            // El "—" con anillo en 0% decía "semana 0 de 13", que no existe.
+            semanaMitad !== null
+              ? {
+                  etiqueta: "semana del punto medio · de 13",
+                  valor: `semana ${semanaMitad}`,
+                  pct: (semanaMitad / 13) * 100,
+                }
+              : {
+                  etiqueta: "semana del punto medio · de 13",
+                  valor: "",
+                  sinDato: {
+                    queFalta:
+                      "La curva base simulada no llega a la mitad de su propio total dentro de las 13 semanas: no hay semana que cruce ese punto.",
+                    consecuencia:
+                      "No se puede decir cuándo se junta la mitad del cobro simulado. Un anillo en 0% señalaría una «semana 0», que no existe en un horizonte que empieza en la 1.",
+                    comoSeLlena:
+                      "Con facturas abiertas al corte que alimenten la simulación. Si las hay en Odoo y acá no aparecen, revisar la importación y el corte usado.",
+                  },
+                },
             {
               etiqueta: "pesimista · del optimista",
               valor: fmt(ultimo.pesimista),

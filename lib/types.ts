@@ -178,10 +178,23 @@ export interface Dataset {
 //                  El export de líneas NO trae la columna descuento: esa suma es
 //                  el pedido A PRECIO DE LISTA, no lo vendido.
 //
-// Sobre los datos reales al 2026-08-23 las dos capas difieren en Q6,866,617.56
-// (26,159,040.47 de líneas contra 19,292,422.91 de referencia, pedidos en
-// estado "sale"). Un número que divida numerador de una capa entre denominador
-// de la otra no está sesgado: NO SIGNIFICA NADA.
+// Sobre los datos reales, los pedidos en estado "sale" dan 26,159,040.47 de
+// líneas contra 19,292,422.91 de referencia. Un número que divida numerador de
+// una capa entre denominador de la otra no está sesgado: NO SIGNIFICA NADA.
+//
+// CORRECCIÓN 2026-08-24 (docs/hallazgos-odoo-en-vivo.md): acá decía que esa
+// diferencia era "Q6,866,617.56 de descuento no restado". La cifra estaba bien;
+// el NOMBRE estaba mal. Esa resta compara una suma de líneas SIN impuesto
+// contra un total CON impuesto, así que mete el IVA adentro y mezcla dos
+// efectos opuestos. Separados, sobre pedidos no cancelados:
+//
+//   descuento real   Q8,974,256.21   (26,285,671.61 bruto − 17,311,415.40 neto)
+//   IVA (12%)        Q2,067,019.16   (19,292,422.91 − 17,225,403.75)
+//
+// El descuento es MAYOR que la brecha observada; el IVA lo compensa en parte.
+// Quien vaya a mostrar "lo vendido" tiene que decidir EXPLÍCITAMENTE si la
+// cifra es con o sin IVA: son 2.07 millones de diferencia, y ninguna de las dos
+// respuestas es la obvia. Esa decisión es de Finanzas, no del código.
 //
 // Por eso el número no viaja como `number` suelto sino dentro de `Cifra<C>`,
 // que lleva su capa en el TIPO. Sumar, restar o comparar exige la misma capa;
@@ -194,7 +207,59 @@ export interface Dataset {
 // vive en una sola función con nombre propio: `brechaEntreCapas()` en
 // lib/cadena.ts. Si aparece una segunda, es un bug.
 
-export type Capa = "hecho" | "composicion";
+// ── LA TERCERA CAPA: "conversion" (moneda) ─────────────────────────────────
+//
+// El primer bug de este proyecto fue montos en QUETZALES rotulados como
+// DÓLARES. La lección no es "poner bien el rótulo": es que un monto en dólares
+// NO ES EL MISMO HECHO que el monto en quetzales del que salió. Es el mismo
+// dinero bajo otra razón formal — una LECTURA derivada, que depende de un tipo
+// de cambio con fuente y fecha. Sin esa tasa declarada, no existe.
+//
+// Por eso la conversión es una capa más, con las mismas garantías que las otras
+// dos: `Cifra<"conversion">` es INVARIANTE, así que no se puede sumar, restar
+// ni comparar contra un `Cifra<"hecho">` ni contra un `Cifra<"composicion">`.
+// Eso hace que la regla dura —EL CAMBIO ES DE VISTA, NUNCA DE DATO— deje de
+// depender de que alguien se acuerde: un umbral, una tolerancia o un cuadre
+// calculado sobre dólares NO COMPILA.
+//
+// El quetzal es la moneda de REGISTRO y el predeterminado siempre. El dólar es
+// una vista derivada que sólo se pinta, nunca se calcula.
+
+export type Capa = "hecho" | "composicion" | "conversion";
+
+export type Moneda = "GTQ" | "USD";
+
+/** La moneda en que están los hechos. No es configurable: es lo que dice el
+ *  dato de origen (ver `moneda_id`, con default 'GTQ' en el esquema real). */
+export const MONEDA_DE_REGISTRO: Moneda = "GTQ";
+
+/**
+ * Un tipo de cambio USABLE. Los tres primeros campos son obligatorios a
+ * propósito: una tasa sin fuente y sin fecha no es un tipo de cambio, es un
+ * número inventado, y con él la conversión sería exactamente el bug original
+ * con más pasos. PROHIBIDO construir uno con una tasa "razonable" de memoria.
+ */
+export interface TipoCambio {
+  /** Cuántos quetzales vale un dólar. */
+  quetzalesPorDolar: number;
+  /** Quién publica la tasa (p. ej. "Banco de Guatemala, tipo de cambio de referencia"). */
+  fuente: string;
+  /** A qué fecha rige. Una tasa sin fecha no dice nada: cambia todos los días. */
+  fecha: string;
+  /** Dónde verificarla. */
+  enlace?: string;
+}
+
+/**
+ * Por qué la vista en dólares NO está disponible. Se muestra en el control
+ * deshabilitado con el mismo vocabulario que el estado "sin-dato": qué falta,
+ * qué se pierde, cómo se llena.
+ */
+export interface MotivoSinTipoCambio {
+  queFalta: string;
+  consecuencia: string;
+  comoSeLlena: string;
+}
 
 export class Cifra<C extends Capa> {
   readonly capa: C;
@@ -224,6 +289,30 @@ export class Cifra<C extends Capa> {
 
   static cero<C2 extends Capa>(capa: C2): Cifra<C2> {
     return new Cifra(capa, 0);
+  }
+
+  /**
+   * Capa "conversion": el MISMO dinero leído en otra moneda.
+   *
+   * No hay un `Cifra.conversion(n)` suelto a propósito. La ÚNICA manera de
+   * fabricar esta capa es pasando por acá, y acá exige un `TipoCambio`
+   * completo — con fuente y fecha. Así es imposible que aparezca un monto en
+   * dólares sin una tasa declarada detrás: no es una convención que haya que
+   * respetar, es la única puerta que existe.
+   *
+   * Es `static` y toma los quetzales como `number` porque convierte desde
+   * CUALQUIER capa: el hecho y la composición son ambos quetzales, y el
+   * resultado deja de pertenecer a la capa de origen — pasa a ser una lectura.
+   */
+  static enDolares(quetzales: number, tc: TipoCambio): Cifra<"conversion"> {
+    if (!(tc.quetzalesPorDolar > 0)) {
+      // Una tasa de 0 o negativa no es una tasa. Antes de dividir por ella y
+      // devolver Infinity con cara de monto, se corta acá.
+      throw new Error(
+        `Tipo de cambio inválido (${tc.quetzalesPorDolar}): la conversión no se hace con una tasa que no lo es.`
+      );
+    }
+    return new Cifra("conversion", quetzales / tc.quetzalesPorDolar);
   }
 
   /** Suma una lista homogénea. La capa se declara explícita para que la lista vacía siga teniendo procedencia. */

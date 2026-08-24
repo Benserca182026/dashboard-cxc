@@ -9,14 +9,14 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { SkeletonPagina } from "@/components/Basicos";
-import { calcularAging, fmtMoneda } from "@/lib/calculos";
+import { calcularAging } from "@/lib/calculos";
 import { BUCKETS } from "@/lib/types";
 import { BUCKET_INFO } from "@/lib/bucketInfo";
 import { useApp } from "@/lib/store";
 import { cargarComparacionOdoo, type ComparacionOdoo } from "@/lib/verificacionOdoo";
 
 export default function PaginaVerificacionOdoo() {
-  const { dataset, cargando, fechaCorte } = useApp();
+  const { dataset, cargando, fechaCorte, fmt } = useApp();
   const [comparacion, setComparacion] = useState<ComparacionOdoo | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -33,7 +33,10 @@ export default function PaginaVerificacionOdoo() {
 
   const aging = calcularAging(dataset, fechaCorte);
   const cartera = aging.totalClasificado + aging.saldoNoClasificable;
-  const fmt = (n: number) => fmtMoneda(n, dataset.fuente === "odoo-real" ? "GTQ" : "USD");
+  // El dinero lo pinta el formateador del store: es el ÚNICO lugar donde una
+  // cifra cambia de moneda, y lo hace al PINTAR. Todo lo de arriba (umbrales,
+  // porcentajes, comparaciones, cuadres) se calculó en la moneda de registro y
+  // no se entera de esta vista. Ver components/ControlMoneda.tsx.
 
   return (
     <div className="space-y-6 p-6">

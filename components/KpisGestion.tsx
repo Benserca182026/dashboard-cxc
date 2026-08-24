@@ -9,7 +9,7 @@
 // el número.
 
 import { useState } from "react";
-import { fmtMoneda } from "@/lib/calculos";
+import { useApp } from "@/lib/store";
 import {
   antiguedadPonderada,
   calcularDso,
@@ -26,6 +26,7 @@ function TarjetaAbrible({
   abierta,
   onToggle,
   children,
+  sinDato,
 }: {
   etiqueta: string;
   valor: string;
@@ -34,6 +35,17 @@ function TarjetaAbrible({
   abierta: boolean;
   onToggle: () => void;
   children: React.ReactNode;
+  /**
+   * EL HUECO DECLARADO. Cuando viene, reemplaza al número.
+   *
+   * Importa especialmente ACÁ: cerrada, esta tarjeta muestra ÚNICAMENTE
+   * `valor`, así que un "—" quedaba completamente mudo hasta que alguien la
+   * abriera. La explicación existía pero estaba escondida un clic más adentro,
+   * que es casi lo mismo que no existir. Ahora el hueco se anuncia cerrado y
+   * se explica entero al abrir, con el mismo tinte azul frío del estado
+   * "sin-dato" de los agentes.
+   */
+  sinDato?: { queFalta: string; consecuencia: string; comoSeLlena: string };
 }) {
   return (
     // Abierta ocupa dos columnas: el desglose necesita mostrar su aritmética
@@ -52,16 +64,48 @@ function TarjetaAbrible({
             {abierta ? "▾" : "▸"}
           </span>
         </div>
-        <p className="mt-1 text-3xl font-extrabold tabular-nums text-tinta">{valor}</p>
-        {/* Cerrada, la tarjeta muestra sólo el número: la nota y la fórmula se
-            leen al abrirla. La página pedía la menor cantidad de texto posible
-            y esto no se pierde, se guarda un clic más adentro. */}
-        {abierta && (
+        {sinDato ? (
           <>
-            <p className="mt-1 text-xs text-tintaSuave">{nota}</p>
-            <p className="mt-2 text-[11px] font-medium text-tintaSuave/80">
-              fórmula: <span className="font-mono">{formula}</span>
+            <p className="mt-1.5">
+              <span
+                className="inline-block rounded-pastilla px-2.5 py-1 text-[11px] font-semibold leading-none"
+                style={{ background: "rgba(91,122,153,.14)", color: "#3f5a75" }}
+              >
+                ? sin dato
+              </span>
             </p>
+            {/* Cerrada, ésta es la línea que impide que el hueco quede mudo. */}
+            <p className="mt-1.5 text-xs leading-snug text-tintaSuave">{sinDato.queFalta}</p>
+            {abierta && (
+              <>
+                <p className="mt-2 text-[11px] font-semibold uppercase tracking-[0.07em] text-[#3f5a75]">
+                  Qué se pierde
+                </p>
+                <p className="mt-0.5 text-xs leading-snug text-tintaSuave">{sinDato.consecuencia}</p>
+                <p className="mt-2 text-[11px] font-semibold uppercase tracking-[0.07em] text-[#3f5a75]">
+                  Cómo se llena
+                </p>
+                <p className="mt-0.5 text-xs leading-snug text-tintaSuave">{sinDato.comoSeLlena}</p>
+                <p className="mt-2 text-[11px] font-medium text-tintaSuave/80">
+                  fórmula que NO se pudo aplicar: <span className="font-mono">{formula}</span>
+                </p>
+              </>
+            )}
+          </>
+        ) : (
+          <>
+            <p className="mt-1 text-3xl font-extrabold tabular-nums text-tinta">{valor}</p>
+            {/* Cerrada, la tarjeta muestra sólo el número: la nota y la fórmula se
+                leen al abrirla. La página pedía la menor cantidad de texto posible
+                y esto no se pierde, se guarda un clic más adentro. */}
+            {abierta && (
+              <>
+                <p className="mt-1 text-xs text-tintaSuave">{nota}</p>
+                <p className="mt-2 text-[11px] font-medium text-tintaSuave/80">
+                  fórmula: <span className="font-mono">{formula}</span>
+                </p>
+              </>
+            )}
           </>
         )}
       </button>
@@ -127,8 +171,11 @@ function TablaMini({
 }
 
 export function KpisGestion({ dataset, fechaCorte }: { dataset: Dataset; fechaCorte: string }) {
-  const moneda = dataset.fuente === "odoo-real" ? "GTQ" : "USD";
-  const fmt = (n: number) => fmtMoneda(n, moneda);
+  const { fmt } = useApp();
+  // El dinero lo pinta el formateador del store: es el ÚNICO lugar donde una
+  // cifra cambia de moneda, y lo hace al PINTAR. Todo lo de arriba (umbrales,
+  // porcentajes, comparaciones, cuadres) se calculó en la moneda de registro y
+  // no se entera de esta vista. Ver components/ControlMoneda.tsx.
   const [abierta, setAbierta] = useState<string | null>(null);
   const alternar = (k: string) => setAbierta(abierta === k ? null : k);
 
@@ -152,7 +199,18 @@ export function KpisGestion({ dataset, fechaCorte }: { dataset: Dataset; fechaCo
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <TarjetaAbrible
           etiqueta="DSO — días de venta en calle"
-          valor={dso.dso === null ? "—" : `${dso.dso} d`}
+          valor={dso.dso === null ? "" : `${dso.dso} d`}
+          sinDato={
+            dso.dso === null
+              ? {
+                  queFalta: `No hubo facturación en la ventana de ${dso.ventanaDias} días que termina en el corte: el divisor de la fórmula es cero.`,
+                  consecuencia:
+                    "No hay días de venta en calle que informar. Un DSO de 0 días significaría que se cobra al instante — lo contrario de no poder medirlo.",
+                  comoSeLlena:
+                    "Con facturas emitidas dentro de la ventana. Si las hay en Odoo y acá no aparecen, revisar scripts/importar-facturas-odoo.mjs y la fecha de corte.",
+                }
+              : undefined
+          }
           nota={
             dso.dso === null
               ? "sin facturación en la ventana: no calculable"
@@ -171,7 +229,19 @@ export function KpisGestion({ dataset, fechaCorte }: { dataset: Dataset; fechaCo
 
         <TarjetaAbrible
           etiqueta="Antigüedad ponderada por monto"
-          valor={ant.ponderada === null ? "—" : `${ant.ponderada} d`}
+          valor={ant.ponderada === null ? "" : `${ant.ponderada} d`}
+          sinDato={
+            ant.ponderada === null
+              ? {
+                  queFalta:
+                    "No hay ninguna factura clasificada en el aging al corte: sin facturas con saldo y fecha de vencimiento no hay antigüedad que ponderar.",
+                  consecuencia:
+                    "No se puede saber si el saldo grande está en lo viejo o en lo reciente. Un promedio sobre cero facturas no es 0 días: es ninguna respuesta.",
+                  comoSeLlena:
+                    "Con facturas abiertas con fecha de vencimiento al corte. Las que no la traen quedan fuera del aging y no se les inventa una.",
+                }
+              : undefined
+          }
           nota={
             ant.simple === null
               ? "sin facturas clasificadas"
@@ -200,7 +270,18 @@ export function KpisGestion({ dataset, fechaCorte }: { dataset: Dataset; fechaCo
 
         <TarjetaAbrible
           etiqueta="Efectividad de cobro"
-          valor={efe.efectividadPct === null ? "—" : `${efe.efectividadPct}%`}
+          valor={efe.efectividadPct === null ? "" : `${efe.efectividadPct}%`}
+          sinDato={
+            efe.efectividadPct === null
+              ? {
+                  queFalta: `Nada vencía en la ventana de ${efe.ventanaDias} días que termina en el corte: el divisor de la fórmula es cero.`,
+                  consecuencia:
+                    "No se puede medir qué proporción de lo exigible se cobró. Un 0% diría que no se cobró nada de lo que vencía, cuando lo cierto es que no vencía nada.",
+                  comoSeLlena:
+                    "Con facturas cuya fecha de vencimiento caiga dentro de la ventana. Cambiar la fecha de corte en el módulo Aging mueve esa ventana.",
+                }
+              : undefined
+          }
           nota={
             efe.efectividadPct === null
               ? "nada vencía en la ventana: 0/0 no se disfraza de porcentaje"
@@ -231,7 +312,7 @@ export function KpisGestion({ dataset, fechaCorte }: { dataset: Dataset; fechaCo
             filas={
               efe.pagosVentana.length
                 ? efe.pagosVentana.map((p) => [p.id_pago, p.fecha_pago, fmt(p.monto)])
-                : [["—", "sin pagos en la ventana", fmt(0)]]
+                : [["sin pagos", `ninguno entre ${efe.desde} y ${efe.hasta}`, fmt(0)]]
             }
             pie={["Total cobrado", "", fmt(efe.cobradoVentana)]}
           />
@@ -239,7 +320,19 @@ export function KpisGestion({ dataset, fechaCorte }: { dataset: Dataset; fechaCo
 
         <TarjetaAbrible
           etiqueta="Concentración del riesgo"
-          valor={con.mayorPct === null ? "—" : `${con.mayorPct}%`}
+          valor={con.mayorPct === null ? "" : `${con.mayorPct}%`}
+          sinDato={
+            con.mayorPct === null
+              ? {
+                  queFalta:
+                    "No hay saldo pendiente al corte: ningún cliente debe nada, así que no hay total entre el cual repartir el riesgo.",
+                  consecuencia:
+                    "No hay concentración que medir. Un 0% afirmaría un reparto perfectamente parejo entre clientes que no existen.",
+                  comoSeLlena:
+                    "Con facturas abiertas con saldo al corte declarado.",
+                }
+              : undefined
+          }
           nota={
             con.mayorCliente
               ? `${con.mayorCliente.nombre}: ${fmt(con.mayorCliente.saldo)} del total ${fmt(con.saldoTotal)}`

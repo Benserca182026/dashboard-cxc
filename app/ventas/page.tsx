@@ -33,7 +33,6 @@
 import { useState } from "react";
 import { SkeletonPagina } from "@/components/Basicos";
 import { BannerFicticioPremium, KpiPremiumCard } from "@/components/ResumenPremium";
-import { fmtMoneda } from "@/lib/calculos";
 import {
   brechaEntreCapas,
   cadenaDeFactura,
@@ -58,9 +57,11 @@ const SECCIONES = [
 ];
 
 export default function PaginaVentas() {
-  const { dataset, cargando, fechaCorte } = useApp();
-  const moneda = dataset.fuente === "odoo-real" ? "GTQ" : "USD";
-  const fmt = (n: number) => fmtMoneda(n, moneda);
+  const { dataset, cargando, fechaCorte, fmt } = useApp();
+  // El dinero lo pinta el formateador del store: es el ÚNICO lugar donde una
+  // cifra cambia de moneda, y lo hace al PINTAR. Todo lo de arriba (umbrales,
+  // porcentajes, comparaciones, cuadres) se calculó en la moneda de registro y
+  // no se entera de esta vista. Ver components/ControlMoneda.tsx.
   const [abierta, setAbierta] = useState<string | null>("VTA-9003");
   const [facturaCruce, setFacturaCruce] = useState("FAC-1003");
 
@@ -131,11 +132,24 @@ export default function PaginaVentas() {
                 valor: fmt(cuadre.totalVendido),
                 pct: cuadre.totalVendido > 0 ? Math.min(100, (cuadre.totalFacturado / cuadre.totalVendido) * 100) : 0,
               },
-              {
-                etiqueta: "venta líder · del total a precio de lista",
-                valor: mayorVenta ? fmt(mayorVenta.total) : "—",
-                pct: pctMayorVenta,
-              },
+              mayorVenta
+                ? {
+                    etiqueta: "venta líder · del total a precio de lista",
+                    valor: fmt(mayorVenta.total),
+                    pct: pctMayorVenta,
+                  }
+                : {
+                    etiqueta: "venta líder · del total a precio de lista",
+                    valor: "",
+                    sinDato: {
+                      queFalta:
+                        "No hay ni un pedido en el dataset: no hay ventas entre las cuales elegir la mayor.",
+                      consecuencia:
+                        "No hay reparto del total que describir. El «—» con el anillo en 0% no distinguía «no hay ventas» de «la venta líder pesa 0%».",
+                      comoSeLlena:
+                        "Importando pedidos y líneas con scripts/importar-ventas-odoo.mjs, o cargando el dataset real.",
+                    },
+                  },
               {
                 etiqueta: "total vendido · referencia Odoo (capa hecho)",
                 valor: fmt(vendido.total.valorParaMostrar()),
@@ -218,9 +232,24 @@ export default function PaginaVentas() {
             />
             <KpiPremiumCard
               etiqueta="Ticket promedio a precio de lista"
-              valor={ticketPromedioLista ? fmt(ticketPromedioLista.valorParaMostrar()) : "—"}
+              valor={ticketPromedioLista ? fmt(ticketPromedioLista.valorParaMostrar()) : ""}
               nota="líneas ÷ cantidad de pedidos — misma capa arriba y abajo de la división"
               variante="soft"
+              /* `Cifra.entre()` devuelve null cuando no hay pedidos: la división
+                 no se hace, no se hace mal. El "—" que había acá tapaba esa
+                 distinción; ahora la tarjeta dice por qué no hay promedio. */
+              sinDato={
+                ticketPromedioLista
+                  ? undefined
+                  : {
+                      queFalta:
+                        "No hay ni un pedido en el dataset: el divisor de la cuenta es cero.",
+                      consecuencia:
+                        "No hay ticket promedio. Un promedio sobre cero pedidos no es 0: no es ningún número.",
+                      comoSeLlena:
+                        "Importando pedidos y líneas con scripts/importar-ventas-odoo.mjs, o cargando el dataset real.",
+                    }
+              }
             />
             <KpiPremiumCard
               etiqueta="Ventas con factura"

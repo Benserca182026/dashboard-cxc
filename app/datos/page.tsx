@@ -26,7 +26,6 @@ import {
   type ResultadoImportacion,
   type ResultadoParseo,
 } from "@/lib/csv";
-import { fmtMoneda } from "@/lib/calculos";
 import { argumentoDatos } from "@/lib/argumento";
 import { useApp } from "@/lib/store";
 import { useState } from "react";
@@ -50,9 +49,11 @@ const SECCIONES = [
 ];
 
 export default function PaginaDatos() {
-  const { dataset, cargando, errorDatosReales, fechaCorte, reemplazarDataset, volverADemo } = useApp();
-  const moneda = dataset.fuente === "odoo-real" ? "GTQ" : "USD";
-  const fmt = (n: number) => fmtMoneda(n, moneda);
+  const { dataset, cargando, errorDatosReales, fechaCorte, reemplazarDataset, volverADemo, fmt } = useApp();
+  // El dinero lo pinta el formateador del store: es el ÚNICO lugar donde una
+  // cifra cambia de moneda, y lo hace al PINTAR. Todo lo de arriba (umbrales,
+  // porcentajes, comparaciones, cuadres) se calculó en la moneda de registro y
+  // no se entera de esta vista. Ver components/ControlMoneda.tsx.
   const [parseo, setParseo] = useState<ResultadoParseo | null>(null);
   const [mapeo, setMapeo] = useState<CampoDestino[]>([]);
   const [ordenFecha, setOrdenFecha] = useState<OrdenFecha>("auto");
@@ -151,11 +152,27 @@ export default function PaginaDatos() {
               valor: `${conProblema.length} de ${total}`,
               pct: pctProblema,
             },
-            {
-              etiqueta: motivoDominante ? "motivo dominante · de las filas con problema" : "sin motivo dominante",
-              valor: motivoDominante ? `${motivoDominante[1]} de ${conProblema.length}` : "—",
-              pct: motivoDominante && conProblema.length > 0 ? (motivoDominante[1] / conProblema.length) * 100 : 0,
-            },
+            // "sin motivo dominante" con un "—" y el anillo en 0% no decía si
+            // el motivo faltaba o si no había filas con problema. Son dos cosas
+            // distintas, y acá siempre es la segunda: se declara cuál.
+            motivoDominante && conProblema.length > 0
+              ? {
+                  etiqueta: "motivo dominante · de las filas con problema",
+                  valor: `${motivoDominante[1]} de ${conProblema.length}`,
+                  pct: (motivoDominante[1] / conProblema.length) * 100,
+                }
+              : {
+                  etiqueta: "motivo dominante · de las filas con problema",
+                  valor: "",
+                  sinDato: {
+                    queFalta:
+                      "No hay filas con problema en esta carga: la población sobre la que se calcula el motivo dominante está vacía.",
+                    consecuencia:
+                      "No hay motivo que destacar ni proporción que medir. Un 0% se leería como «ningún problema tiene motivo conocido», que es lo contrario de lo que pasa.",
+                    comoSeLlena:
+                      "Se llena solo si una carga trae filas con problema. Que hoy esté vacía es el resultado deseable, no un fallo.",
+                  },
+                },
             {
               etiqueta: "dataset limpio · calidad general",
               valor: `${Math.round(100 - pctProblema)}% limpio`,

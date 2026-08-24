@@ -185,7 +185,13 @@ function PanelBuscar({ dataset }: { dataset: Dataset }) {
             {resultados.facturas.map((f) => (
               <tr key={f.id_factura} className="border-t border-[rgba(22,24,29,.05)]">
                 <td className="px-3 py-2 font-medium text-tinta">{f.numero_factura}</td>
-                <td className="px-3 py-2 text-[#5b5e64]">{clientesPorId.get(f.id_cliente) ?? "—"}</td>
+                <td className="px-3 py-2 text-[#5b5e64]">
+                  {/* Un id que no resuelve NO se muestra como "—": eso se lee
+                      como "este cliente no tiene nombre". Lo que pasa es que el
+                      id no resolvió, y `nombreDeCliente` existe justamente para
+                      decirlo con esas palabras. */}
+                  {clientesPorId.get(f.id_cliente) ?? `cliente no identificado (${f.id_cliente})`}
+                </td>
                 <td className="px-3 py-2 text-[#8b8f98]">{f.fecha_vencimiento ?? "sin fecha"}</td>
                 <td className="px-3 py-2 text-right tabular-nums text-tinta">
                   {fmt(f.monto_original)}

@@ -12,11 +12,77 @@ import React, {
   useMemo,
   useState,
 } from "react";
-import type { Dataset, GestionCobranza } from "./types";
+import type {
+  Dataset,
+  GestionCobranza,
+  Moneda,
+  MotivoSinTipoCambio,
+  TipoCambio,
+} from "./types";
+import { Cifra } from "./types";
+import { fmtMoneda } from "./calculos";
 import { datosDemo, FECHA_CORTE_DEFAULT, gestionesSemilla } from "./datos";
-import { cargarDatasetReal } from "./datosReales";
+import { cargarDatasetReal, FECHA_CORTE_DATOS_REALES } from "./datosReales";
 
 const CLAVE_GESTIONES = "cxc-prototipo-gestiones-ficticias";
+
+// ── MONEDA: el quetzal es el hecho, el dólar es una vista ───────────────────
+//
+// DEPENDE DE (R7): que el Frente 1 confirme en docs/hallazgos-odoo-en-vivo.md
+// si el export de Odoo puede entregar un tipo de cambio con FUENTE y FECHA
+// (res.currency.rate del propio Odoo, o la tasa de referencia del Banguat).
+//
+// LAS DOS SALIDAS ESTÁN CONSTRUIDAS, y cuál rige lo decide este único valor:
+//
+//   · NULL  (hoy)  → el control de moneda se muestra DESHABILITADO y explica
+//                    qué falta. La vista en dólares es inalcanzable: no hay
+//                    forma de llegar a ella desde la interfaz.
+//   · una tasa     → el control se habilita solo, y mientras la vista en
+//                    dólares esté activa la pantalla muestra valor, fuente y
+//                    fecha de la tasa usada.
+//
+// SI RESULTA FALSO que Odoo no la trae, no se cae nada: se reemplaza este null
+// por el objeto y no hay una sola línea más que tocar.
+//
+// PROHIBIDO poner acá una tasa "razonable" de memoria (7.7, 7.8, la que sea).
+// Una tasa sin fuente y sin fecha convierte montos reales con un número
+// inventado — que es el bug original de este proyecto (quetzales rotulados
+// como dólares) disfrazado de mejora.
+const TIPO_CAMBIO: TipoCambio | null = null;
+
+// RAMA R7 — RESUELTA el 2026-08-24 por el Frente 1, y resolvió hacia ESTA
+// salida: docs/hallazgos-odoo-en-vivo.md, sección «2. ¿Hay tipo de cambio
+// GTQ/USD?» → «NO en disco. Y para CxC no hace falta.»
+//
+//   · En las 3.207 facturas del export de account.move, "Total firmado" y
+//     "Total en divisa firmado" son IDÉNTICOS fila por fila: la cartera entera
+//     está en una sola moneda y no hay ninguna conversión en juego para CxC.
+//   · Ninguna tasa aparece en ningún archivo en disco. `res.currency` nunca se
+//     leyó, así que ni siquiera consta si Odoo tiene USD configurado.
+//   · Queda una contradicción DECLARADA y sin resolver: el lado ventas muestra
+//     indicios de dos símbolos de moneda, mientras que el lado facturas es
+//     monomoneda. Sólo Odoo vivo la desempata.
+//
+// La otra salida (control habilitado) está construida y probada igual: vive en
+// components/ControlMoneda.tsx y se enciende sola en cuanto este valor deje de
+// ser null. Que hoy no haga falta para CxC no la vuelve inútil — la vuelve no
+// urgente.
+const MOTIVO_SIN_TIPO_CAMBIO: MotivoSinTipoCambio = {
+  queFalta:
+    "Un tipo de cambio con valor, fuente y fecha. El Frente 1 lo buscó el 2026-08-24 y no existe: ninguna tasa aparece en ningún archivo en disco, y res.currency nunca se leyó, así que ni siquiera consta si Odoo tiene el dólar configurado.",
+  consecuencia:
+    "Sin tasa no hay conversión posible. Se deja la opción deshabilitada en vez de convertir con un número de memoria: un monto real dividido por una tasa inventada se ve exactamente igual que uno correcto, y ése es el primer bug que tuvo este proyecto. Para CxC además no se pierde nada: en las 3.207 facturas el importe en divisa y el de compañía son idénticos fila por fila, o sea que la cartera ya está entera en una sola moneda.",
+  comoSeLlena:
+    "Pidiendo res.currency y res.currency.rate a Odoo vivo con search_read (la máquina para hacerlo está descrita en el boletín) y declarando el resultado en TIPO_CAMBIO, en lib/store.tsx. Hace falta antes para ventas que para CxC: ahí el export muestra dos símbolos de moneda distintos y esa contradicción sigue abierta.",
+};
+
+/** La moneda en que están los HECHOS de este dataset.
+ *
+ *  No es una preferencia: es lo que dice el origen. El dataset real de Odoo
+ *  (Benserca 18) está en quetzales; el demo ficticio está denominado en
+ *  dólares. Por eso sobre el demo no hay conversión que ofrecer — ya está en
+ *  la moneda de destino, y convertirlo a sí mismo no es una vista, es ruido. */
+const monedaDeRegistro = (d: Dataset): Moneda => (d.fuente === "odoo-real" ? "GTQ" : "USD");
 
 interface EstadoApp {
   dataset: Dataset;
@@ -25,6 +91,27 @@ interface EstadoApp {
   errorDatosReales: string | null;
   fechaCorte: string;
   setFechaCorte: (f: string) => void;
+  /** La moneda de los hechos de este dataset. No se elige: la dicta el origen. */
+  monedaRegistro: Moneda;
+  /** La moneda que se está PINTANDO. Arranca y vuelve siempre a la de registro. */
+  monedaVista: Moneda;
+  /** Pedir una vista. Pedir "USD" sin tasa declarada NO hace nada. */
+  setMonedaVista: (m: Moneda) => void;
+  /** La tasa en uso, o null. Cuando la vista es en dólares, va a pantalla. */
+  tipoCambio: TipoCambio | null;
+  /** Si no se puede ver en dólares, POR QUÉ. */
+  motivoSinTipoCambio: MotivoSinTipoCambio;
+  /** ¿Está disponible la vista derivada? */
+  puedeVerEnDolares: boolean;
+  /**
+   * EL ÚNICO formateador de dinero de la aplicación.
+   *
+   * Recibe SIEMPRE un monto en la moneda de registro —todo se calcula ahí— y
+   * convierte, si corresponde, únicamente al pintar. Ningún cálculo, umbral,
+   * tolerancia ni comparación pasa por acá: esta función es el último paso
+   * antes del pixel.
+   */
+  fmt: (montoEnMonedaDeRegistro: number) => string;
   reemplazarDataset: (d: Dataset) => void;
   volverADemo: () => void;
   gestiones: GestionCobranza[];
@@ -38,6 +125,9 @@ export function ProveedorApp({ children }: { children: React.ReactNode }) {
   const [cargando, setCargando] = useState(true);
   const [errorDatosReales, setErrorDatosReales] = useState<string | null>(null);
   const [fechaCorte, setFechaCorte] = useState(FECHA_CORTE_DEFAULT);
+  // Lo que el usuario PIDIÓ ver. Lo que se ve de verdad se deriva más abajo:
+  // así el quetzal no depende de que nadie se acuerde de reponerlo.
+  const [monedaPedida, setMonedaPedida] = useState<Moneda>("GTQ");
   // Sólo las gestiones que registró el usuario. La semilla de demo NO vive
   // acá: se agrega derivada más abajo, y sólo cuando corresponde. Ver el
   // comentario de `gestiones`.
@@ -53,7 +143,7 @@ export function ProveedorApp({ children }: { children: React.ReactNode }) {
       .then((real) => {
         if (!vigente) return;
         setDataset(real);
-        setFechaCorte(new Date().toISOString().slice(0, 10));
+        setFechaCorte(FECHA_CORTE_DATOS_REALES);
         setCargando(false);
       })
       .catch((e) => {
@@ -120,6 +210,35 @@ export function ProveedorApp({ children }: { children: React.ReactNode }) {
     });
   }, []);
 
+  // ── La vista de moneda, derivada — nunca un estado que pueda quedar mal ──
+  const monedaRegistro = monedaDeRegistro(dataset);
+  const puedeVerEnDolares = monedaRegistro === "GTQ" && TIPO_CAMBIO !== null;
+  // EL QUETZAL ES EL PREDETERMINADO SIEMPRE, y esta línea es la que lo
+  // garantiza: la vista en dólares exige que se la haya pedido Y que sea
+  // posible. Si la tasa desaparece, o si se carga un dataset que ya está en
+  // dólares, la vista vuelve sola a la moneda de registro. No hay ningún
+  // useEffect de limpieza que pudiera olvidarse ni orden de carga que importe.
+  const monedaVista: Moneda = monedaPedida === "USD" && puedeVerEnDolares ? "USD" : monedaRegistro;
+
+  const setMonedaVista = useCallback((m: Moneda) => {
+    // Pedir dólares sin tasa no hace nada. La opción además se pinta
+    // deshabilitada, así que esto es el segundo cerrojo, no el primero.
+    if (m === "USD" && TIPO_CAMBIO === null) return;
+    setMonedaPedida(m);
+  }, []);
+
+  const fmt = useCallback(
+    (monto: number) => {
+      if (monedaVista === monedaRegistro || TIPO_CAMBIO === null) {
+        return fmtMoneda(monto, monedaRegistro);
+      }
+      // Capa "conversion": el número deja de ser un hecho y pasa a ser una
+      // lectura. `Cifra.enDolares` es la única puerta, y exige la tasa entera.
+      return fmtMoneda(Cifra.enDolares(monto, TIPO_CAMBIO).valorParaMostrar(), "USD");
+    },
+    [monedaVista, monedaRegistro]
+  );
+
   const reemplazarDataset = useCallback((d: Dataset) => setDataset(d), []);
   const volverADemo = useCallback(() => setDataset(datosDemo), []);
 
@@ -130,12 +249,33 @@ export function ProveedorApp({ children }: { children: React.ReactNode }) {
       errorDatosReales,
       fechaCorte,
       setFechaCorte,
+      monedaRegistro,
+      monedaVista,
+      setMonedaVista,
+      tipoCambio: TIPO_CAMBIO,
+      motivoSinTipoCambio: MOTIVO_SIN_TIPO_CAMBIO,
+      puedeVerEnDolares,
+      fmt,
       reemplazarDataset,
       volverADemo,
       gestiones,
       agregarGestion,
     }),
-    [dataset, cargando, errorDatosReales, fechaCorte, reemplazarDataset, volverADemo, gestiones, agregarGestion]
+    [
+      dataset,
+      cargando,
+      errorDatosReales,
+      fechaCorte,
+      monedaRegistro,
+      monedaVista,
+      setMonedaVista,
+      puedeVerEnDolares,
+      fmt,
+      reemplazarDataset,
+      volverADemo,
+      gestiones,
+      agregarGestion,
+    ]
   );
 
   return <Contexto.Provider value={valor}>{children}</Contexto.Provider>;

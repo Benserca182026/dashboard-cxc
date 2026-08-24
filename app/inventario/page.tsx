@@ -18,8 +18,7 @@
 import { useState } from "react";
 import { SkeletonPagina } from "@/components/Basicos";
 import { BannerFicticioPremium, KpiPremiumCard } from "@/components/ResumenPremium";
-import { fmtMoneda } from "@/lib/calculos";
-import { hayCadena, salidasSinVenta, stockPorProducto } from "@/lib/cadena";
+import { hayCadena, integridadInventario, salidasSinVenta, stockPorProducto } from "@/lib/cadena";
 import { argumentoInventario } from "@/lib/argumento";
 import { useApp } from "@/lib/store";
 import { Encabezado } from "@/components/Encabezado";
@@ -124,9 +123,11 @@ const SECCIONES = [
 ];
 
 export default function PaginaInventario() {
-  const { dataset, cargando, fechaCorte } = useApp();
-  const moneda = dataset.fuente === "odoo-real" ? "GTQ" : "USD";
-  const fmt = (n: number) => fmtMoneda(n, moneda);
+  const { dataset, cargando, fechaCorte, fmt } = useApp();
+  // El dinero lo pinta el formateador del store: es el ÚNICO lugar donde una
+  // cifra cambia de moneda, y lo hace al PINTAR. Todo lo de arriba (umbrales,
+  // porcentajes, comparaciones, cuadres) se calculó en la moneda de registro y
+  // no se entera de esta vista. Ver components/ControlMoneda.tsx.
   const [abierto, setAbierto] = useState<string | null>("PRD-C");
 
   if (cargando) return <SkeletonPagina />;
@@ -151,6 +152,11 @@ export default function PaginaInventario() {
   const valorTotal = stock.reduce((s, x) => s + x.valorCosto, 0);
   const bajos = stock.filter((x) => x.bajoMinimo);
   const huerfanas = salidasSinVenta(dataset);
+  // Los dos huecos que impiden hablar de EXISTENCIA y de MÍNIMO, DERIVADOS del
+  // propio dato (ver lib/cadena.ts). No son un flag que alguien tenga que
+  // apagar: el día que el import traiga saldo inicial y punto de reorden
+  // reales, estas dos banderas se dan vuelta solas.
+  const integridad = integridadInventario(dataset);
 
   // ── Las cifras de los cuatro anillos — derivadas del mismo stock que arma
   //    el argumento, no números sueltos. ──
@@ -184,31 +190,77 @@ export default function PaginaInventario() {
             arg={argumento}
             agentes={<FilaAgentes dataset={dataset} fechaCorte={fechaCorte} agentes={AGENTES_INVENTARIO} />}
             kpis={[
-              {
-                etiqueta: "SKU líder por valor · del valor total",
-                valor: mayorValor ? fmt(mayorValor.valorCosto) : "—",
-                pct: pctMayorValor,
-                advertencia: `Proporción sobre un total contaminado: incluye ${PRODUCTOS_NEGATIVOS} SKU con existencia negativa que restan ${RESTA_NEGATIVOS}.`,
-              },
-              {
-                etiqueta: "bajo mínimo · de los SKU",
-                valor: `${bajos.length} de ${stock.length}`,
-                pct: stock.length > 0 ? (bajos.length / stock.length) * 100 : 0,
-                advertencia: `El mínimo es 0 en los ${TOTAL_SKU_AUDITADOS} productos, así que "bajo mínimo" hoy es "existencia ≤ 0" (${SKU_BAJO_MINIMO_AUDITADOS} de ${TOTAL_SKU_AUDITADOS}). No son productos por reponer.`,
-              },
+              mayorValor
+                ? {
+                    etiqueta: "SKU líder por valor · del valor total",
+                    valor: fmt(mayorValor.valorCosto),
+                    pct: pctMayorValor,
+                    advertencia: `Proporción sobre un total contaminado: incluye ${PRODUCTOS_NEGATIVOS} SKU con existencia negativa que restan ${RESTA_NEGATIVOS}.`,
+                  }
+                : {
+                    etiqueta: "SKU líder por valor · del valor total",
+                    valor: "",
+                    sinDato: {
+                      queFalta:
+                        "No hay ni un producto con movimientos en el dataset: no hay catálogo del cual elegir un SKU líder.",
+                      consecuencia:
+                        "No hay valor de inventario que repartir. El «—» anterior no distinguía esto de un fallo de carga.",
+                      comoSeLlena:
+                        "Importando productos y movimientos con scripts/importar-inventario-odoo.mjs.",
+                    },
+                  },
+              // "bajo mínimo" ya no muestra un número con una advertencia que
+              // lo desmiente. Si el mínimo no está declarado, la regla degenera
+              // a "existencia ≤ 0" y el conteo no mide el inventario: mide el
+              // hueco en los datos. Es el mismo criterio que aplica el agente
+              // Mínimo, para que tarjeta y agente no se contradigan en pantalla.
+              integridad.existenciaEsAfirmable && integridad.minimoEsAfirmable
+                ? {
+                    etiqueta: "bajo mínimo · de los SKU",
+                    valor: `${bajos.length} de ${stock.length}`,
+                    pct: stock.length > 0 ? (bajos.length / stock.length) * 100 : 0,
+                  }
+                : {
+                    etiqueta: "bajo mínimo · de los SKU",
+                    valor: "",
+                    sinDato: {
+                      queFalta: !integridad.minimoEsAfirmable
+                        ? `El punto de reorden: el mínimo está en 0 para los ${TOTAL_SKU_AUDITADOS} productos porque el importador lo escribe así, no porque sea la política.`
+                        : `El saldo inicial: ${integridad.seriesTruncadas.length} SKU arrancan su serie con una salida${integridad.desde ? `, con movimientos sólo desde ${integridad.desde}` : ""}.`,
+                      consecuencia: `Con el mínimo en 0 la regla degenera a "existencia ≤ 0" y marca ${SKU_BAJO_MINIMO_AUDITADOS} de ${TOTAL_SKU_AUDITADOS} SKU. Ese número no son productos por reponer: es el hueco de los datos contado como si fuera inventario.`,
+                      comoSeLlena:
+                        "Trayendo de Odoo el punto de reorden real (stock.warehouse.orderpoint) y un saldo inicial por producto, en vez del 0 que hoy escribe el importador.",
+                    },
+                  },
               {
                 // El Math.min(100, …) que había acá era el mismo engaño que el
                 // clamp del anillo, un piso más arriba: tapaba un cociente
                 // desbordado antes de que el anillo pudiera mostrarlo. El
                 // recorte ahora es sólo del DIBUJO, dentro de <Anillo>.
-                etiqueta: critico ? "existencia del urgente · del mínimo" : "sin producto urgente",
-                valor: critico ? `${critico.existencia} u (mín. ${critico.producto.stock_minimo})` : "—",
-                pct: critico && critico.producto.stock_minimo > 0
-                  ? (critico.existencia / critico.producto.stock_minimo) * 100
-                  : 0,
-                advertencia: critico
-                  ? `Con el mínimo en 0 este porcentaje no significa nada. La existencia tampoco es real: ${SKU_TESTIGO}, p. ej., figura en ${TESTIGO_CALCULADO} u y en Odoo tiene ${TESTIGO_REAL_ODOO}.`
-                  : undefined,
+                etiqueta: "existencia del urgente · del mínimo",
+                ...(critico && critico.producto.stock_minimo > 0
+                  ? {
+                      valor: `${critico.existencia} u (mín. ${critico.producto.stock_minimo})`,
+                      pct: (critico.existencia / critico.producto.stock_minimo) * 100,
+                      advertencia: `La existencia no es real: ${SKU_TESTIGO}, p. ej., figura en ${TESTIGO_CALCULADO} u y en Odoo tiene ${TESTIGO_REAL_ODOO}.`,
+                    }
+                  : {
+                      // Antes decía "sin producto urgente" con un "—" y el
+                      // anillo en 0%. Eso mezclaba DOS cosas opuestas: que no
+                      // haya ningún producto urgente (buena noticia) y que el
+                      // mínimo esté en 0 y la razón no signifique nada.
+                      valor: "",
+                      sinDato: {
+                        queFalta: critico
+                          ? `El punto de reorden de ${critico.producto.sku}: su mínimo es 0, así que no hay contra qué medir su existencia.`
+                          : "Ningún producto quedó marcado como urgente, así que no hay caso que mostrar.",
+                        consecuencia: critico
+                          ? "La razón existencia ÷ mínimo sería una división por cero. Un anillo en 0% la presentaría como una proporción medida."
+                          : "No hay urgencia que describir. El «—» anterior no distinguía «no hay ninguno» de «no se pudo calcular».",
+                        comoSeLlena:
+                          "Trayendo de Odoo el punto de reorden real (stock.warehouse.orderpoint) en vez del 0 que hoy escribe scripts/importar-inventario-odoo.mjs.",
+                      },
+                    }),
               },
               {
                 etiqueta: "valor en riesgo · del valor total",
@@ -341,7 +393,17 @@ export default function PaginaInventario() {
                               <td className="py-1.5 pr-3 tabular-nums">{m.fecha}</td>
                               <td className="py-1.5 pr-3">{m.tipo}</td>
                               <td className="py-1.5 pr-3 font-mono">
-                                {m.id_venta ?? <span className="text-tintaSuave">{m.motivo ?? "—"}</span>}
+                                {/* El origen del movimiento: la venta que lo
+                                    produjo, o el motivo escrito a mano. Si no
+                                    hay ninguno de los dos, se DICE — el "—" que
+                                    había acá se leía como una celda vacía de
+                                    formato, no como un movimiento sin origen
+                                    registrado, que es lo que de verdad es. */}
+                                {m.id_venta ?? (
+                                  <span className="text-tintaSuave">
+                                    {m.motivo ?? "sin origen registrado"}
+                                  </span>
+                                )}
                               </td>
                               <td className={`py-1.5 text-right font-semibold tabular-nums ${m.cantidad < 0 ? "text-red-600" : "text-emerald-700"}`}>
                                 {m.cantidad > 0 ? `+${m.cantidad}` : m.cantidad}

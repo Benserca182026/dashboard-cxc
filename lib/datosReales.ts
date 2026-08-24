@@ -66,6 +66,38 @@ const TAMANO_PAGINA = 1000; // límite por defecto de PostgREST por respuesta
 const ESTADO_VENTA_CONFIRMADA = "sale";
 
 /**
+ * FECHA DE CORTE DEL DATASET REAL — la única, declarada en un solo lugar.
+ *
+ * Hasta 2026-08-24 no existía: `lib/store.tsx:56` ponía
+ * `new Date().toISOString().slice(0,10)`, es decir "hoy, el día que se abra la
+ * página". Como los datos están congelados en el último import, eso hacía que
+ * **la cartera envejeciera sola**: la misma factura caía en un tramo distinto
+ * de aging según el día en que uno mirara, sin que hubiera entrado ni un dato
+ * nuevo. Es exactamente lo que denuncia la comprobación #1 de
+ * `verificacion/linea-base.mjs` ("Antiguedad ponderada estable sin datos
+ * nuevos"), que hoy falla.
+ *
+ * Una fecha de corte es una AFIRMACIÓN SOBRE LOS DATOS ("así estaba la cartera
+ * el día X"), no una lectura del reloj. Tiene que moverse cuando se importan
+ * datos nuevos, y sólo entonces.
+ *
+ * ── CÓMO SE ACTUALIZA ─────────────────────────────────────────────────────
+ * Se cambia ACÁ, y en ningún otro lado. Al importar datos nuevos, se pone la
+ * fecha del extracto de Odoo — no la del día en que se corrió el import.
+ *
+ * ── ADVERTENCIA PARA INVENTARIO ───────────────────────────────────────────
+ * Esta constante NO es, por sí sola, la fecha del saldo inicial de inventario.
+ * La existencia se arma como `saldo inicial + Σ movimientos posteriores`, y
+ * las dos partes tienen que estar fechadas contra el MISMO instante. Si el
+ * saldo inicial sale de un `stock.quant` del día D y se le suman movimientos
+ * anteriores a D, esos movimientos SE CUENTAN DOS VECES — y un doble conteo no
+ * da negativo, no rompe ninguna prueba y no se distingue de un dato correcto
+ * mirándolo. Ver `verificacion/saldo-inicial-inventario.mjs`, que comprueba la
+ * identidad producto por producto y se niega a seguir si alguno no cuadra.
+ */
+export const FECHA_CORTE_DATOS_REALES = "2026-08-24";
+
+/**
  * Paginado por header Range. `orden` NO es opcional a propósito: PostgREST no
  * garantiza un orden estable entre respuestas si no se lo pide, así que sin
  * `order` dos páginas consecutivas pueden repetir una fila y omitir otra —

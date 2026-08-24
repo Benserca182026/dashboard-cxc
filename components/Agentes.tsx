@@ -16,9 +16,18 @@ import { calcularAging, diasAtraso, disputaActiva, estadoFacturaDerivado, fmtMon
 import type { ResultadoAging } from "@/lib/calculos";
 import { antiguedadPonderada, calcularDso, concentracionRiesgo } from "@/lib/kpis";
 import type { ResultadoAntiguedad, ResultadoConcentracion, ResultadoDso } from "@/lib/kpis";
-import { hayCadena, salidasSinVenta, stockPorProducto, ventasConTotal } from "@/lib/cadena";
+import {
+  hayCadena,
+  integridadInventario,
+  salidasSinVenta,
+  stockPorProducto,
+  ventasConTotal,
+  vinculoVentaFacturaDisponible,
+} from "@/lib/cadena";
+import type { FilaStock, IntegridadInventario } from "@/lib/cadena";
 import { forecastSimulado, prioridadSimulada } from "@/lib/simulados";
-import type { Dataset } from "@/lib/types";
+import type { FilaPrioridad, PuntoForecast } from "@/lib/simulados";
+import type { Dataset, Disputa, Moneda } from "@/lib/types";
 
 // ── El tipo de un hallazgo: TRES estados, no dos ──────────────────────────
 //
@@ -94,14 +103,28 @@ export type Hallazgo =
       comoSeLlena: string;
     };
 
-/** La forma anterior. Los seis grupos de agentes de módulo (prioritarios,
- *  seguimiento, ventas, inventario, forecast, datos) todavía la devuelven y no
- *  se tocan en esta tanda: siguen compilando y funcionando sin cambios. Se
- *  normalizan en el borde, en `normalizarHallazgo`. */
-export interface HallazgoLegado {
-  hay: boolean;
-  texto: string;
-}
+// ── EL ADAPTADOR TEMPORAL: MUERTO, Y ESTA ES SU ACTA ──────────────────────
+//
+// Acá vivían `HallazgoLegado` (`{ hay: boolean; texto: string }`) y su
+// traductor `normalizarHallazgo()`. Existían para que los agentes sin migrar
+// siguieran compilando mientras se pasaba, grupo por grupo, al tipo de tres
+// estados. Su condición de muerte estaba escrita desde el principio: se
+// borraban cuando migrara el ÚLTIMO de los seis grupos de módulo. Ya migraron
+// los seis, por nombre:
+//
+//   1. AGENTES_PRIORITARIOS   (M3 · worklist)
+//   2. AGENTES_SEGUIMIENTO    (M5 · cobros)
+//   3. AGENTES_VENTAS         (M8 · ventas)
+//   4. AGENTES_INVENTARIO     (M7 · inventario)
+//   5. AGENTES_FORECAST       (M4 · forecast)
+//   6. AGENTES_DATOS          (M6 · calidad de datos)
+//
+// Con los seis migrados el adaptador quedaba en función identidad: recibía un
+// Hallazgo y devolvía el mismo Hallazgo. Un adaptador que no adapta nada es
+// justamente el vestigio que se vuelve permanente si nadie lo borra el día que
+// sobra, así que se borró ese día. Los 28 agentes (4 de cartera + 6 × 4 de
+// módulo) construyen su Hallazgo de tres estados directamente, y `mirar`
+// devuelve ese tipo y ningún otro: ya no hay borde que normalizar.
 
 export interface Agente {
   id: string;
@@ -112,7 +135,7 @@ export interface Agente {
    *  auditar sin abrir el código: si alguien discute el resultado, discute
    *  esta línea. */
   base: string;
-  mirar: (d: Dataset, corte: string) => Hallazgo | HallazgoLegado;
+  mirar: (d: Dataset, corte: string) => Hallazgo;
 }
 
 /** Un agente ya migrado: MIDE y REDACTA por separado.
@@ -132,33 +155,11 @@ function definirAgente<M>(spec: Omit<AgenteMedido<M>, "mirar">): AgenteMedido<M>
   return { ...spec, mirar: (d, corte) => spec.redactar(spec.medir(d, corte)) };
 }
 
-/** Lleva cualquier hallazgo al tipo de tres estados.
- *
- *  Un agente no migrado no tiene evidencia estructurada, y eso NO se disimula:
- *  su procedencia lo dice con todas las letras y sus entradas quedan vacías, de
- *  modo que la ventana muestre "entradas no declaradas todavía" en vez de una
- *  tabla inventada. La deuda se ve; no se rellena. */
-export function normalizarHallazgo(
-  h: Hallazgo | HallazgoLegado,
-  agente: Agente,
-  corte: string
-): Hallazgo {
-  if ("estado" in h) return h;
-  const evidencia: Evidencia = {
-    expresion: agente.base,
-    entradas: [],
-    procedencia: {
-      modelo: "dataset en memoria",
-      filtro: "agente sin migrar: no declara entradas ni filtro",
-      corte,
-    },
-  };
-  return h.hay
-    ? { estado: "hallazgo", texto: h.texto, evidencia }
-    : { estado: "sin-hallazgo", texto: h.texto, evidencia };
-}
-
-type Moneda = "GTQ" | "USD";
+// `Moneda` vive en lib/types.ts junto al resto del vocabulario de dinero: acá
+// se reexporta para no romper a quien ya la importaba desde este módulo, pero
+// la definición es UNA SOLA. Dos listas de monedas que hay que mantener
+// sincronizadas a mano se desincronizan.
+export type { Moneda };
 const monedaDe = (d: Dataset): Moneda => (d.fuente === "odoo-real" ? "GTQ" : "USD");
 
 interface TramoMedido {
@@ -462,455 +463,1376 @@ export const AGENTES: Agente[] = [
 // Argumento.tsx) se calcula una sola vez a partir de NUM_AGENTES = AGENTES.length
 // — mantener 4 en cada módulo nuevo evita tener que tocar esa cuenta.
 
+/** Procedencia armada en una línea: los tres campos obligatorios, siempre. */
+function proc(modelo: string, filtro: string, corte: string, enlace?: string): Procedencia {
+  return { modelo, filtro, corte, enlace };
+}
+
+/** El dataset real de Odoo NO trae tabla de disputas: `lib/datosReales.ts`
+ *  devuelve `disputas: []` literal porque esa tabla no existe en el Supabase
+ *  real (verificado 2026-08-19). Por eso "no hay disputas viejas" es una frase
+ *  que NO se puede decir con datos reales: no es que se haya mirado y no
+ *  hubiera — es que no hay dónde mirar. Los agentes que dependen de disputas
+ *  consultan esto y caen a "sin-dato" en vez de afirmar tranquilidad. */
+const hayFuenteDeDisputas = (d: Dataset): boolean =>
+  // La segunda mitad no es defensa vacía: si algún día el import SÍ trae
+  // disputas reales, el dato manda sobre la suposición y estos agentes vuelven
+  // a medir solos. La regla es "no hay dónde mirar", no "la fuente es odoo".
+  d.fuente !== "odoo-real" || d.disputas.length > 0;
+
+// RAMA R7 — RESUELTA el 2026-08-24 (docs/hallazgos-odoo-en-vivo.md, «¿Existen
+// disputas en Odoo?»): NO EXISTEN COMO TAL. No es que el import las haya
+// dejado afuera — es que en Odoo no hay ningún modelo de disputa o reclamo. Lo
+// más parecido es el seguimiento de cobranza (account_followup, 64 clientes en
+// follow-up-reports.xlsx), y el propio boletín lo separa con todas las letras:
+// «eso es gestión de cobro, no disputa». Un seguimiento dice que se está
+// reclamando; una disputa dice que el cliente DESCONOCE el cargo. Tomar uno por
+// el otro convertiría a 64 clientes gestionados en 64 clientes en conflicto.
+const SIN_FUENTE_DISPUTAS = {
+  queFalta:
+    "La fuente de disputas, que no existe en ningún lado. Ni la tabla en Supabase (lib/datosReales.ts devuelve la lista vacía), ni el modelo en Odoo: el Frente 1 lo buscó el 2026-08-24 y no encontró ningún modelo de disputa ni de reclamo. No es una lista vacía: es una fuente que no está.",
+  consecuencia:
+    "No se puede afirmar que no haya disputas, ni contarlas, ni medir su antigüedad. Un cero acá sería tranquilidad inventada: se estaría leyendo una ausencia de datos como una ausencia de conflictos.",
+  comoSeLlena:
+    "Primero hay que decidir dónde se registran los reclamos, porque hoy no se registran. Lo más cercano que existe es el seguimiento de cobranza de Odoo (account_followup, 64 clientes), pero eso es gestión de cobro y NO es una disputa: confundirlos convertiría clientes gestionados en clientes en conflicto. Confirmar contra Odoo vivo antes de construir cualquier pantalla de disputas.",
+} as const;
+
+const SIN_CADENA_VENTAS = {
+  queFalta:
+    "Este dataset no trae la cadena de ventas: faltan productos, ventas o líneas de venta. Un CSV solo-CxC es un dataset válido, pero no contiene lo vendido.",
+  consecuencia:
+    "No se puede comparar lo vendido contra lo facturado, ni seguir una venta hasta su factura. No se muestra un cero: cero ventas y no saber de ventas son cosas distintas, y sólo una de las dos es cierta acá.",
+  comoSeLlena:
+    "Cargando el dataset real de Odoo (que sí trae la cadena) o importando ventas y líneas con scripts/importar-ventas-odoo.mjs.",
+} as const;
+
+const SIN_CADENA_INVENTARIO = {
+  queFalta:
+    "Este dataset no trae la cadena de inventario: faltan productos o movimientos.",
+  consecuencia:
+    "No se puede auditar el kardex ni medir rotación. Un tablero de inventario en blanco es honesto; uno lleno de ceros afirmaría que no hay mercadería, que es otra cosa.",
+  comoSeLlena:
+    "Cargando el dataset real de Odoo o importando movimientos con scripts/importar-inventario-odoo.mjs.",
+} as const;
+
 /** M3 — worklist de prioritarios: agentes sobre `prioridadSimulada`. */
 export const AGENTES_PRIORITARIOS: Agente[] = [
-  {
+  definirAgente<{ corte: string; filas: FilaPrioridad[] }>({
     id: "vigia",
     glifo: "👁",
     nombre: "Vigía",
     pregunta: "¿Una cuenta en disputa igual quedó entre las 3 más urgentes?",
     base: "prioridadSimulada() · top 3 por score · enDisputa === true",
-    mirar: (d, corte) => {
-      const top3 = prioridadSimulada(d, corte).slice(0, 3);
-      const conDisputa = top3.find((f) => f.enDisputa);
-      if (conDisputa) {
+    medir: (d, corte) => ({ corte, filas: prioridadSimulada(d, corte) }),
+    redactar: ({ corte, filas }) => {
+      // Con la worklist vacía, "la penalización la sacó del podio" era una
+      // afirmación sobre un podio que no existe. No hay tres cuentas que mirar.
+      if (filas.length === 0) {
         return {
-          hay: true,
-          texto: `${conDisputa.nombreCliente} sigue en el top 3 (score ${conDisputa.scoreSimulado}) aunque la disputa ya penalizó su score a la mitad. La penalización no alcanza a bajarla del podio.`,
+          estado: "sin-dato",
+          queFalta:
+            "La worklist de prioritarios salió vacía al corte: prioridadSimulada() no devolvió ninguna cuenta con saldo abierto.",
+          consecuencia:
+            "No hay top 3 sobre el cual preguntar si una disputa se coló. Decir que la penalización la sacó del podio describiría un podio que no existe.",
+          comoSeLlena:
+            "Con facturas abiertas al corte declarado. Si las hay en Odoo y acá no aparecen, el corte o la importación son el problema, no el score.",
         };
       }
-      return { hay: false, texto: "Ninguna cuenta en disputa quedó entre las 3 más urgentes: la penalización la sacó del podio." };
+      const top3 = filas.slice(0, 3);
+      const conDisputa = top3.find((f) => f.enDisputa);
+      const procedencia = proc(
+        "facturas + disputas → prioridadSimulada(dataset, corte)",
+        "sólo las 3 primeras filas por score simulado; el score de una cuenta en disputa ya viene penalizado a la mitad",
+        corte,
+        "/prioritarios"
+      );
+      // Sin ranking A PROPÓSITO: la pregunta es de pertenencia (quedó o no en
+      // el top 3), no de reparto. Un top N con porcentajes exigiría un
+      // denominador, y la suma de scores no es una magnitud: no significa nada.
+      const entradas: EntradaEvidencia[] = [
+        ...top3.map((f, i) => ({
+          nombre: `#${i + 1} ${f.nombreCliente}${f.enDisputa ? " (en disputa)" : ""}`,
+          valor: f.scoreSimulado,
+          unidad: "score",
+        })),
+        { nombre: "cuentas en la worklist", valor: filas.length },
+      ];
+      if (conDisputa) {
+        return {
+          estado: "hallazgo",
+          texto: `${conDisputa.nombreCliente} sigue en el top 3 (score ${conDisputa.scoreSimulado}) aunque la disputa ya penalizó su score a la mitad. La penalización no alcanza a bajarla del podio.`,
+          evidencia: { expresion: "prioridadSimulada() · top 3 por score · enDisputa === true", entradas, procedencia },
+        };
+      }
+      return {
+        estado: "sin-hallazgo",
+        texto: "Ninguna cuenta en disputa quedó entre las 3 más urgentes: la penalización la sacó del podio.",
+        evidencia: { expresion: "prioridadSimulada() · top 3 por score · enDisputa === true", entradas, procedencia },
+      };
     },
-  },
-  {
+  }),
+  definirAgente<{ moneda: Moneda; corte: string; filas: FilaPrioridad[] }>({
     id: "balanza-worklist",
     glifo: "⚖",
     nombre: "Balanza",
     pregunta: "¿Un cliente concentra el saldo de la worklist?",
     base: "mayor saldoTotal de la worklist ÷ saldo total de la worklist · umbral 35%",
-    mirar: (d, corte) => {
-      const moneda = d.fuente === "odoo-real" ? "GTQ" : "USD";
+    medir: (d, corte) => ({ moneda: monedaDe(d), corte, filas: prioridadSimulada(d, corte) }),
+    redactar: ({ moneda, corte, filas }) => {
       const fmt = (n: number) => fmtMoneda(n, moneda);
-      const filas = prioridadSimulada(d, corte);
       const total = filas.reduce((s, f) => s + f.saldoTotal, 0);
-      const mayor = [...filas].sort((a, b) => b.saldoTotal - a.saldoTotal)[0];
-      if (!mayor || total <= 0) return { hay: false, texto: "Sin saldo en la worklist: nada que concentrar." };
-      const part = (mayor.saldoTotal / total) * 100;
-      if (part >= 35) {
+      const ordenado = [...filas].sort((a, b) => b.saldoTotal - a.saldoTotal);
+      const mayor = ordenado[0];
+      if (!mayor || total <= 0) {
         return {
-          hay: true,
-          texto: `${mayor.nombreCliente} concentra el ${Math.round(part)}% del saldo de la worklist (${fmt(mayor.saldoTotal)} de ${fmt(total)}).`,
+          estado: "sin-dato",
+          queFalta:
+            "La worklist no tiene saldo al corte: o salió vacía, o todas sus cuentas suman cero. Sin denominador no hay reparto que medir.",
+          consecuencia:
+            "No se puede decir si alguien concentra el riesgo ni tampoco descartarlo. Un cero por ciento de concentración sería una división por cero disfrazada de tranquilidad.",
+          comoSeLlena:
+            "Con facturas abiertas con saldo al corte declarado. Si las hay en Odoo y acá no aparecen, revisar la importación y el corte usado.",
         };
       }
-      return { hay: false, texto: `Mayor cliente: ${Math.round(part)}% del saldo de la worklist, bajo el umbral de 35%. El saldo está repartido.` };
+      const part = (mayor.saldoTotal / total) * 100;
+      const procedencia = proc(
+        "facturas → prioridadSimulada(dataset, corte) · saldoTotal por cuenta",
+        "todas las cuentas de la worklist con saldo abierto al corte",
+        corte,
+        "/prioritarios"
+      );
+      const entradas: EntradaEvidencia[] = [
+        { nombre: "mayor saldo de la worklist", valor: mayor.saldoTotal, unidad: moneda },
+        { nombre: "saldo total de la worklist", valor: total, unidad: moneda },
+        { nombre: "concentración", valor: part, unidad: "%" },
+        { nombre: "umbral", valor: 35, unidad: "%" },
+        { nombre: "cuentas en la worklist", valor: filas.length },
+      ];
+      const ranking: Ranking = {
+        total,
+        unidad: moneda,
+        filas: ordenado.slice(0, 10).map((f) => ({
+          id: f.idCliente,
+          etiqueta: f.nombreCliente,
+          valor: f.saldoTotal,
+          pct: (f.saldoTotal / total) * 100,
+        })),
+      };
+      if (part >= 35) {
+        return {
+          estado: "hallazgo",
+          texto: `${mayor.nombreCliente} concentra el ${Math.round(part)}% del saldo de la worklist (${fmt(mayor.saldoTotal)} de ${fmt(total)}).`,
+          evidencia: { expresion: "mayor saldoTotal de la worklist ÷ saldo total de la worklist · umbral 35%", entradas, procedencia },
+          ranking,
+        };
+      }
+      return {
+        estado: "sin-hallazgo",
+        texto: `Mayor cliente: ${Math.round(part)}% del saldo de la worklist, bajo el umbral de 35%. El saldo está repartido.`,
+        evidencia: { expresion: "mayor saldoTotal de la worklist ÷ saldo total de la worklist · umbral 35%", entradas, procedencia },
+        ranking,
+      };
     },
-  },
-  {
+  }),
+  definirAgente<{ corte: string; lider: FilaPrioridad | undefined }>({
     id: "compas",
     glifo: "🧭",
     nombre: "Compás",
     pregunta: "¿El score del líder lo explica el saldo o los días de atraso?",
     base: "nSaldo = saldo÷5.000 · nDias = días÷120 (techos del score simulado) · brecha ≥ 0.15",
-    mirar: (d, corte) => {
-      const lider = prioridadSimulada(d, corte)[0];
-      if (!lider) return { hay: false, texto: "Worklist vacía: no hay líder que explicar." };
+    medir: (d, corte) => ({ corte, lider: prioridadSimulada(d, corte)[0] }),
+    redactar: ({ corte, lider }) => {
+      if (!lider) {
+        return {
+          estado: "sin-dato",
+          queFalta:
+            "La worklist salió vacía al corte: no hay una cuenta líder cuyo score se pueda descomponer en saldo y días.",
+          consecuencia:
+            "No se puede decir qué pesa más en la urgencia. Sin líder no hay score, y sin score no hay nada que explicar.",
+          comoSeLlena:
+            "Con facturas abiertas al corte declarado. Si las hay en Odoo y acá no aparecen, revisar la importación y el corte usado.",
+        };
+      }
       const nSaldo = Math.min(lider.saldoTotal / 5000, 1);
       const nDias = Math.min(Math.max(lider.diasMaxAtraso, 0) / 120, 1);
       const brecha = Math.abs(nSaldo - nDias);
+      const procedencia = proc(
+        "facturas → prioridadSimulada(dataset, corte) · primera fila",
+        "sólo la cuenta líder; los techos 5.000 y 120 d son los del score simulado, no umbrales de negocio",
+        corte,
+        "/prioritarios"
+      );
+      // Sin ranking: se comparan DOS componentes de UNA cuenta, no una
+      // población. Fabricar un top N acá sería inventar un orden inexistente.
+      const entradas: EntradaEvidencia[] = [
+        { nombre: "cuenta líder", valor: lider.nombreCliente },
+        { nombre: "saldo del líder", valor: lider.saldoTotal },
+        { nombre: "saldo normalizado (÷5.000, tope 1)", valor: Number(nSaldo.toFixed(4)) },
+        { nombre: "días de atraso del líder", valor: lider.diasMaxAtraso, unidad: "d" },
+        { nombre: "días normalizados (÷120, tope 1)", valor: Number(nDias.toFixed(4)) },
+        { nombre: "brecha", valor: Number(brecha.toFixed(4)) },
+        { nombre: "umbral", valor: 0.15 },
+      ];
       if (brecha >= 0.15) {
         const manda = nSaldo > nDias ? "el saldo" : "los días de atraso";
         return {
-          hay: true,
+          estado: "hallazgo",
           texto: `En ${lider.nombreCliente}, ${manda} explica la mayor parte del score (saldo normalizado ${(nSaldo * 100).toFixed(0)}% contra días normalizados ${(nDias * 100).toFixed(0)}%).`,
+          evidencia: { expresion: "nSaldo = saldo÷5.000 · nDias = días÷120 (techos del score simulado) · brecha ≥ 0.15", entradas, procedencia },
         };
       }
-      return { hay: false, texto: `En ${lider.nombreCliente}, saldo y días pesan casi igual en el score: ninguno de los dos manda solo.` };
+      return {
+        estado: "sin-hallazgo",
+        texto: `En ${lider.nombreCliente}, saldo y días pesan casi igual en el score: ninguno de los dos manda solo.`,
+        evidencia: { expresion: "nSaldo = saldo÷5.000 · nDias = días÷120 (techos del score simulado) · brecha ≥ 0.15", entradas, procedencia },
+      };
     },
-  },
-  {
+  }),
+  definirAgente<{ corte: string; filas: FilaPrioridad[] }>({
     id: "filtro",
     glifo: "🗂",
     nombre: "Filtro",
     pregunta: "¿Hay cuentas en la worklist sin un solo día de atraso?",
     base: "filas con saldoTotal > 0 y diasMaxAtraso === 0",
-    mirar: (d, corte) => {
-      const sinAtraso = prioridadSimulada(d, corte).filter((f) => f.diasMaxAtraso === 0);
-      if (sinAtraso.length > 0) {
+    medir: (d, corte) => ({ corte, filas: prioridadSimulada(d, corte) }),
+    redactar: ({ corte, filas }) => {
+      if (filas.length === 0) {
         return {
-          hay: true,
-          texto: `${sinAtraso.length} cuenta(s) están en la worklist con saldo abierto pero SIN un solo día de atraso: ${sinAtraso.map((f) => f.nombreCliente).join(", ")}. Entraron por tener saldo, no por estar vencidas.`,
+          estado: "sin-dato",
+          queFalta:
+            "La worklist salió vacía al corte: no hay ninguna cuenta cuyos días de atraso se puedan revisar.",
+          consecuencia:
+            "Afirmar que toda cuenta tiene al menos un día de atraso, sobre cero cuentas, es cierto por vacío y falso como información: daría por revisada una lista que no existe.",
+          comoSeLlena:
+            "Con facturas abiertas al corte declarado. Si las hay en Odoo y acá no aparecen, revisar la importación y el corte usado.",
         };
       }
-      return { hay: false, texto: "Toda cuenta en la worklist tiene al menos un día de atraso." };
+      const sinAtraso = filas.filter((f) => f.diasMaxAtraso === 0);
+      const procedencia = proc(
+        "facturas → prioridadSimulada(dataset, corte) · diasMaxAtraso",
+        "todas las cuentas de la worklist; se entra por tener saldo abierto, no por estar vencida",
+        corte,
+        "/prioritarios"
+      );
+      // La pregunta es un CONTEO: cuántas cuentas cumplen la condición. Un top N
+      // no aporta orden alguno acá — todas valen lo mismo frente al criterio.
+      const entradas: EntradaEvidencia[] = [
+        { nombre: "cuentas en la worklist", valor: filas.length },
+        { nombre: "cuentas sin un solo día de atraso", valor: sinAtraso.length },
+        { nombre: "cuentas con al menos un día de atraso", valor: filas.length - sinAtraso.length },
+      ];
+      if (sinAtraso.length > 0) {
+        return {
+          estado: "hallazgo",
+          texto: `${sinAtraso.length} cuenta(s) están en la worklist con saldo abierto pero SIN un solo día de atraso: ${sinAtraso.map((f) => f.nombreCliente).join(", ")}. Entraron por tener saldo, no por estar vencidas.`,
+          evidencia: { expresion: "filas con saldoTotal > 0 y diasMaxAtraso === 0", entradas, procedencia },
+        };
+      }
+      return {
+        estado: "sin-hallazgo",
+        texto: "Toda cuenta en la worklist tiene al menos un día de atraso.",
+        evidencia: { expresion: "filas con saldoTotal > 0 y diasMaxAtraso === 0", entradas, procedencia },
+      };
     },
-  },
+  }),
 ];
 
 /** M5 — seguimiento de cobros: agentes sobre el dataset (facturas/disputas).
  *  La bitácora local (gestiones) NO pasa por acá — vive en el estado del
  *  componente, no en Dataset; el motor de argumentación de la página sí la usa. */
 export const AGENTES_SEGUIMIENTO: Agente[] = [
-  {
+  definirAgente<{ corte: string; hayFuente: boolean; activas: Disputa[]; viejas: Disputa[] }>({
     id: "guardia",
     glifo: "⏳",
     nombre: "Guardia",
     pregunta: "¿Alguna disputa lleva más de 30 días abierta?",
     base: "disputas activas · fecha de corte − fecha de apertura > 30 días",
-    mirar: (d, corte) => {
-      const viejas = d.disputas.filter((x) => disputaActiva(x) && diasAtraso(corte, x.fecha_apertura) > 30);
+    medir: (d, corte) => {
+      const activas = d.disputas.filter((x) => disputaActiva(x));
+      return {
+        corte,
+        hayFuente: hayFuenteDeDisputas(d),
+        activas,
+        viejas: activas.filter((x) => diasAtraso(corte, x.fecha_apertura) > 30),
+      };
+    },
+    redactar: ({ corte, hayFuente, activas, viejas }) => {
+      // Sin tabla de disputas NO se puede decir "ninguna lleva más de 30 días":
+      // esa frase afirma haber revisado una lista que no existe.
+      if (!hayFuente) return { estado: "sin-dato", ...SIN_FUENTE_DISPUTAS };
+      const procedencia = proc(
+        "disputas → disputaActiva() + diasAtraso(corte, fecha_apertura)",
+        "sólo disputas activas (abierta o en revisión); las resueltas y rechazadas no cuentan",
+        corte,
+        "/seguimiento"
+      );
+      // Sin ranking: la pregunta es un CONTEO con un peor caso, y la prosa ya
+      // nombra ese peor caso. Un top N por días no tiene denominador posible
+      // (la suma de días de varias disputas no es una magnitud).
+      const entradas: EntradaEvidencia[] = [
+        { nombre: "disputas activas", valor: activas.length },
+        { nombre: "disputas con más de 30 días", valor: viejas.length },
+        { nombre: "umbral", valor: 30, unidad: "d" },
+        ...viejas.map((x) => ({
+          nombre: `factura ${x.id_factura} abierta desde ${x.fecha_apertura}`,
+          valor: diasAtraso(corte, x.fecha_apertura),
+          unidad: "d",
+        })),
+      ];
       if (viejas.length > 0) {
         const peor = [...viejas].sort((a, b) => diasAtraso(corte, a.fecha_apertura) - diasAtraso(corte, b.fecha_apertura)).at(-1)!;
         return {
-          hay: true,
+          estado: "hallazgo",
           texto: `${viejas.length} disputa(s) llevan más de 30 días abiertas. La más vieja: factura ${peor.id_factura}, ${diasAtraso(corte, peor.fecha_apertura)} días sin resolver.`,
+          evidencia: { expresion: "disputas activas · fecha de corte − fecha de apertura > 30 días", entradas, procedencia },
         };
       }
-      return { hay: false, texto: "Ninguna disputa activa lleva más de 30 días abierta." };
+      return {
+        estado: "sin-hallazgo",
+        texto: "Ninguna disputa activa lleva más de 30 días abierta.",
+        evidencia: { expresion: "disputas activas · fecha de corte − fecha de apertura > 30 días", entradas, procedencia },
+      };
     },
-  },
-  {
+  }),
+  definirAgente<{ moneda: Moneda; corte: string; abiertas: ResultadoAging["clasificadas"] }>({
     id: "reloj-seguimiento",
     glifo: "⏱",
     nombre: "Reloj",
     pregunta: "¿Cuál factura abierta lleva más días esperando cobro?",
     base: "facturas clasificadas no pagadas · máximo de días de atraso",
-    mirar: (d, corte) => {
-      const moneda = d.fuente === "odoo-real" ? "GTQ" : "USD";
+    medir: (d, corte) => ({
+      moneda: monedaDe(d),
+      corte,
+      abiertas: calcularAging(d, corte).clasificadas.filter((c) => c.estado !== "pagada"),
+    }),
+    redactar: ({ moneda, corte, abiertas }) => {
       const fmt = (n: number) => fmtMoneda(n, moneda);
-      const abiertas = calcularAging(d, corte).clasificadas.filter((c) => c.estado !== "pagada");
-      if (abiertas.length === 0) return { hay: false, texto: "No hay facturas clasificadas abiertas: nada que esperar." };
-      const peor = [...abiertas].sort((x, y) => y.dias - x.dias)[0];
-      if (peor.dias > 0) {
+      if (abiertas.length === 0) {
         return {
-          hay: true,
-          texto: `${peor.factura.numero_factura} lleva ${peor.dias} días de atraso — es la que más tiempo espera gestión (${fmt(peor.saldo)}).`,
+          estado: "sin-dato",
+          queFalta:
+            "No hay ninguna factura clasificada y abierta al corte: sin facturas con saldo y fecha de vencimiento, no hay espera que medir.",
+          consecuencia:
+            "No se puede señalar cuál lleva más tiempo esperando gestión. No es que la cobranza esté al día: es que no hay nada sobre lo cual afirmarlo.",
+          comoSeLlena:
+            "Con facturas abiertas con fecha de vencimiento al corte. Si las hay en Odoo y acá no aparecen, revisar scripts/importar-facturas-odoo.mjs y el corte usado.",
         };
       }
-      return { hay: false, texto: "Ninguna factura clasificada está vencida: la que más espera todavía está en plazo." };
+      const peor = [...abiertas].sort((x, y) => y.dias - x.dias)[0];
+      const procedencia = proc(
+        "facturas → calcularAging(dataset, corte).clasificadas",
+        "sólo facturas clasificadas cuyo estado derivado no es «pagada»; las sin fecha de vencimiento quedan fuera del aging",
+        corte,
+        "/seguimiento"
+      );
+      // Sin ranking: es un MÁXIMO, no un reparto. Los días de varias facturas
+      // no suman un total contra el cual sacar porcentajes.
+      const entradas: EntradaEvidencia[] = [
+        { nombre: "facturas clasificadas abiertas", valor: abiertas.length },
+        { nombre: "factura que más espera", valor: peor.factura.numero_factura },
+        { nombre: "días de atraso de esa factura", valor: peor.dias, unidad: "d" },
+        { nombre: "saldo de esa factura", valor: peor.saldo, unidad: moneda },
+      ];
+      if (peor.dias > 0) {
+        return {
+          estado: "hallazgo",
+          texto: `${peor.factura.numero_factura} lleva ${peor.dias} días de atraso — es la que más tiempo espera gestión (${fmt(peor.saldo)}).`,
+          evidencia: { expresion: "facturas clasificadas no pagadas · máximo de días de atraso", entradas, procedencia },
+        };
+      }
+      return {
+        estado: "sin-hallazgo",
+        texto: "Ninguna factura clasificada está vencida: la que más espera todavía está en plazo.",
+        evidencia: { expresion: "facturas clasificadas no pagadas · máximo de días de atraso", entradas, procedencia },
+      };
     },
-  },
-  {
+  }),
+  definirAgente<{ corte: string; abiertas: number; conVarias: [string, number][]; nombre: (id: string) => string }>({
     id: "enlace",
     glifo: "🔗",
     nombre: "Enlace",
     pregunta: "¿Hay clientes con más de una factura abierta a la vez?",
     base: "facturas no pagadas agrupadas por cliente · cuenta ≥ 2",
-    mirar: (d, corte) => {
+    medir: (d, corte) => {
       const porCliente = new Map<string, number>();
+      let abiertas = 0;
       for (const c of calcularAging(d, corte).clasificadas) {
         if (c.estado === "pagada") continue;
+        abiertas++;
         porCliente.set(c.factura.id_cliente, (porCliente.get(c.factura.id_cliente) ?? 0) + 1);
       }
-      const conVarias = [...porCliente.entries()].filter(([, n]) => n >= 2);
-      if (conVarias.length > 0) {
-        const nombre = (id: string) => nombreDeCliente(d.clientes, id);
+      return {
+        corte,
+        abiertas,
+        conVarias: [...porCliente.entries()].filter(([, n]) => n >= 2),
+        nombre: (id: string) => nombreDeCliente(d.clientes, id),
+      };
+    },
+    redactar: ({ corte, abiertas, conVarias, nombre }) => {
+      if (abiertas === 0) {
         return {
-          hay: true,
-          texto: `${conVarias.length} cliente(s) tienen 2 o más facturas abiertas a la vez: ${conVarias.map(([id, n]) => `${nombre(id)} (${n})`).join(", ")}. Conviene gestionarlas juntas, no factura por factura.`,
+          estado: "sin-dato",
+          queFalta:
+            "No hay ninguna factura clasificada y abierta al corte: no hay nada que agrupar por cliente.",
+          consecuencia:
+            "Afirmar que ningún cliente acumula facturas, sobre cero facturas, es cierto por vacío y engañoso como información: sugiere una cartera revisada y sana donde no hay cartera.",
+          comoSeLlena:
+            "Con facturas abiertas con fecha de vencimiento al corte. Si las hay en Odoo y acá no aparecen, revisar scripts/importar-facturas-odoo.mjs y el corte usado.",
         };
       }
-      return { hay: false, texto: "Ningún cliente tiene más de una factura abierta a la vez." };
+      const procedencia = proc(
+        "facturas → calcularAging(dataset, corte).clasificadas, agrupadas por id_cliente",
+        "sólo facturas clasificadas cuyo estado derivado no es «pagada»",
+        corte,
+        "/seguimiento"
+      );
+      // Sin ranking: es un CONTEO de clientes que cruzan un umbral de 2, y la
+      // prosa ya los nombra con su cuenta. No hay reparto de un total.
+      const entradas: EntradaEvidencia[] = [
+        { nombre: "facturas clasificadas abiertas", valor: abiertas },
+        { nombre: "clientes con 2 o más facturas abiertas", valor: conVarias.length },
+        { nombre: "umbral", valor: 2, unidad: "facturas" },
+        ...conVarias.map(([id, n]) => ({ nombre: nombre(id), valor: n, unidad: "facturas" })),
+      ];
+      if (conVarias.length > 0) {
+        return {
+          estado: "hallazgo",
+          texto: `${conVarias.length} cliente(s) tienen 2 o más facturas abiertas a la vez: ${conVarias.map(([id, n]) => `${nombre(id)} (${n})`).join(", ")}. Conviene gestionarlas juntas, no factura por factura.`,
+          evidencia: { expresion: "facturas no pagadas agrupadas por cliente · cuenta ≥ 2", entradas, procedencia },
+        };
+      }
+      return {
+        estado: "sin-hallazgo",
+        texto: "Ningún cliente tiene más de una factura abierta a la vez.",
+        evidencia: { expresion: "facturas no pagadas agrupadas por cliente · cuenta ≥ 2", entradas, procedencia },
+      };
     },
-  },
-  {
+  }),
+  definirAgente<{ corte: string; hayFuente: boolean; noAnuladas: number; bloqueadas: string[] }>({
     id: "bitacora-bloqueo",
     glifo: "🔒",
     nombre: "Bitácora",
     pregunta: "¿Cuántas facturas tienen el cobro bloqueado por una disputa?",
     base: "estadoFacturaDerivado === disputada, sobre las facturas no anuladas",
-    mirar: (d, corte) => {
-      void corte;
+    medir: (d, corte) => {
       const noAnuladas = d.facturas.filter((f) => f.estado_factura !== "anulada");
-      const bloqueadas = noAnuladas.filter((f) => estadoFacturaDerivado(f, d.pagos, d.notasCredito, d.disputas) === "disputada");
+      return {
+        corte,
+        hayFuente: hayFuenteDeDisputas(d),
+        noAnuladas: noAnuladas.length,
+        bloqueadas: noAnuladas
+          .filter((f) => estadoFacturaDerivado(f, d.pagos, d.notasCredito, d.disputas) === "disputada")
+          .map((f) => f.numero_factura),
+      };
+    },
+    redactar: ({ corte, hayFuente, noAnuladas, bloqueadas }) => {
+      // El estado "disputada" se DERIVA de la tabla de disputas. Sin esa tabla
+      // ninguna factura puede salir disputada nunca, así que el conteo daría 0
+      // por construcción — un cero que no mide nada.
+      if (!hayFuente) return { estado: "sin-dato", ...SIN_FUENTE_DISPUTAS };
+      const procedencia = proc(
+        "facturas + disputas → estadoFacturaDerivado(factura, pagos, notasCredito, disputas)",
+        "se excluyen las facturas anuladas; el estado se deriva, no se lee del campo estado_factura",
+        corte,
+        "/seguimiento"
+      );
+      // La pregunta empieza con "¿cuántas?": es un conteo. Sin ranking.
+      const entradas: EntradaEvidencia[] = [
+        { nombre: "facturas no anuladas", valor: noAnuladas },
+        { nombre: "facturas con cobro bloqueado por disputa", valor: bloqueadas.length },
+      ];
       if (bloqueadas.length > 0) {
         return {
-          hay: true,
-          texto: `${bloqueadas.length} de ${noAnuladas.length} factura(s) no anuladas tienen el cobro bloqueado por disputa: ${bloqueadas.map((f) => f.numero_factura).join(", ")}. No se gestionan como cobranza normal hasta resolverse.`,
+          estado: "hallazgo",
+          texto: `${bloqueadas.length} de ${noAnuladas} factura(s) no anuladas tienen el cobro bloqueado por disputa: ${bloqueadas.join(", ")}. No se gestionan como cobranza normal hasta resolverse.`,
+          evidencia: { expresion: "estadoFacturaDerivado === disputada, sobre las facturas no anuladas", entradas, procedencia },
         };
       }
-      return { hay: false, texto: "Ninguna factura tiene el cobro bloqueado por disputa." };
+      return {
+        estado: "sin-hallazgo",
+        texto: "Ninguna factura tiene el cobro bloqueado por disputa.",
+        evidencia: { expresion: "estadoFacturaDerivado === disputada, sobre las facturas no anuladas", entradas, procedencia },
+      };
     },
-  },
+  }),
 ];
 
 /** M8 — ventas: agentes sobre `dataset.ventas`/`ventaLineas` (Paso 11). Si el
  *  dataset no trae la cadena, cada agente lo declara en vez de mostrar ceros. */
 export const AGENTES_VENTAS: Agente[] = [
-  {
+  definirAgente<{
+    moneda: Moneda;
+    corte: string;
+    hay: boolean;
+    c: ReturnType<typeof cuadreVentasFacturacionSafe> | null;
+  }>({
     id: "cuadre",
     glifo: "🧮",
     nombre: "Cuadre",
     pregunta: "¿Vendido y facturado cuadran exactamente?",
     base: "Σ líneas de venta vs Σ monto_original no anulado · diferencia exacta",
-    mirar: (d) => {
-      const moneda = d.fuente === "odoo-real" ? "GTQ" : "USD";
+    medir: (d, corte) => ({
+      moneda: monedaDe(d),
+      corte,
+      hay: hayCadena(d),
+      c: hayCadena(d) ? cuadreVentasFacturacionSafe(d) : null,
+    }),
+    redactar: ({ moneda, corte, hay, c }) => {
+      if (!hay || !c) return { estado: "sin-dato", ...SIN_CADENA_VENTAS };
       const fmt = (n: number) => fmtMoneda(n, moneda);
-      if (!hayCadena(d)) return { hay: false, texto: "Este dataset no trae la cadena de ventas: nada que cuadrar." };
-      const c = cuadreVentasFacturacionSafe(d);
+      const procedencia = proc(
+        "ventaLineas → Σ(cantidad × precio_unitario) contra facturas → Σ monto_original",
+        "capa «composicion»: las líneas van A PRECIO DE LISTA porque el export de Odoo no trae la columna descuento. Se comparan dos poblaciones distintas (pedidos contra facturas)",
+        corte,
+        "/ventas"
+      );
+      // Sin ranking: es UNA resta entre dos totales, no un reparto.
+      const entradas: EntradaEvidencia[] = [
+        { nombre: "vendido (Σ líneas, a precio de lista)", valor: c.totalVendido, unidad: moneda },
+        { nombre: "facturado (Σ monto_original, sin anuladas)", valor: c.totalFacturado, unidad: moneda },
+        { nombre: "diferencia", valor: c.diferencia, unidad: moneda },
+        { nombre: "tolerancia", valor: 0.005, unidad: moneda },
+      ];
       if (!c.cuadra) {
-        return { hay: true, texto: `Descuadre de ${fmt(Math.abs(c.diferencia))}: vendido ${fmt(c.totalVendido)} contra facturado ${fmt(c.totalFacturado)}.` };
+        return {
+          estado: "hallazgo",
+          texto: `Descuadre de ${fmt(Math.abs(c.diferencia))}: vendido ${fmt(c.totalVendido)} contra facturado ${fmt(c.totalFacturado)}.`,
+          evidencia: { expresion: "Σ líneas de venta vs Σ monto_original no anulado · diferencia exacta", entradas, procedencia },
+        };
       }
-      return { hay: false, texto: `Vendido y facturado cuadran: ${fmt(c.totalVendido)}.` };
+      return {
+        estado: "sin-hallazgo",
+        texto: `Vendido y facturado cuadran: ${fmt(c.totalVendido)}.`,
+        evidencia: { expresion: "Σ líneas de venta vs Σ monto_original no anulado · diferencia exacta", entradas, procedencia },
+      };
     },
-  },
-  {
+  }),
+  definirAgente<{ corte: string; hay: boolean; hayVinculo: boolean; ventas: number; sinFactura: string[] }>({
     id: "cadena-venta",
     glifo: "🔗",
     nombre: "Cadena",
     pregunta: "¿Hay ventas sin factura asociada?",
     base: "ventasConTotal() · id_factura ausente",
-    mirar: (d) => {
-      if (!hayCadena(d)) return { hay: false, texto: "Este dataset no trae la cadena de ventas: nada que verificar." };
-      const sinFactura = ventasConTotal(d).filter((v) => !v.id_factura);
-      if (sinFactura.length > 0) {
-        return { hay: true, texto: `${sinFactura.length} venta(s) no tienen factura asociada: ${sinFactura.map((v) => v.id_venta).join(", ")}. La cadena se rompió ahí.` };
-      }
-      return { hay: false, texto: "Toda venta tiene su factura asociada." };
+    medir: (d, corte) => {
+      const hay = hayCadena(d);
+      const filas = hay ? ventasConTotal(d) : [];
+      return {
+        corte,
+        hay,
+        hayVinculo: vinculoVentaFacturaDisponible(d),
+        ventas: filas.length,
+        sinFactura: filas.filter((v) => !v.id_factura).map((v) => v.id_venta),
+      };
     },
-  },
-  {
+    redactar: ({ corte, hay, hayVinculo, ventas, sinFactura }) => {
+      if (!hay) return { estado: "sin-dato", ...SIN_CADENA_VENTAS };
+      // Si NINGUNA factura trae id_venta, "ventas sin factura" no es una alarma
+      // de negocio: es que este export nunca capturó el vínculo. Acusar a la
+      // venta de una cadena rota que el dato es incapaz de mostrar sería
+      // fabricar un hallazgo — el mismo vicio, con otro disfraz.
+      if (!hayVinculo) {
+        return {
+          estado: "sin-dato",
+          queFalta:
+            "Ninguna factura del dataset trae id_venta poblado: este export de Odoo nunca capturó el vínculo venta ↔ factura.",
+          consecuencia:
+            "Todas las ventas parecerían huérfanas, y no lo son: la cadena no está rota, está sin registrar. Reportarlas como hallazgo sería acusar a la venta de un defecto del export.",
+          comoSeLlena:
+            "Trayendo de Odoo el campo que liga account.move con sale.order (invoice_origin o la relación sale_line_ids) y mapeándolo a Factura.id_venta en scripts/importar-facturas-odoo.mjs.",
+        };
+      }
+      const procedencia = proc(
+        "ventas → ventasConTotal(dataset), cruzado contra facturas por id_venta",
+        "sólo ventas del dataset; el vínculo se resuelve por Factura.id_venta, nunca por coincidencia de monto o fecha",
+        corte,
+        "/ventas"
+      );
+      // La pregunta es de existencia y conteo. Sin ranking.
+      const entradas: EntradaEvidencia[] = [
+        { nombre: "ventas en el dataset", valor: ventas },
+        { nombre: "ventas sin factura asociada", valor: sinFactura.length },
+      ];
+      if (sinFactura.length > 0) {
+        return {
+          estado: "hallazgo",
+          texto: `${sinFactura.length} venta(s) no tienen factura asociada: ${sinFactura.join(", ")}. La cadena se rompió ahí.`,
+          evidencia: { expresion: "ventasConTotal() · id_factura ausente", entradas, procedencia },
+        };
+      }
+      return {
+        estado: "sin-hallazgo",
+        texto: "Toda venta tiene su factura asociada.",
+        evidencia: { expresion: "ventasConTotal() · id_factura ausente", entradas, procedencia },
+      };
+    },
+  }),
+  definirAgente<{ moneda: Moneda; corte: string; hay: boolean; total: number; porCliente: [string, number][] }>({
     id: "cliente-venta",
     glifo: "⚖",
     nombre: "Cliente",
     pregunta: "¿Un cliente concentra más de 35% de lo vendido?",
     base: "Σ total de ventas por cliente ÷ total vendido · umbral 35%",
-    mirar: (d) => {
-      const moneda = d.fuente === "odoo-real" ? "GTQ" : "USD";
-      const fmt = (n: number) => fmtMoneda(n, moneda);
-      if (!hayCadena(d)) return { hay: false, texto: "Este dataset no trae la cadena de ventas: nada que concentrar." };
-      const ventas = ventasConTotal(d);
-      const total = ventas.reduce((s, v) => s + v.total, 0);
+    medir: (d, corte) => {
+      const hay = hayCadena(d);
+      const ventas = hay ? ventasConTotal(d) : [];
       const porCliente = new Map<string, number>();
       for (const v of ventas) porCliente.set(v.cliente, (porCliente.get(v.cliente) ?? 0) + v.total);
-      const mayor = [...porCliente.entries()].sort((a, b) => b[1] - a[1])[0];
-      if (!mayor || total <= 0) return { hay: false, texto: "Sin ventas: nada que concentrar." };
-      const part = (mayor[1] / total) * 100;
-      if (part >= 35) {
-        return { hay: true, texto: `${mayor[0]} concentra el ${Math.round(part)}% de lo vendido (${fmt(mayor[1])} de ${fmt(total)}).` };
-      }
-      return { hay: false, texto: `Mayor cliente: ${Math.round(part)}% de lo vendido, bajo el umbral de 35%.` };
+      return {
+        moneda: monedaDe(d),
+        corte,
+        hay,
+        total: ventas.reduce((s, v) => s + v.total, 0),
+        porCliente: [...porCliente.entries()].sort((a, b) => b[1] - a[1]),
+      };
     },
-  },
-  {
+    redactar: ({ moneda, corte, hay, total, porCliente }) => {
+      if (!hay) return { estado: "sin-dato", ...SIN_CADENA_VENTAS };
+      const fmt = (n: number) => fmtMoneda(n, moneda);
+      const mayor = porCliente[0];
+      if (!mayor || total <= 0) {
+        return {
+          estado: "sin-dato",
+          queFalta:
+            "El dataset trae la cadena de ventas pero el total vendido es cero: no hay denominador contra el cual medir concentración.",
+          consecuencia:
+            "No se puede afirmar ni descartar que alguien concentre las ventas. Un cero por ciento sería una división por cero disfrazada de reparto sano.",
+          comoSeLlena:
+            "Con líneas de venta que tengan cantidad y precio unitario distintos de cero. Si las hay en Odoo y acá no aparecen, revisar scripts/importar-ventas-odoo.mjs.",
+        };
+      }
+      const part = (mayor[1] / total) * 100;
+      const procedencia = proc(
+        "ventas → ventasConTotal(dataset) · Σ total por cliente",
+        "capa «composicion»: el total de cada venta va A PRECIO DE LISTA porque el export no trae la columna descuento",
+        corte,
+        "/ventas"
+      );
+      const entradas: EntradaEvidencia[] = [
+        { nombre: "mayor total por cliente", valor: mayor[1], unidad: moneda },
+        { nombre: "total vendido (a precio de lista)", valor: total, unidad: moneda },
+        { nombre: "concentración", valor: part, unidad: "%" },
+        { nombre: "umbral", valor: 35, unidad: "%" },
+        { nombre: "clientes con ventas", valor: porCliente.length },
+      ];
+      const ranking: Ranking = {
+        total,
+        unidad: moneda,
+        filas: porCliente.slice(0, 10).map(([cliente, monto]) => ({
+          id: cliente,
+          etiqueta: cliente,
+          valor: monto,
+          pct: (monto / total) * 100,
+        })),
+      };
+      if (part >= 35) {
+        return {
+          estado: "hallazgo",
+          texto: `${mayor[0]} concentra el ${Math.round(part)}% de lo vendido (${fmt(mayor[1])} de ${fmt(total)}).`,
+          evidencia: { expresion: "Σ total de ventas por cliente ÷ total vendido · umbral 35%", entradas, procedencia },
+          ranking,
+        };
+      }
+      return {
+        estado: "sin-hallazgo",
+        texto: `Mayor cliente: ${Math.round(part)}% de lo vendido, bajo el umbral de 35%.`,
+        evidencia: { expresion: "Σ total de ventas por cliente ÷ total vendido · umbral 35%", entradas, procedencia },
+        ranking,
+      };
+    },
+  }),
+  definirAgente<{ corte: string; hay: boolean; ventas: number; sinMargen: string[] }>({
     id: "margen-venta",
     glifo: "💹",
     nombre: "Margen",
     pregunta: "¿Alguna venta se vendió con margen cero o negativo?",
     base: "ventasConTotal() · margen ≤ 0",
-    mirar: (d) => {
-      if (!hayCadena(d)) return { hay: false, texto: "Este dataset no trae la cadena de ventas: nada que medir." };
-      const sinMargen = ventasConTotal(d).filter((v) => v.margen <= 0);
-      if (sinMargen.length > 0) {
-        return { hay: true, texto: `${sinMargen.length} venta(s) tienen margen cero o negativo: ${sinMargen.map((v) => v.id_venta).join(", ")}.` };
-      }
-      return { hay: false, texto: "Toda venta tiene margen positivo." };
+    medir: (d, corte) => {
+      const hay = hayCadena(d);
+      const filas = hay ? ventasConTotal(d) : [];
+      return {
+        corte,
+        hay,
+        ventas: filas.length,
+        sinMargen: filas.filter((v) => v.margen <= 0).map((v) => v.id_venta),
+      };
     },
-  },
+    redactar: ({ corte, hay, ventas, sinMargen }) => {
+      if (!hay) return { estado: "sin-dato", ...SIN_CADENA_VENTAS };
+      const procedencia = proc(
+        "ventas → ventasConTotal(dataset) · margen = total − costoTotal",
+        "capa «composicion»: es precio de lista menos costo, NO margen comercial — el descuento no está restado, así que el margen real es MENOR que éste",
+        corte,
+        "/ventas"
+      );
+      // La pregunta es de existencia y conteo. Sin ranking: ordenar por margen
+      // exigiría un denominador que la pregunta no tiene.
+      const entradas: EntradaEvidencia[] = [
+        { nombre: "ventas en el dataset", valor: ventas },
+        { nombre: "ventas con margen cero o negativo", valor: sinMargen.length },
+        { nombre: "umbral", valor: 0 },
+      ];
+      if (sinMargen.length > 0) {
+        return {
+          estado: "hallazgo",
+          texto: `${sinMargen.length} venta(s) tienen margen cero o negativo: ${sinMargen.join(", ")}.`,
+          evidencia: { expresion: "ventasConTotal() · margen ≤ 0", entradas, procedencia },
+        };
+      }
+      return {
+        estado: "sin-hallazgo",
+        texto: "Toda venta tiene margen positivo.",
+        evidencia: { expresion: "ventasConTotal() · margen ≤ 0", entradas, procedencia },
+      };
+    },
+  }),
 ];
 
-/** M7 — inventario: agentes sobre `dataset.movimientosInventario`/`productos`. */
+/** M7 — inventario: agentes sobre `dataset.movimientosInventario`/`productos`.
+ *
+ *  DEPENDE DE (R7): los dos primeros agentes hablan de EXISTENCIA, y la
+ *  existencia sólo es afirmable si la serie de movimientos contiene toda la
+ *  historia del producto. `integridadInventario()` (lib/cadena.ts) lo DERIVA
+ *  del propio dato: si la serie de un producto arranca con una salida, hubo
+ *  stock antes que el dataset no tiene. Si el Frente 1 confirma que Odoo puede
+ *  entregar el saldo inicial y los mínimos reales, estos agentes vuelven solos
+ *  a medir — no hay ningún interruptor que acordarse de tocar. */
 export const AGENTES_INVENTARIO: Agente[] = [
-  {
+  definirAgente<{
+    corte: string;
+    hay: boolean;
+    integridad: IntegridadInventario | null;
+    stock: FilaStock[];
+  }>({
     id: "kardex",
     glifo: "🧾",
     nombre: "Kardex",
     pregunta: "¿Algún producto tiene existencia negativa?",
     base: "stockPorProducto() · existencia < 0",
-    mirar: (d) => {
-      if (!hayCadena(d)) return { hay: false, texto: "Este dataset no trae la cadena de inventario: nada que auditar." };
-      const negativos = stockPorProducto(d).filter((s) => s.existencia < 0);
-      if (negativos.length > 0) {
-        return { hay: true, texto: `${negativos.length} producto(s) con existencia NEGATIVA: ${negativos.map((s) => `${s.producto.sku} (${s.existencia})`).join(", ")}. El kardex no cuadra.` };
-      }
-      return { hay: false, texto: "Ningún producto tiene existencia negativa: el kardex cuadra." };
+    medir: (d, corte) => {
+      const hay = hayCadena(d);
+      return {
+        corte,
+        hay,
+        integridad: hay ? integridadInventario(d) : null,
+        stock: hay ? stockPorProducto(d) : [],
+      };
     },
-  },
-  {
+    redactar: ({ corte, hay, integridad, stock }) => {
+      if (!hay || !integridad) return { estado: "sin-dato", ...SIN_CADENA_INVENTARIO };
+      // Una existencia negativa sólo prueba que "el kardex no cuadra" si la
+      // serie está COMPLETA. Si arranca a mitad de la historia, el negativo es
+      // el síntoma esperable de un saldo inicial ausente, no un descuadre. Se
+      // diagnosticaba una cosa por otra.
+      if (!integridad.existenciaEsAfirmable) {
+        const t = integridad.seriesTruncadas;
+        return {
+          estado: "sin-dato",
+          queFalta: `No hay saldo inicial de existencias: ${t.length} de ${integridad.productosConMovimiento} producto(s) con movimiento arrancan su serie con una SALIDA${integridad.desde ? `, y el dataset sólo tiene movimientos desde ${integridad.desde}` : ""}. Para que saliera mercadería tenía que haber entrado antes, y esa entrada no está.`,
+          consecuencia:
+            "La suma de movimientos NO es la existencia: es la variación de la existencia dentro de la ventana importada. Sobre una serie recortada, un saldo negativo no prueba que el kardex no cuadre — es lo que cabe esperar. Llamarlo descuadre sería diagnosticar un problema de datos como un problema de bodega.",
+          comoSeLlena:
+            "Con un saldo inicial por producto a la fecha en que arranca la ventana (en Odoo, stock.quant a esa fecha o un ajuste de apertura), cargado como movimiento de apertura. Poner 0 NO sirve: afirmaría que la bodega arrancó vacía, que es falso.",
+        };
+      }
+      const negativos = stock.filter((s) => s.existencia < 0);
+      const procedencia = proc(
+        "movimientosInventario → stockPorProducto(dataset) · existencia = Σ cantidad",
+        "serie COMPLETA verificada: ningún producto arranca con salida, así que la suma de movimientos sí es la existencia",
+        corte,
+        "/inventario"
+      );
+      // La pregunta es de existencia y conteo. Sin ranking.
+      const entradas: EntradaEvidencia[] = [
+        { nombre: "productos con movimiento", valor: integridad.productosConMovimiento },
+        { nombre: "productos con existencia negativa", valor: negativos.length },
+        ...negativos.map((s) => ({ nombre: s.producto.sku, valor: s.existencia, unidad: "u" })),
+      ];
+      if (negativos.length > 0) {
+        return {
+          estado: "hallazgo",
+          texto: `${negativos.length} producto(s) con existencia NEGATIVA: ${negativos.map((s) => `${s.producto.sku} (${s.existencia})`).join(", ")}. El kardex no cuadra.`,
+          evidencia: { expresion: "stockPorProducto() · existencia < 0", entradas, procedencia },
+        };
+      }
+      return {
+        estado: "sin-hallazgo",
+        texto: "Ningún producto tiene existencia negativa: el kardex cuadra.",
+        evidencia: { expresion: "stockPorProducto() · existencia < 0", entradas, procedencia },
+      };
+    },
+  }),
+  definirAgente<{
+    corte: string;
+    hay: boolean;
+    integridad: IntegridadInventario | null;
+    stock: FilaStock[];
+  }>({
     id: "minimo",
     glifo: "📉",
     nombre: "Mínimo",
     pregunta: "¿Cuántos productos están bajo su stock mínimo?",
     base: "stockPorProducto() · existencia ≤ stock_minimo",
-    mirar: (d) => {
-      if (!hayCadena(d)) return { hay: false, texto: "Este dataset no trae la cadena de inventario: nada que medir." };
-      const bajos = stockPorProducto(d).filter((s) => s.bajoMinimo);
-      if (bajos.length > 0) {
-        return { hay: true, texto: `${bajos.length} producto(s) bajo su mínimo: ${bajos.map((s) => s.producto.sku).join(", ")}.` };
-      }
-      return { hay: false, texto: "Ningún producto está bajo su stock mínimo." };
+    medir: (d, corte) => {
+      const hay = hayCadena(d);
+      return {
+        corte,
+        hay,
+        integridad: hay ? integridadInventario(d) : null,
+        stock: hay ? stockPorProducto(d) : [],
+      };
     },
-  },
-  {
+    redactar: ({ corte, hay, integridad, stock }) => {
+      if (!hay || !integridad) return { estado: "sin-dato", ...SIN_CADENA_INVENTARIO };
+      // Esta comparación necesita DOS datos, y los dos pueden faltar por
+      // separado: un lado (la existencia) y el umbral contra el que se compara.
+      if (!integridad.existenciaEsAfirmable || !integridad.minimoEsAfirmable) {
+        const faltantes: string[] = [];
+        if (!integridad.existenciaEsAfirmable) {
+          faltantes.push(
+            `el saldo inicial de existencias (${integridad.seriesTruncadas.length} de ${integridad.productosConMovimiento} producto(s) con movimiento arrancan su serie con una salida${integridad.desde ? `, con movimientos sólo desde ${integridad.desde}` : ""})`
+          );
+        }
+        if (!integridad.minimoEsAfirmable) {
+          faltantes.push(
+            "el punto de reorden real (ningún producto declara un stock_minimo mayor que cero: scripts/importar-inventario-odoo.mjs escribe 0 para todo el catálogo, y un mínimo de 0 para todo no es una política de inventario, es una columna vacía). El 2026-08-24 el Frente 1 confirmó que NO existe ni un solo export de stock.warehouse.orderpoint en disco: es el único de los tres huecos que no se puede tapar con material ya guardado"
+          );
+        }
+        return {
+          estado: "sin-dato",
+          queFalta: `Falta ${faltantes.join("; y falta ")}.`,
+          consecuencia:
+            "El conteo de productos bajo mínimo compara dos números que no se pueden afirmar. Con existencia = 0 por serie recortada y mínimo = 0 por columna vacía, la condición «existencia ≤ mínimo» se cumple sola y marcaría casi todo el catálogo como crítico. Ese número no mediría el inventario: mediría el hueco en los datos.",
+          comoSeLlena:
+            "El mínimo se pide a Odoo vivo con search_read sobre stock.warehouse.orderpoint (product_id, product_min_qty): no hay ningún export en disco que lo traiga. El saldo inicial necesita un movimiento de apertura por producto, y su fecha tiene que ser EL MISMO instante en que arranca la ventana de movimientos: el boletín del 2026-08-24 muestra dos cifras de Odoo para el mismo SKU (714 al 19-08, 658 al 23-08) y advierte que mezclar una fecha con la otra da un resultado plausible y equivocado.",
+        };
+      }
+      const bajos = stock.filter((s) => s.bajoMinimo);
+      const procedencia = proc(
+        "movimientosInventario + productos → stockPorProducto(dataset) · existencia ≤ stock_minimo",
+        `serie COMPLETA y mínimos declarados (${integridad.productosConMinimoPositivo} producto(s) con stock_minimo mayor que cero)`,
+        corte,
+        "/inventario"
+      );
+      // La pregunta empieza con "¿cuántos?": es un conteo. Sin ranking.
+      const entradas: EntradaEvidencia[] = [
+        { nombre: "productos con movimiento", valor: integridad.productosConMovimiento },
+        { nombre: "productos bajo su mínimo", valor: bajos.length },
+        ...bajos.map((s) => ({
+          nombre: `${s.producto.sku} (mín. ${s.producto.stock_minimo})`,
+          valor: s.existencia,
+          unidad: "u",
+        })),
+      ];
+      if (bajos.length > 0) {
+        return {
+          estado: "hallazgo",
+          texto: `${bajos.length} producto(s) bajo su mínimo: ${bajos.map((s) => s.producto.sku).join(", ")}.`,
+          evidencia: { expresion: "stockPorProducto() · existencia ≤ stock_minimo", entradas, procedencia },
+        };
+      }
+      return {
+        estado: "sin-hallazgo",
+        texto: "Ningún producto está bajo su stock mínimo.",
+        evidencia: { expresion: "stockPorProducto() · existencia ≤ stock_minimo", entradas, procedencia },
+      };
+    },
+  }),
+  definirAgente<{
+    corte: string;
+    hay: boolean;
+    conSalidas: { sku: string; id: string; salidas: number }[];
+    totalSalidas: number;
+  }>({
     id: "rotacion",
     glifo: "🔄",
     nombre: "Rotación",
     pregunta: "¿Qué producto tuvo más salidas (mayor rotación)?",
     base: "Σ|cantidad| de movimientos tipo salida, por producto · máximo",
-    mirar: (d) => {
-      if (!hayCadena(d)) return { hay: false, texto: "Este dataset no trae la cadena de inventario: nada que rotar." };
-      const stock = stockPorProducto(d);
-      const conSalidas = stock
-        .map((s) => ({ s, salidas: s.movimientos.filter((m) => m.tipo === "salida").reduce((acc, m) => acc + Math.abs(m.cantidad), 0) }))
+    medir: (d, corte) => {
+      const hay = hayCadena(d);
+      const conSalidas = (hay ? stockPorProducto(d) : [])
+        .map((s) => ({
+          sku: s.producto.sku,
+          id: s.producto.id_producto,
+          salidas: s.movimientos.filter((m) => m.tipo === "salida").reduce((acc, m) => acc + Math.abs(m.cantidad), 0),
+        }))
         .sort((a, b) => b.salidas - a.salidas);
-      const mayor = conSalidas[0];
-      if (!mayor || mayor.salidas === 0) return { hay: false, texto: "Ningún producto registra salidas." };
-      return { hay: true, texto: `${mayor.s.producto.sku} es el de mayor rotación: ${mayor.salidas} unidad(es) de salida.` };
+      return { corte, hay, conSalidas, totalSalidas: conSalidas.reduce((s, x) => s + x.salidas, 0) };
     },
-  },
-  {
+    redactar: ({ corte, hay, conSalidas, totalSalidas }) => {
+      if (!hay) return { estado: "sin-dato", ...SIN_CADENA_INVENTARIO };
+      const mayor = conSalidas[0];
+      const procedencia = proc(
+        "movimientosInventario → movimientos tipo «salida», agrupados por producto",
+        "sólo salidas dentro de la ventana importada. NO depende del saldo inicial: la rotación es un FLUJO, no un nivel — por eso este agente sigue midiendo donde Kardex y Mínimo no pueden",
+        corte,
+        "/inventario"
+      );
+      if (!mayor || mayor.salidas === 0) {
+        return {
+          estado: "sin-hallazgo",
+          texto: "Ningún producto registra salidas.",
+          evidencia: {
+            expresion: "Σ|cantidad| de movimientos tipo salida, por producto · máximo",
+            entradas: [
+              { nombre: "productos evaluados", valor: conSalidas.length },
+              { nombre: "unidades de salida en total", valor: 0, unidad: "u" },
+            ],
+            procedencia,
+          },
+        };
+      }
+      const entradas: EntradaEvidencia[] = [
+        { nombre: "productos evaluados", valor: conSalidas.length },
+        { nombre: "producto de mayor rotación", valor: mayor.sku },
+        { nombre: "unidades de salida de ese producto", valor: mayor.salidas, unidad: "u" },
+        { nombre: "unidades de salida en total", valor: totalSalidas, unidad: "u" },
+      ];
+      // Acá el ranking SÍ corresponde: hay un reparto real de un total real
+      // (las unidades salidas se reparten entre productos y suman el total).
+      const ranking: Ranking = {
+        total: totalSalidas,
+        unidad: "u",
+        filas: conSalidas
+          .filter((x) => x.salidas > 0)
+          .slice(0, 10)
+          .map((x) => ({
+            id: x.id,
+            etiqueta: x.sku,
+            valor: x.salidas,
+            pct: totalSalidas > 0 ? (x.salidas / totalSalidas) * 100 : 0,
+          })),
+      };
+      return {
+        estado: "hallazgo",
+        texto: `${mayor.sku} es el de mayor rotación: ${mayor.salidas} unidad(es) de salida.`,
+        evidencia: { expresion: "Σ|cantidad| de movimientos tipo salida, por producto · máximo", entradas, procedencia },
+        ranking,
+      };
+    },
+  }),
+  definirAgente<{ corte: string; hay: boolean; salidas: number; huerfanas: string[] }>({
     id: "huerfano",
     glifo: "🕳",
     nombre: "Huérfano",
     pregunta: "¿Hay salidas de inventario sin venta de origen?",
     base: "movimientosInventario · tipo salida · id_venta ausente",
-    mirar: (d) => {
-      if (!hayCadena(d)) return { hay: false, texto: "Este dataset no trae la cadena de inventario: nada que auditar." };
-      const huerfanas = salidasSinVenta(d);
-      if (huerfanas.length > 0) {
-        return { hay: true, texto: `${huerfanas.length} salida(s) no declaran qué venta las produjo: ${huerfanas.map((m) => m.id_movimiento).join(", ")}.` };
-      }
-      return { hay: false, texto: "Toda salida de inventario declara la venta que la produjo." };
+    medir: (d, corte) => {
+      const hay = hayCadena(d);
+      return {
+        corte,
+        hay,
+        salidas: (d.movimientosInventario ?? []).filter((m) => m.tipo === "salida").length,
+        huerfanas: hay ? salidasSinVenta(d).map((m) => m.id_movimiento) : [],
+      };
     },
-  },
+    redactar: ({ corte, hay, salidas, huerfanas }) => {
+      if (!hay) return { estado: "sin-dato", ...SIN_CADENA_INVENTARIO };
+      const procedencia = proc(
+        "movimientosInventario → salidasSinVenta(dataset)",
+        "sólo movimientos tipo «salida». NO depende del saldo inicial: es una auditoría de referencias, no de niveles",
+        corte,
+        "/inventario"
+      );
+      // La pregunta es de existencia y conteo. Sin ranking.
+      const entradas: EntradaEvidencia[] = [
+        { nombre: "salidas registradas", valor: salidas },
+        { nombre: "salidas sin venta de origen", valor: huerfanas.length },
+      ];
+      if (huerfanas.length > 0) {
+        return {
+          estado: "hallazgo",
+          texto: `${huerfanas.length} salida(s) no declaran qué venta las produjo: ${huerfanas.join(", ")}.`,
+          evidencia: { expresion: "movimientosInventario · tipo salida · id_venta ausente", entradas, procedencia },
+        };
+      }
+      return {
+        estado: "sin-hallazgo",
+        texto: "Toda salida de inventario declara la venta que la produjo.",
+        evidencia: { expresion: "movimientosInventario · tipo salida · id_venta ausente", entradas, procedencia },
+      };
+    },
+  }),
 ];
 
 /** M4 — forecast: agentes sobre `forecastSimulado()`. Siempre declaran que es
  *  simulación, nunca dato real — el hallazgo describe el simulacro, no la caja. */
 export const AGENTES_FORECAST: Agente[] = [
-  {
+  definirAgente<{ corte: string; facturas: number; abiertas: number }>({
     id: "horizonte",
     glifo: "🕐",
     nombre: "Horizonte",
     pregunta: "¿Cuántas facturas abiertas entran en la simulación?",
     base: "facturas con estado abierta/disputada al corte",
-    mirar: (d, corte) => {
+    medir: (d, corte) => {
+      void corte;
       const abiertas = d.facturas.filter((f) => {
         const e = estadoFacturaDerivado(f, d.pagos, d.notasCredito, d.disputas);
         return e === "abierta" || e === "disputada";
       });
-      void corte;
-      if (abiertas.length === 0) return { hay: false, texto: "No hay facturas abiertas: la simulación parte de cero." };
-      return { hay: true, texto: `${abiertas.length} factura(s) abiertas o disputadas alimentan las tres curvas simuladas.` };
+      return { corte, facturas: d.facturas.length, abiertas: abiertas.length };
     },
-  },
-  {
+    redactar: ({ corte, facturas, abiertas }) => {
+      const procedencia = proc(
+        "facturas → estadoFacturaDerivado(factura, pagos, notasCredito, disputas)",
+        "sólo facturas cuyo estado derivado es «abierta» o «disputada». SIMULACIÓN: describe qué alimenta las curvas, no cuánto va a entrar en caja",
+        corte,
+        "/forecast"
+      );
+      // La pregunta empieza con "¿cuántas?": es un conteo. Sin ranking.
+      const entradas: EntradaEvidencia[] = [
+        { nombre: "facturas en el dataset", valor: facturas },
+        { nombre: "facturas abiertas o disputadas", valor: abiertas },
+      ];
+      if (abiertas === 0) {
+        return {
+          estado: "sin-hallazgo",
+          texto: "No hay facturas abiertas: la simulación parte de cero.",
+          evidencia: { expresion: "facturas con estado abierta/disputada al corte", entradas, procedencia },
+        };
+      }
+      return {
+        estado: "hallazgo",
+        texto: `${abiertas} factura(s) abiertas o disputadas alimentan las tres curvas simuladas.`,
+        evidencia: { expresion: "facturas con estado abierta/disputada al corte", entradas, procedencia },
+      };
+    },
+  }),
+  definirAgente<{ moneda: Moneda; corte: string; puntos: PuntoForecast[] }>({
     id: "brecha",
     glifo: "📏",
     nombre: "Brecha",
     pregunta: "¿En qué semana la brecha optimista−pesimista es mayor?",
     base: "max(optimista − pesimista) sobre las 13 semanas simuladas",
-    mirar: (d, corte) => {
-      const moneda = d.fuente === "odoo-real" ? "GTQ" : "USD";
+    medir: (d, corte) => ({ moneda: monedaDe(d), corte, puntos: forecastSimulado(d, corte) }),
+    redactar: ({ moneda, corte, puntos }) => {
       const fmt = (n: number) => fmtMoneda(n, moneda);
-      const puntos = forecastSimulado(d, corte);
       const conBrecha = puntos.map((p) => ({ semana: p.semana, brecha: p.optimista - p.pesimista }));
       const mayor = [...conBrecha].sort((a, b) => b.brecha - a.brecha)[0];
-      if (!mayor || mayor.brecha <= 0) return { hay: false, texto: "Las tres curvas simuladas casi no se separan: la incertidumbre es pareja." };
-      return { hay: true, texto: `La brecha simulada es mayor en la semana ${mayor.semana}: ${fmt(mayor.brecha)} entre optimista y pesimista.` };
+      const procedencia = proc(
+        "facturas → forecastSimulado(dataset, corte) · optimista − pesimista por semana",
+        "SIMULACIÓN de 13 semanas con supuestos del prototipo. La brecha mide la incertidumbre del simulacro, NO un rango de cobro comprometido",
+        corte,
+        "/forecast"
+      );
+      // Sin ranking: la pregunta pide UNA semana (el máximo). Las brechas
+      // semanales no reparten un total: sumarlas no significaría nada.
+      const entradas: EntradaEvidencia[] = [
+        { nombre: "semanas simuladas", valor: puntos.length },
+        ...(mayor
+          ? [
+              { nombre: "semana de mayor brecha", valor: mayor.semana },
+              { nombre: "brecha en esa semana", valor: mayor.brecha, unidad: moneda },
+            ]
+          : []),
+      ];
+      if (!mayor || mayor.brecha <= 0) {
+        return {
+          estado: "sin-hallazgo",
+          texto: "Las tres curvas simuladas casi no se separan: la incertidumbre es pareja.",
+          evidencia: { expresion: "max(optimista − pesimista) sobre las 13 semanas simuladas", entradas, procedencia },
+        };
+      }
+      return {
+        estado: "hallazgo",
+        texto: `La brecha simulada es mayor en la semana ${mayor.semana}: ${fmt(mayor.brecha)} entre optimista y pesimista.`,
+        evidencia: { expresion: "max(optimista − pesimista) sobre las 13 semanas simuladas", entradas, procedencia },
+      };
     },
-  },
-  {
+  }),
+  definirAgente<{ moneda: Moneda; corte: string; hayFuente: boolean; cuantas: number; monto: number }>({
     id: "disputa-forecast",
     glifo: "🚫",
     nombre: "Disputa",
     pregunta: "¿Cuánto saldo disputado el escenario pesimista no cobra?",
     base: "Σ saldo de facturas con estado disputada — el pesimista las excluye del horizonte",
-    mirar: (d, corte) => {
-      const moneda = d.fuente === "odoo-real" ? "GTQ" : "USD";
-      const fmt = (n: number) => fmtMoneda(n, moneda);
+    medir: (d, corte) => {
+      void corte;
       const disputadas = d.facturas.filter(
         (f) => estadoFacturaDerivado(f, d.pagos, d.notasCredito, d.disputas) === "disputada"
       );
-      void corte;
-      if (disputadas.length === 0) return { hay: false, texto: "No hay facturas disputadas: el escenario pesimista no excluye nada por esa causa." };
-      const monto = disputadas.reduce((s, f) => s + f.monto_original, 0);
-      return { hay: true, texto: `${fmt(monto)} en ${disputadas.length} factura(s) disputada(s) NO se cobran en el escenario pesimista dentro del horizonte (supuesto de simulación).` };
+      return {
+        moneda: monedaDe(d),
+        corte,
+        hayFuente: hayFuenteDeDisputas(d),
+        cuantas: disputadas.length,
+        monto: disputadas.reduce((s, f) => s + f.monto_original, 0),
+      };
     },
-  },
-  {
+    redactar: ({ moneda, corte, hayFuente, cuantas, monto }) => {
+      // Sin tabla de disputas ninguna factura puede derivar a "disputada": el
+      // conteo daría 0 por construcción, y ese 0 no mide nada.
+      if (!hayFuente) return { estado: "sin-dato", ...SIN_FUENTE_DISPUTAS };
+      const fmt = (n: number) => fmtMoneda(n, moneda);
+      const procedencia = proc(
+        "facturas + disputas → estadoFacturaDerivado() === «disputada»",
+        "SUPUESTO DE SIMULACIÓN: el escenario pesimista excluye del horizonte todo lo disputado. Es una regla del prototipo, no una política de cobranza validada",
+        corte,
+        "/forecast"
+      );
+      // La pregunta empieza con "¿cuánto?": es un monto agregado. Sin ranking.
+      const entradas: EntradaEvidencia[] = [
+        { nombre: "facturas disputadas", valor: cuantas },
+        { nombre: "monto disputado excluido del pesimista", valor: monto, unidad: moneda },
+      ];
+      if (cuantas === 0) {
+        return {
+          estado: "sin-hallazgo",
+          texto: "No hay facturas disputadas: el escenario pesimista no excluye nada por esa causa.",
+          evidencia: { expresion: "Σ saldo de facturas con estado disputada — el pesimista las excluye del horizonte", entradas, procedencia },
+        };
+      }
+      return {
+        estado: "hallazgo",
+        texto: `${fmt(monto)} en ${cuantas} factura(s) disputada(s) NO se cobran en el escenario pesimista dentro del horizonte (supuesto de simulación).`,
+        evidencia: { expresion: "Σ saldo de facturas con estado disputada — el pesimista las excluye del horizonte", entradas, procedencia },
+      };
+    },
+  }),
+  definirAgente<{ corte: string; s4: PuntoForecast | undefined; s13: PuntoForecast | undefined }>({
     id: "meseta",
     glifo: "⏸",
     nombre: "Meseta",
     pregunta: "¿Cuánto del cobro de 13 semanas ya se simuló para la semana 4?",
     base: "punto de la semana 4 ÷ punto de la semana 13, escenario base",
-    mirar: (d, corte) => {
+    medir: (d, corte) => {
       const puntos = forecastSimulado(d, corte);
-      const s4 = puntos.find((p) => p.semana === 4);
-      const s13 = puntos[puntos.length - 1];
-      if (!s4 || !s13 || s13.base <= 0) return { hay: false, texto: "Sin cobro simulado: no hay meseta que describir." };
-      const part = (s4.base / s13.base) * 100;
-      if (part >= 50) {
-        return { hay: true, texto: `Para la semana 4 ya se simuló el ${Math.round(part)}% del cobro base de las 13 semanas: la curva se adelanta, no se reparte pareja.` };
-      }
-      return { hay: false, texto: `Para la semana 4 sólo se simuló el ${Math.round(part)}% del cobro base: el grueso llega después, no al principio.` };
+      return { corte, s4: puntos.find((p) => p.semana === 4), s13: puntos[puntos.length - 1] };
     },
-  },
+    redactar: ({ corte, s4, s13 }) => {
+      if (!s4 || !s13 || s13.base <= 0) {
+        return {
+          estado: "sin-dato",
+          queFalta:
+            "La curva base simulada no acumula nada al final del horizonte: no hay total de 13 semanas contra el cual medir qué proporción cae en la semana 4.",
+          consecuencia:
+            "No hay forma de decir si el cobro simulado se adelanta o se reparte. Un porcentaje sobre un denominador de cero no es un cero: no es ningún número.",
+          comoSeLlena:
+            "Con facturas abiertas al corte que alimenten la simulación. Si las hay en Odoo y acá no aparecen, revisar la importación y el corte usado.",
+        };
+      }
+      const part = (s4.base / s13.base) * 100;
+      const procedencia = proc(
+        "facturas → forecastSimulado(dataset, corte) · escenario base, semana 4 contra semana 13",
+        "SIMULACIÓN: describe la forma de la curva del simulacro, no un calendario de cobro comprometido",
+        corte,
+        "/forecast"
+      );
+      // Sin ranking: es UNA razón entre dos puntos de la misma curva.
+      const entradas: EntradaEvidencia[] = [
+        { nombre: "acumulado base a la semana 4", valor: s4.base },
+        { nombre: "acumulado base a la semana 13", valor: s13.base },
+        { nombre: "proporción", valor: part, unidad: "%" },
+        { nombre: "umbral", valor: 50, unidad: "%" },
+      ];
+      if (part >= 50) {
+        return {
+          estado: "hallazgo",
+          texto: `Para la semana 4 ya se simuló el ${Math.round(part)}% del cobro base de las 13 semanas: la curva se adelanta, no se reparte pareja.`,
+          evidencia: { expresion: "punto de la semana 4 ÷ punto de la semana 13, escenario base", entradas, procedencia },
+        };
+      }
+      return {
+        estado: "sin-hallazgo",
+        texto: `Para la semana 4 sólo se simuló el ${Math.round(part)}% del cobro base: el grueso llega después, no al principio.`,
+        evidencia: { expresion: "punto de la semana 4 ÷ punto de la semana 13, escenario base", entradas, procedencia },
+      };
+    },
+  }),
 ];
 
 /** M6 — carga y calidad de datos: agentes sobre el propio dataset, no sobre
- *  el negocio. Complementan (no repiten) las etapas de `argumentoDatos`. */
+ *  el negocio. Complementan (no repiten) las etapas de `argumentoDatos`.
+ *
+ *  Los cuatro comparten una regla: sobre un dataset SIN filas, "todo está
+ *  bien" es cierto por vacío y engañoso como información — daría por auditada
+ *  una carga que no ocurrió. Por eso caen a "sin-dato" en vez de felicitar. */
+const SIN_FACTURAS_QUE_AUDITAR = {
+  queFalta:
+    "El dataset no tiene ni una factura: no hay filas que auditar al corte declarado.",
+  consecuencia:
+    "Un veredicto de calidad sobre cero filas es cierto por vacío y engañoso como información: se leería como «la carga está limpia» cuando lo que pasa es que no hay carga.",
+  comoSeLlena:
+    "Importando facturas con scripts/importar-facturas-odoo.mjs, o cargando el dataset real. Si el import corrió y aun así no hay filas, el problema está en el import, no en los datos de Odoo.",
+} as const;
+
 export const AGENTES_DATOS: Agente[] = [
-  {
+  definirAgente<{ corte: string; facturas: number; sinFecha: number }>({
     id: "vencimiento-dato",
     glifo: "📅",
     nombre: "Vencimiento",
     pregunta: "¿Cuántas facturas no tienen fecha de vencimiento?",
     base: "facturas · fecha_vencimiento === null",
-    mirar: (d) => {
-      const sinFecha = d.facturas.filter((f) => !f.fecha_vencimiento);
-      if (sinFecha.length > 0) {
-        return { hay: true, texto: `${sinFecha.length} de ${d.facturas.length} factura(s) no tienen fecha de vencimiento: quedan fuera del aging y no se les inventa una.` };
+    medir: (d, corte) => ({
+      corte,
+      facturas: d.facturas.length,
+      sinFecha: d.facturas.filter((f) => !f.fecha_vencimiento).length,
+    }),
+    redactar: ({ corte, facturas, sinFecha }) => {
+      if (facturas === 0) return { estado: "sin-dato", ...SIN_FACTURAS_QUE_AUDITAR };
+      const procedencia = proc(
+        "facturas → campo fecha_vencimiento",
+        "todas las facturas del dataset, sin filtrar por estado ni por corte: es una auditoría de la CARGA, no de la cartera",
+        corte,
+        "/datos"
+      );
+      // La pregunta empieza con "¿cuántas?": es un conteo. Sin ranking.
+      const entradas: EntradaEvidencia[] = [
+        { nombre: "facturas en el dataset", valor: facturas },
+        { nombre: "facturas sin fecha de vencimiento", valor: sinFecha },
+        { nombre: "proporción", valor: Number(((sinFecha / facturas) * 100).toFixed(2)), unidad: "%" },
+      ];
+      if (sinFecha > 0) {
+        return {
+          estado: "hallazgo",
+          texto: `${sinFecha} de ${facturas} factura(s) no tienen fecha de vencimiento: quedan fuera del aging y no se les inventa una.`,
+          evidencia: { expresion: "facturas · fecha_vencimiento === null", entradas, procedencia },
+        };
       }
-      return { hay: false, texto: "Toda factura tiene fecha de vencimiento." };
+      return {
+        estado: "sin-hallazgo",
+        texto: "Toda factura tiene fecha de vencimiento.",
+        evidencia: { expresion: "facturas · fecha_vencimiento === null", entradas, procedencia },
+      };
     },
-  },
-  {
+  }),
+  definirAgente<{ corte: string; facturas: number; sinEmision: number }>({
     id: "emision-dato",
     glifo: "🗓",
     nombre: "Emisión",
     pregunta: "¿Alguna factura tiene fecha de emisión sin informar?",
     base: "facturas · fecha_emision === '1970-01-01' (centinela de importación sin mapear)",
-    mirar: (d) => {
-      const sinEmision = d.facturas.filter((f) => f.fecha_emision === "1970-01-01");
-      if (sinEmision.length > 0) {
-        return { hay: true, texto: `${sinEmision.length} factura(s) quedaron con fecha de emisión centinela (1970-01-01): la columna no se mapeó o venía vacía al importar.` };
+    medir: (d, corte) => ({
+      corte,
+      facturas: d.facturas.length,
+      sinEmision: d.facturas.filter((f) => f.fecha_emision === "1970-01-01").length,
+    }),
+    redactar: ({ corte, facturas, sinEmision }) => {
+      if (facturas === 0) return { estado: "sin-dato", ...SIN_FACTURAS_QUE_AUDITAR };
+      const procedencia = proc(
+        "facturas → campo fecha_emision, comparado contra el centinela 1970-01-01",
+        "todas las facturas del dataset. 1970-01-01 es el epoch: lo escribe la importación cuando la columna venía vacía o sin mapear, nunca es una fecha real",
+        corte,
+        "/datos"
+      );
+      // Pregunta de existencia y conteo. Sin ranking.
+      const entradas: EntradaEvidencia[] = [
+        { nombre: "facturas en el dataset", valor: facturas },
+        { nombre: "facturas con fecha de emisión centinela", valor: sinEmision },
+        { nombre: "centinela", valor: "1970-01-01" },
+      ];
+      if (sinEmision > 0) {
+        return {
+          estado: "hallazgo",
+          texto: `${sinEmision} factura(s) quedaron con fecha de emisión centinela (1970-01-01): la columna no se mapeó o venía vacía al importar.`,
+          evidencia: { expresion: "facturas · fecha_emision === '1970-01-01' (centinela de importación sin mapear)", entradas, procedencia },
+        };
       }
-      return { hay: false, texto: "Toda factura tiene una fecha de emisión distinta del centinela de importación." };
+      return {
+        estado: "sin-hallazgo",
+        texto: "Toda factura tiene una fecha de emisión distinta del centinela de importación.",
+        evidencia: { expresion: "facturas · fecha_emision === '1970-01-01' (centinela de importación sin mapear)", entradas, procedencia },
+      };
     },
-  },
-  {
+  }),
+  definirAgente<{ corte: string; facturas: number; repetidos: number; claves: number }>({
     id: "duplicado-dato",
     glifo: "⧉",
     nombre: "Duplicado",
     pregunta: "¿Hay números de factura repetidos para el mismo cliente?",
     base: "agrupado por (id_cliente, numero_factura) · cuenta > 1",
-    mirar: (d) => {
+    medir: (d, corte) => {
       const claves = new Map<string, number>();
       for (const f of d.facturas) {
         const k = `${f.id_cliente}|${f.numero_factura}`;
         claves.set(k, (claves.get(k) ?? 0) + 1);
       }
-      const repetidos = [...claves.entries()].filter(([, n]) => n > 1);
-      if (repetidos.length > 0) {
-        return { hay: true, texto: `${repetidos.length} número(s) de factura están repetidos para el mismo cliente. Posible duplicado de carga.` };
-      }
-      return { hay: false, texto: "Ningún número de factura se repite para el mismo cliente." };
+      return {
+        corte,
+        facturas: d.facturas.length,
+        claves: claves.size,
+        repetidos: [...claves.values()].filter((n) => n > 1).length,
+      };
     },
-  },
-  {
+    redactar: ({ corte, facturas, repetidos, claves }) => {
+      if (facturas === 0) return { estado: "sin-dato", ...SIN_FACTURAS_QUE_AUDITAR };
+      const procedencia = proc(
+        "facturas → agrupadas por la clave (id_cliente, numero_factura)",
+        "todas las facturas del dataset. Un mismo número para DISTINTOS clientes no cuenta: la numeración sólo tiene que ser única dentro de cada cliente",
+        corte,
+        "/datos"
+      );
+      // Pregunta de existencia y conteo. Sin ranking.
+      const entradas: EntradaEvidencia[] = [
+        { nombre: "facturas en el dataset", valor: facturas },
+        { nombre: "claves (cliente + número) distintas", valor: claves },
+        { nombre: "claves repetidas", valor: repetidos },
+      ];
+      if (repetidos > 0) {
+        return {
+          estado: "hallazgo",
+          texto: `${repetidos} número(s) de factura están repetidos para el mismo cliente. Posible duplicado de carga.`,
+          evidencia: { expresion: "agrupado por (id_cliente, numero_factura) · cuenta > 1", entradas, procedencia },
+        };
+      }
+      return {
+        estado: "sin-hallazgo",
+        texto: "Ningún número de factura se repite para el mismo cliente.",
+        evidencia: { expresion: "agrupado por (id_cliente, numero_factura) · cuenta > 1", entradas, procedencia },
+      };
+    },
+  }),
+  definirAgente<{ corte: string; clientes: number; sinFactura: string[] }>({
     id: "catalogo-dato",
     glifo: "👤",
     nombre: "Catálogo",
     pregunta: "¿Hay clientes en el catálogo sin ninguna factura?",
     base: "clientes cuyo id_cliente no aparece en ninguna factura",
-    mirar: (d) => {
-      const sinFactura = d.clientes.filter((c) => !d.facturas.some((f) => f.id_cliente === c.id_cliente));
-      if (sinFactura.length > 0) {
-        return { hay: true, texto: `${sinFactura.length} cliente(s) del catálogo no tienen ninguna factura: ${sinFactura.map((c) => c.nombre_cliente).join(", ")}.` };
+    medir: (d, corte) => ({
+      corte,
+      clientes: d.clientes.length,
+      sinFactura: d.clientes
+        .filter((c) => !d.facturas.some((f) => f.id_cliente === c.id_cliente))
+        .map((c) => c.nombre_cliente),
+    }),
+    redactar: ({ corte, clientes, sinFactura }) => {
+      // Acá el vacío que importa es el del CATÁLOGO, no el de las facturas: sin
+      // clientes no hay a quién buscarle facturas.
+      if (clientes === 0) {
+        return {
+          estado: "sin-dato",
+          queFalta: "El catálogo de clientes está vacío: no hay a quién buscarle facturas.",
+          consecuencia:
+            "Afirmar que todo cliente tiene al menos una factura, sobre cero clientes, es cierto por vacío y engañoso como información: daría por auditado un catálogo que no se cargó.",
+          comoSeLlena:
+            "Importando el catálogo de clientes (res.partner) desde Odoo, o cargando el dataset real.",
+        };
       }
-      return { hay: false, texto: "Todo cliente del catálogo tiene al menos una factura." };
+      const procedencia = proc(
+        "clientes → id_cliente, cruzado contra facturas",
+        "todo el catálogo. Un cliente sin facturas no es necesariamente un error: puede ser un alta reciente o un prospecto. Se declara, no se acusa",
+        corte,
+        "/datos"
+      );
+      // Pregunta de existencia y conteo. Sin ranking.
+      const entradas: EntradaEvidencia[] = [
+        { nombre: "clientes en el catálogo", valor: clientes },
+        { nombre: "clientes sin ninguna factura", valor: sinFactura.length },
+      ];
+      if (sinFactura.length > 0) {
+        return {
+          estado: "hallazgo",
+          texto: `${sinFactura.length} cliente(s) del catálogo no tienen ninguna factura: ${sinFactura.join(", ")}.`,
+          evidencia: { expresion: "clientes cuyo id_cliente no aparece en ninguna factura", entradas, procedencia },
+        };
+      }
+      return {
+        estado: "sin-hallazgo",
+        texto: "Todo cliente del catálogo tiene al menos una factura.",
+        evidencia: { expresion: "clientes cuyo id_cliente no aparece en ninguna factura", entradas, procedencia },
+      };
     },
-  },
+  }),
 ];
 
 /** cuadreVentasFacturacion, pero importado con nombre local porque `Cuadre`
@@ -934,11 +1856,6 @@ export const FICHA_PX = 44;
 export const FICHA_GAP_PX = 8;
 export const NUM_AGENTES = AGENTES.length;
 
-/** Cuántos agentes encontraron algo. Vive acá porque la lista de agentes vive
- *  acá: así el panel puede escribir "2 de 4" en su pie sin tener que meter esa
- *  frase dentro de la franja, donde rompía la alineación de la fila.
- *  `agentes` es opcional — sin él sigue contando sobre AGENTES (cartera),
- *  igual que siempre; cada módulo nuevo pasa su propia lista. */
 /** El vocabulario visual de los TRES estados, en un solo lugar, para que la
  *  ficha y la ventana no puedan discrepar entre sí.
  *
@@ -976,20 +1893,13 @@ const PINTA: Record<
   },
 };
 
-export function contarHallazgos(dataset: Dataset, fechaCorte: string, agentes: Agente[] = AGENTES) {
-  // TRES conteos, no dos. Antes `con` contaba `.hay` y todo lo demás caía en el
-  // resto por descarte, mezclando "miró y no había" con "no pudo mirar". Son
-  // cosas distintas y se informan por separado: un agente sin dato NO es un
-  // hallazgo, pero tampoco es evidencia de que no haya nada. Contarlo como si
-  // lo fuera es afirmar tranquilidad donde sólo hay ceguera.
-  const estados = agentes.map((a) => normalizarHallazgo(a.mirar(dataset, fechaCorte), a, fechaCorte).estado);
-  return {
-    con: estados.filter((e) => e === "hallazgo").length,
-    sinHallazgo: estados.filter((e) => e === "sin-hallazgo").length,
-    sinDato: estados.filter((e) => e === "sin-dato").length,
-    total: agentes.length,
-  };
-}
+// `contarHallazgos()` vivía acá y se borró (2026-08-24). Devolvía los tres
+// conteos (con / sinHallazgo / sinDato) para un pie de panel que decía "2 de 4".
+// Ese pie no existe en ninguna pantalla: un grep sobre app/, components/, lib/
+// y scripts/ no encontró ni un consumidor fuera de su propia prueba, que se
+// borró con ella. Una función exportada que sólo usa su test no está probada:
+// está sostenida por su test. Si mañana un panel necesita ese pie, son cinco
+// líneas y vuelve — con un consumidor de verdad.
 
 /** `agentes` es opcional — por defecto sigue siendo AGENTES (los 4 de cartera
  *  general que ya usan `/` y `/aging`, sin tocar su comportamiento). Los
@@ -1004,12 +1914,11 @@ export function FilaAgentes({
   fechaCorte: string;
   agentes?: Agente[];
 }) {
-  // Se normaliza en el borde: de acá para adentro todo es el tipo de tres
-  // estados, venga de un agente migrado o de uno que todavía devuelve la forma
-  // vieja.
+  // Ya no hay borde que normalizar: los 28 agentes devuelven el tipo de tres
+  // estados directamente (ver el acta del adaptador, arriba del todo).
   const vistos = agentes.map((a) => ({
     agente: a,
-    hallazgo: normalizarHallazgo(a.mirar(dataset, fechaCorte), a, fechaCorte),
+    hallazgo: a.mirar(dataset, fechaCorte),
   }));
 
   // Arranca cerrado: ahora el resultado abre una ventana sobre el tablero, y

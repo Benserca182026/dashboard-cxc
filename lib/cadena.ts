@@ -331,3 +331,113 @@ export function cadenaDeFactura(d: Dataset, idFactura: string, fmtMoneda: (n: nu
     saldoHoy: saldoPendiente(f, d.pagos, d.notasCredito),
   };
 }
+
+// ── 2.6 · Lo que el inventario TODAVÍA NO PUEDE AFIRMAR ─────────────────────
+//
+// DEPENDE DE (R7): que el Frente 1 confirme en docs/hallazgos-odoo-en-vivo.md
+// si Odoo puede entregar (a) un saldo inicial de existencias anterior a la
+// ventana de movimientos importada y (b) el punto de reorden real por producto.
+// Si resultara falso que faltan —es decir, si el export SÍ los trae—, nada de
+// esto se cae: las dos funciones de abajo pasan a devolver `true` SOLAS, porque
+// leen el dato en vez de afirmarlo. No hay ningún flag que acordarse de apagar.
+//
+// EL PRINCIPIO, que es el mismo del resto del archivo: el valor neutro se
+// admite SÓLO donde es verdadero. Y de los dos casos, uno CAMBIÓ DE LADO:
+//
+//   descuento = 0   YA NO. Acá decía que no restar nada era literalmente
+//                        correcto «porque no consta ningún descuento». El
+//                        boletín del 2026-08-24 REFUTÓ esa premisa: sobre los
+//                        pedidos no cancelados el descuento real es de
+//                        Q8,974,256.21 (26,285,671.61 bruto contra 17,311,415.40
+//                        neto). El descuento CONSTA; lo que falta es traerlo.
+//                        Y ya no hace falta pedir la columna `discount` a nadie:
+//                        Odoo entregó `price_subtotal` —el importe neto por
+//                        línea— para las 24.349 líneas, y está en disco.
+//                        Mientras `VentaLinea` no tenga ese campo, la suma de
+//                        cantidad × precio_unitario NO es un neutro inocente:
+//                        es una cifra que se sabe inflada, y por eso vive en la
+//                        capa "composicion" y se rotula SIEMPRE "a precio de
+//                        lista" — nunca "vendido".
+//
+//   saldo inicial = 0  NO, y el boletín lo confirmó. Poner 0 es AFIRMAR que la
+//                        bodega arrancó vacía el día del primer movimiento
+//                        importado, y eso es falso: la empresa ya operaba.
+//                        `Σ movimientos` sobre una ventana recortada no es la
+//                        existencia, es la VARIACIÓN de la existencia dentro de
+//                        esa ventana. Son dos magnitudes distintas y la segunda
+//                        no autoriza a hablar de stock. El Frente 1 tampoco
+//                        cargó ninguno, y por la misma razón: tiene DOS cifras
+//                        de Odoo para el mismo SKU en fechas distintas (714 al
+//                        19-08, 658 al 23-08) y elegir una sería fabricar el
+//                        número. El saldo inicial y la ventana de movimientos
+//                        tienen que fecharse contra el MISMO instante.
+
+/** Un producto cuya serie de movimientos NO alcanza para afirmar su existencia. */
+export interface SerieTruncada {
+  producto: Producto;
+  /** El primer movimiento registrado. Si es una SALIDA, había stock antes: la serie empieza a mitad de la historia. */
+  primerMovimiento: MovimientoInventario;
+  /** La variación acumulada dentro de la ventana. NO es la existencia. */
+  variacion: number;
+}
+
+export interface IntegridadInventario {
+  /** Productos con al menos un movimiento. Los que no tienen ninguno no se juzgan. */
+  productosConMovimiento: number;
+  /**
+   * Series que arrancan con una salida: para que salga mercadería tenía que
+   * haber entrado antes, y esa entrada no está en el dataset. La conclusión no
+   * se asume, se DERIVA del propio dato.
+   */
+  seriesTruncadas: SerieTruncada[];
+  /**
+   * ¿Se puede hablar de EXISTENCIA? Sólo si ninguna serie está truncada, es
+   * decir si toda la historia de cada producto está dentro del dataset.
+   */
+  existenciaEsAfirmable: boolean;
+  /** Fecha del primer movimiento del dataset — el borde de la ventana importada. */
+  desde: string | null;
+  /**
+   * ¿Hay punto de reorden real? Si TODOS los productos traen stock_minimo = 0,
+   * la columna nunca se pobló (scripts/importar-inventario-odoo.mjs la escribe
+   * literalmente como 0). Un mínimo de 0 para todo el catálogo no es una
+   * política de inventario: es una columna vacía. También se DERIVA del dato.
+   */
+  minimoEsAfirmable: boolean;
+  productosConMinimoPositivo: number;
+}
+
+export function integridadInventario(d: Dataset): IntegridadInventario {
+  const productos = d.productos ?? [];
+  const movimientos = d.movimientosInventario ?? [];
+  const seriesTruncadas: SerieTruncada[] = [];
+  let productosConMovimiento = 0;
+
+  for (const p of productos) {
+    const propios = movimientos
+      .filter((m) => m.id_producto === p.id_producto)
+      .sort((a, b) => a.fecha.localeCompare(b.fecha));
+    if (propios.length === 0) continue;
+    productosConMovimiento++;
+    const primerMovimiento = propios[0];
+    if (primerMovimiento.tipo === "salida") {
+      seriesTruncadas.push({
+        producto: p,
+        primerMovimiento,
+        variacion: propios.reduce((s, m) => s + m.cantidad, 0),
+      });
+    }
+  }
+
+  const productosConMinimoPositivo = productos.filter((p) => p.stock_minimo > 0).length;
+  const fechas = movimientos.map((m) => m.fecha).sort();
+
+  return {
+    productosConMovimiento,
+    seriesTruncadas,
+    existenciaEsAfirmable: productosConMovimiento > 0 && seriesTruncadas.length === 0,
+    desde: fechas[0] ?? null,
+    minimoEsAfirmable: productos.length > 0 && productosConMinimoPositivo > 0,
+    productosConMinimoPositivo,
+  };
+}

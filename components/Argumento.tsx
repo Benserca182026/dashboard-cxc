@@ -141,6 +141,94 @@ export interface KpiPie {
    *  ser lo que su etiqueta promete. Se imprime junto al valor, siempre
    *  visible, porque un número contaminado sin rótulo se lee como bueno. */
   advertencia?: string;
+  /**
+   * EL HUECO DECLARADO. Cuando el dato no existe, esto REEMPLAZA al anillo y al
+   * valor: la tarjeta deja de fingir que mide y pasa a explicar por qué no
+   * puede. Si viene, `valor` y `pct` se ignoran — no hay número que mostrar.
+   *
+   * Los tres campos son obligatorios, igual que en el estado "sin-dato" de los
+   * agentes (components/Agentes.tsx): una tarjeta que no puede medir NO COMPILA
+   * hasta decir qué le falta, qué se pierde y cómo se llena.
+   */
+  sinDato?: HuecoDeclarado;
+}
+
+/** Los tres campos que convierten un hueco mudo en información. Mismo contrato
+ *  y mismo vocabulario visual que el bloque "sin-dato" del popover de agentes:
+ *  un hueco explicado es información; uno mudo es una tarjeta desperdiciada; y
+ *  uno rellenado con un 0 es una mentira. */
+export interface HuecoDeclarado {
+  queFalta: string;
+  consecuencia: string;
+  comoSeLlena: string;
+}
+
+/** Azul frío del estado "sin dato", copiado de PINTA en components/Agentes.tsx.
+ *  No es una alarma (eso es naranja) ni un "miré y no había" (eso es gris): es
+ *  una ausencia de dato, y tiene que verse distinta de las otras dos. */
+const SIN_DATO_TINTE = {
+  disco: "#5b7a99",
+  fondoPastilla: "rgba(91,122,153,.14)",
+  textoPastilla: "#3f5a75",
+} as const;
+
+/** El hueco, dicho con todas las letras, en el lugar donde iría el anillo. */
+function PieSinDato({ kpi, oscuro }: { kpi: KpiPie; oscuro?: boolean }) {
+  const hueco = kpi.sinDato!;
+  const filas: [string, string][] = [
+    ["Qué falta", hueco.queFalta],
+    ["Qué se pierde", hueco.consecuencia],
+    ["Cómo se llena", hueco.comoSeLlena],
+  ];
+  return (
+    <span className="my-auto block pt-3">
+      <span className="flex items-center gap-2.5">
+        {/* El "?" en disco, hermano de la insignia de la ficha del agente. */}
+        <span
+          aria-hidden
+          className="grid h-7 w-7 shrink-0 place-items-center rounded-full text-[13px] font-bold text-white"
+          style={{ background: SIN_DATO_TINTE.disco }}
+        >
+          ?
+        </span>
+        <span className="min-w-0 flex-1">
+          <span
+            className="block text-[9px] font-semibold uppercase leading-tight tracking-[0.08em]"
+            style={{ color: oscuro ? "rgba(255,255,255,.5)" : "#a0a2a6" }}
+          >
+            {kpi.etiqueta}
+          </span>
+          <span
+            className="mt-1 inline-block rounded-pastilla px-2 py-[3px] text-[9.5px] font-semibold leading-none"
+            style={{
+              background: oscuro ? "rgba(255,255,255,.14)" : SIN_DATO_TINTE.fondoPastilla,
+              color: oscuro ? "#dce7f3" : SIN_DATO_TINTE.textoPastilla,
+            }}
+          >
+            sin dato
+          </span>
+        </span>
+      </span>
+      <span className="mt-2 block space-y-1">
+        {filas.map(([rotulo, texto]) => (
+          <span key={rotulo} className="block">
+            <span
+              className="block text-[8px] font-semibold uppercase leading-tight tracking-[0.07em]"
+              style={{ color: oscuro ? "#a9c4dd" : SIN_DATO_TINTE.textoPastilla }}
+            >
+              {rotulo}
+            </span>
+            <span
+              className="block text-[9.5px] leading-[1.35]"
+              style={{ color: oscuro ? "rgba(255,255,255,.72)" : "#6b6f78" }}
+            >
+              {texto}
+            </span>
+          </span>
+        ))}
+      </span>
+    </span>
+  );
 }
 
 /** Anillo de proporción. El mismo en las cuatro tarjetas, porque las cuatro
@@ -273,7 +361,11 @@ function Columna({ etapa, indice, activa, onElegir, kpi }: {
 
         {/* El gráfico, en el lugar donde estaba el párrafo. Mismo anillo en las
             cuatro tarjetas: la forma no cambia, sólo cuánto se llena. */}
-        {kpi?.pct !== undefined && (
+        {/* Un hueco declarado gana al anillo: si el dato no existe, la tarjeta
+            explica el hueco en vez de dibujar una proporción de nada. */}
+        {kpi?.sinDato ? (
+          <PieSinDato kpi={kpi} oscuro={esConclusion} />
+        ) : kpi?.pct !== undefined && (
           <span className="my-auto flex items-center gap-3 pt-3">
             <Anillo pct={kpi.pct} oscuro={esConclusion} />
             <span className="min-w-0 flex-1">

@@ -17,9 +17,13 @@ import assert from "node:assert/strict";
 import { datosDemo } from "../lib/datos";
 import {
   AGENTES,
+  AGENTES_DATOS,
+  AGENTES_FORECAST,
+  AGENTES_INVENTARIO,
+  AGENTES_PRIORITARIOS,
+  AGENTES_SEGUIMIENTO,
   AGENTES_VENTAS,
-  contarHallazgos,
-  normalizarHallazgo,
+  type Agente,
   type Hallazgo,
 } from "../components/Agentes";
 import type { Dataset } from "../lib/types";
@@ -31,12 +35,24 @@ function prueba(nombre: string, fn: () => void) {
   console.log(`  ✅ ${nombre}`);
 }
 
-/** Mira con un agente y devuelve SIEMPRE el tipo de tres estados. */
+/** Mira con un agente de cartera. `mirar` YA devuelve el tipo de tres estados:
+ *  desde que migró el último grupo no hay adaptador que interponer. */
 function ver(id: string, d: Dataset, corte: string): Hallazgo {
   const a = AGENTES.find((x) => x.id === id);
   assert.ok(a, `no existe el agente ${id}`);
-  return normalizarHallazgo(a.mirar(d, corte), a, corte);
+  return a.mirar(d, corte);
 }
+
+/** Los SIETE grupos, para poder afirmar cosas sobre los 28 agentes a la vez. */
+const GRUPOS: [string, Agente[]][] = [
+  ["AGENTES", AGENTES],
+  ["AGENTES_PRIORITARIOS", AGENTES_PRIORITARIOS],
+  ["AGENTES_SEGUIMIENTO", AGENTES_SEGUIMIENTO],
+  ["AGENTES_VENTAS", AGENTES_VENTAS],
+  ["AGENTES_INVENTARIO", AGENTES_INVENTARIO],
+  ["AGENTES_FORECAST", AGENTES_FORECAST],
+  ["AGENTES_DATOS", AGENTES_DATOS],
+];
 
 /** Un dataset legítimo y VACÍO: no es un dataset roto, es una cartera sin
  *  facturas. Es el único caso en que un agente de antigüedad no puede mirar. */
@@ -156,13 +172,6 @@ prueba("un \"sin-dato\" NO afirma prosa de hallazgo: no tiene texto ni evidencia
   assert.ok(!("evidencia" in h), "no hay evidencia de algo que no se pudo medir");
 });
 
-prueba("contarHallazgos separa los TRES estados y suman el total", () => {
-  const c = contarHallazgos(DATASET_VACIO, CORTE);
-  assert.equal(c.total, AGENTES.length);
-  assert.equal(c.con + c.sinHallazgo + c.sinDato, c.total, "algún agente no cayó en ningún estado");
-  assert.ok(c.sinDato >= 1, "con la cartera vacía, al menos el Cronómetro no puede mirar");
-});
-
 // ── 4 · La prosa NO cambió al separar medir de redactar ─────────────────────
 
 console.log("\n— La prosa es la misma que antes del refactor (Paso 3) —");
@@ -202,23 +211,119 @@ for (const [corte, esperados] of Object.entries(PROSA_ESPERADA)) {
   }
 }
 
-// ── 5 · Los grupos NO migrados siguen funcionando ───────────────────────────
+// ── 5 · LOS SIETE GRUPOS ESTÁN MIGRADOS ─────────────────────────────────────
+//
+// Esta sección decía lo contrario: comprobaba que los agentes SIN migrar
+// siguieran andando y declararan su deuda. Ya no queda ninguno, así que ahora
+// afirma la propiedad opuesta y mucho más fuerte — y es la que impide que la
+// deuda vuelva a entrar sin que nadie se dé cuenta.
 
-console.log("\n— Los seis grupos sin migrar siguen andando, y declaran su deuda —");
+console.log("\n— Los 28 agentes de los siete grupos están migrados —");
 
-prueba("un agente legado se normaliza a uno de los tres estados", () => {
-  const a = AGENTES_VENTAS[0];
-  const h = normalizarHallazgo(a.mirar(datosDemo, CORTE), a, CORTE);
-  assert.ok(h.estado === "hallazgo" || h.estado === "sin-hallazgo" || h.estado === "sin-dato");
+prueba("son 28 agentes: 4 de cartera + 6 grupos de módulo × 4", () => {
+  const total = GRUPOS.reduce((s, [, lista]) => s + lista.length, 0);
+  assert.equal(total, 28, `se contaron ${total}`);
+  for (const [nombre, lista] of GRUPOS) {
+    assert.equal(lista.length, 4, `${nombre} tiene ${lista.length} agentes, no 4`);
+  }
 });
 
-prueba("un agente legado DECLARA que todavía no trae entradas, en vez de inventarlas", () => {
-  const a = AGENTES_VENTAS[0];
-  const h = normalizarHallazgo(a.mirar(datosDemo, CORTE), a, CORTE);
-  if (h.estado === "sin-dato") return;
-  assert.equal(h.evidencia.entradas.length, 0, "un agente sin migrar no puede traer entradas de la nada");
-  assert.match(h.evidencia.procedencia.filtro, /sin migrar/);
-  assert.equal(h.evidencia.expresion, a.base);
+prueba("ningún id de agente se repite entre los siete grupos", () => {
+  const ids = GRUPOS.flatMap(([, lista]) => lista.map((a) => a.id));
+  assert.equal(new Set(ids).size, ids.length, "hay ids duplicados");
+});
+
+prueba("TODO agente devuelve el tipo de tres estados, en todo escenario", () => {
+  for (const [nombre, lista] of GRUPOS) {
+    for (const a of lista) {
+      for (const d of [datosDemo, DATASET_VACIO]) {
+        const h = a.mirar(d, CORTE);
+        assert.ok(
+          h.estado === "hallazgo" || h.estado === "sin-hallazgo" || h.estado === "sin-dato",
+          `${nombre}/${a.id} devolvió algo que no es un Hallazgo`
+        );
+      }
+    }
+  }
+});
+
+prueba("ya NO existe el placeholder «sin migrar»: todo agente declara entradas y filtro reales", () => {
+  for (const [nombre, lista] of GRUPOS) {
+    for (const a of lista) {
+      const h = a.mirar(datosDemo, CORTE);
+      if (h.estado === "sin-dato") continue;
+      assert.ok(
+        h.evidencia.entradas.length > 0,
+        `${nombre}/${a.id} no declara ni una entrada: quedó sin migrar`
+      );
+      assert.doesNotMatch(
+        h.evidencia.procedencia.filtro,
+        /sin migrar/,
+        `${nombre}/${a.id} todavía trae la procedencia del adaptador muerto`
+      );
+      assert.ok(h.evidencia.procedencia.modelo.length > 0, `${nombre}/${a.id} no declara origen`);
+      assert.equal(h.evidencia.procedencia.corte, CORTE, `${nombre}/${a.id} no declara el corte`);
+    }
+  }
+});
+
+prueba("todo «sin-dato» explica las tres cosas, en cualquier grupo y escenario", () => {
+  let vistos = 0;
+  for (const [nombre, lista] of GRUPOS) {
+    for (const a of lista) {
+      for (const d of [datosDemo, DATASET_VACIO]) {
+        const h = a.mirar(d, CORTE);
+        if (h.estado !== "sin-dato") continue;
+        vistos++;
+        assert.ok(h.queFalta.trim().length > 20, `${nombre}/${a.id}: queFalta no explica nada`);
+        assert.ok(h.consecuencia.trim().length > 20, `${nombre}/${a.id}: consecuencia no explica nada`);
+        assert.ok(h.comoSeLlena.trim().length > 20, `${nombre}/${a.id}: comoSeLlena no explica nada`);
+        assert.ok(!("texto" in h), `${nombre}/${a.id}: un sin-dato con texto vuelve a mentir`);
+        assert.ok(!("evidencia" in h), `${nombre}/${a.id}: no hay evidencia de lo que no se midió`);
+      }
+    }
+  }
+  assert.ok(vistos >= 19, `sólo ${vistos} casos «sin-dato»: la cartera vacía debería producir muchos más`);
+});
+
+prueba("todo ranking declara su denominador y va ordenado de mayor a menor", () => {
+  for (const [nombre, lista] of GRUPOS) {
+    for (const a of lista) {
+      const h = a.mirar(datosDemo, CORTE);
+      if (h.estado !== "hallazgo" || !h.ranking) continue;
+      const r = h.ranking;
+      assert.ok(r.total > 0, `${nombre}/${a.id}: ranking sin denominador declarado`);
+      assert.ok(r.filas.length <= 10, `${nombre}/${a.id}: ranking de ${r.filas.length} filas`);
+      for (let i = 1; i < r.filas.length; i++) {
+        assert.ok(
+          r.filas[i - 1].valor >= r.filas[i].valor,
+          `${nombre}/${a.id}: ranking desordenado`
+        );
+      }
+      for (const f of r.filas) {
+        assert.ok(
+          Math.abs((f.valor / r.total) * 100 - f.pct) < 0.05,
+          `${nombre}/${a.id}: pct incoherente en ${f.etiqueta}`
+        );
+      }
+    }
+  }
+});
+
+prueba("un agente cuya pregunta es un CONTEO no fabrica ranking", () => {
+  // La regla que este proyecto extirpa: inventar un top N donde no hay reparto.
+  // Estos cuatro preguntan «¿cuántos?» o «¿hay alguno?» — no admiten orden.
+  const deConteo = ["filtro", "bitacora-bloqueo", "huerfano", "vencimiento-dato", "duplicado-dato"];
+  for (const [nombre, lista] of GRUPOS) {
+    for (const a of lista) {
+      if (!deConteo.includes(a.id)) continue;
+      const h = a.mirar(datosDemo, CORTE);
+      assert.ok(
+        !("ranking" in h && h.ranking),
+        `${nombre}/${a.id} fabricó un ranking para una pregunta de conteo`
+      );
+    }
+  }
 });
 
 console.log(

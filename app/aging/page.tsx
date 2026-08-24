@@ -19,7 +19,7 @@
 
 import Link from "next/link";
 import { SkeletonPagina } from "@/components/Basicos";
-import { calcularAging, fmtMoneda } from "@/lib/calculos";
+import { calcularAging } from "@/lib/calculos";
 import { BUCKETS, type BucketAging } from "@/lib/types";
 import { BUCKET_INFO } from "@/lib/bucketInfo";
 import { useApp } from "@/lib/store";
@@ -38,7 +38,7 @@ const SECCIONES = [
 ];
 
 export default function PaginaAging() {
-  const { dataset, cargando, fechaCorte, setFechaCorte } = useApp();
+  const { dataset, cargando, fechaCorte, setFechaCorte, fmt } = useApp();
   const [bucketActivo, setBucketActivo] = useState<BucketAging | null>(null);
   const [comparacion, setComparacion] = useState<ComparacionOdoo | null>(null);
   const [errorComparacion, setErrorComparacion] = useState<string | null>(null);
@@ -86,8 +86,10 @@ export default function PaginaAging() {
   const mayorDeudor = [...vencidoPorCliente.entries()].sort((a, b) => b[1] - a[1])[0] ?? null;
   const porcentaje = (parte: number, total: number) => (total > 0 ? (parte / total) * 100 : 0);
   const diferenciaOdoo = comparacion ? cartera - comparacion.total : null;
-  const moneda = dataset.fuente === "odoo-real" ? "GTQ" : "USD";
-  const fmt = (n: number) => fmtMoneda(n, moneda);
+  // El dinero lo pinta el formateador del store: es el ÚNICO lugar donde una
+  // cifra cambia de moneda, y lo hace al PINTAR. Todo lo de arriba (umbrales,
+  // porcentajes, comparaciones, cuadres) se calculó en la moneda de registro y
+  // no se entera de esta vista. Ver components/ControlMoneda.tsx.
 
   return (
     <div className="space-y-6">
@@ -115,16 +117,45 @@ export default function PaginaAging() {
               valor: fmt(vencido),
               pct: porcentaje(vencido, cartera),
             },
-            {
-              etiqueta: `tramo ${mayorTramo?.bucket ?? "—"} · del vencido`,
-              valor: fmt(mayorTramo?.monto ?? 0),
-              pct: porcentaje(mayorTramo?.monto ?? 0, vencido),
-            },
-            {
-              etiqueta: "mayor deudor · del vencido",
-              valor: mayorDeudor ? fmt(mayorDeudor[1]) : "—",
-              pct: porcentaje(mayorDeudor?.[1] ?? 0, vencido),
-            },
+            // Los dos de abajo se reparten el VENCIDO. Sin vencido no hay
+            // denominador, y el "—" con anillo en 0% que había acá afirmaba un
+            // reparto de cero sobre cero. Se declara el hueco en su lugar.
+            mayorTramo
+              ? {
+                  etiqueta: `tramo ${mayorTramo.bucket} · del vencido`,
+                  valor: fmt(mayorTramo.monto),
+                  pct: porcentaje(mayorTramo.monto, vencido),
+                }
+              : {
+                  etiqueta: "tramo mayor · del vencido",
+                  valor: "",
+                  sinDato: {
+                    queFalta:
+                      "No hay ni un quetzal vencido al corte: ningún tramo del aging tiene saldo, así que no hay tramo mayor que señalar.",
+                    consecuencia:
+                      "No hay reparto del vencido que describir. Un anillo en 0% se leería como «el tramo mayor es el 0% del vencido», que es una división por cero, no un dato.",
+                    comoSeLlena:
+                      "Se llena solo en cuanto haya facturas vencidas con saldo al corte. Hoy no las hay, y ésa es la buena noticia.",
+                  },
+                },
+            mayorDeudor
+              ? {
+                  etiqueta: "mayor deudor · del vencido",
+                  valor: fmt(mayorDeudor[1]),
+                  pct: porcentaje(mayorDeudor[1], vencido),
+                }
+              : {
+                  etiqueta: "mayor deudor · del vencido",
+                  valor: "",
+                  sinDato: {
+                    queFalta:
+                      "Ningún cliente tiene saldo vencido al corte: no hay deudores entre los cuales elegir al mayor.",
+                    consecuencia:
+                      "No se puede nombrar al mayor deudor ni medir cuánto pesa. El «—» anterior no distinguía esto de un fallo de carga.",
+                    comoSeLlena:
+                      "Se llena solo en cuanto haya facturas vencidas con saldo al corte.",
+                  },
+                },
             {
               etiqueta: "fuera del aging · de la cartera",
               valor: fmt(aging.saldoNoClasificable),

@@ -15,6 +15,7 @@
 import { useEffect, useState } from "react";
 import type { Dataset } from "@/lib/types";
 import { BarraUsuario, type ModuloFlujo } from "@/components/BarraUsuario";
+import { ControlMoneda } from "@/components/ControlMoneda";
 
 export interface SeccionPagina {
   id: string;
@@ -138,9 +139,19 @@ export function Encabezado({
       </div>
 
       {/* El título grande, como "Customer Journeys" en la referencia. */}
-      <h1 className="mt-6 text-[38px] font-extrabold leading-[1.05] tracking-[-0.02em] text-tinta">
-        {titulo}
-      </h1>
+      <div className="mt-6 flex flex-wrap items-start justify-between gap-x-8 gap-y-3">
+        <h1 className="text-[38px] font-extrabold leading-[1.05] tracking-[-0.02em] text-tinta">
+          {titulo}
+        </h1>
+        {/* El control de moneda vive en el ENCABEZADO, que es el único lugar
+            común a todas las páginas: así un solo gesto cambia toda la vista de
+            una vez, y no hay una pantalla que quede en otra moneda que el
+            resto. Lo que cambia es cómo se PINTA el dinero; ningún cálculo,
+            umbral ni comparación se rehace (ver components/ControlMoneda.tsx). */}
+        <div className="max-w-[340px] shrink-0">
+          <ControlMoneda />
+        </div>
+      </div>
     </header>
   );
 }

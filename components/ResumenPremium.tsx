@@ -109,12 +109,24 @@ export function KpiPremiumCard({
   nota,
   tono = "normal",
   variante = "soft",
+  sinDato,
 }: {
   etiqueta: string;
   valor: string;
   nota?: string;
   tono?: "normal" | "alerta" | "critico" | "simulado";
   variante?: keyof typeof VARIANTES;
+  /**
+   * EL HUECO DECLARADO. Si viene, `valor` y `nota` se ignoran: la tarjeta deja
+   * de mostrar una cifra y pasa a explicar por qué no la tiene. Mismo contrato
+   * y mismo tinte azul frío que el estado "sin-dato" de los agentes y que
+   * `KpiPie.sinDato` en components/Argumento.tsx — un hueco se ve igual en
+   * todo el tablero, venga de donde venga.
+   *
+   * PROHIBIDO llenarlo con un 0: un hueco explicado es información, uno mudo
+   * es una tarjeta desperdiciada, y uno con un cero es una mentira.
+   */
+  sinDato?: { queFalta: string; consecuencia: string; comoSeLlena: string };
 }) {
   const colorValor =
     tono === "critico"
@@ -125,6 +137,8 @@ export function KpiPremiumCard({
           ? "text-simulado"
           : "text-tinta";
 
+  const oscuro = variante === "acento";
+
   return (
     <div
       className={`p-5 ${VARIANTES[variante]}`}
@@ -132,14 +146,49 @@ export function KpiPremiumCard({
     >
       <p className="flex items-center gap-1.5 text-xs font-medium text-tintaSuave">
         <span aria-hidden className="text-[11px] opacity-60">
-          {tono === "critico" ? "▲" : tono === "alerta" ? "◆" : "✓"}
+          {sinDato ? "?" : tono === "critico" ? "▲" : tono === "alerta" ? "◆" : "✓"}
         </span>
         {etiqueta}
       </p>
-      <p className={`mt-2 text-[26px] font-bold leading-none ${colorValor}`}>
-        {valor}
-      </p>
-      {nota && <p className="mt-2 text-xs text-tintaSuave">{nota}</p>}
+      {sinDato ? (
+        <div className="mt-2">
+          <span
+            className="inline-block rounded-pastilla px-2 py-[3px] text-[10px] font-semibold leading-none"
+            style={{
+              background: oscuro ? "rgba(255,255,255,.14)" : "rgba(91,122,153,.14)",
+              color: oscuro ? "#dce7f3" : "#3f5a75",
+            }}
+          >
+            sin dato
+          </span>
+          <dl className="mt-2.5 space-y-1.5">
+            {(
+              [
+                ["Qué falta", sinDato.queFalta],
+                ["Qué se pierde", sinDato.consecuencia],
+                ["Cómo se llena", sinDato.comoSeLlena],
+              ] as [string, string][]
+            ).map(([rotulo, texto]) => (
+              <div key={rotulo}>
+                <dt
+                  className="text-[9px] font-semibold uppercase leading-tight tracking-[0.07em]"
+                  style={{ color: oscuro ? "#a9c4dd" : "#3f5a75" }}
+                >
+                  {rotulo}
+                </dt>
+                <dd className="mt-0.5 text-[11px] leading-[1.4] text-tintaSuave">{texto}</dd>
+              </div>
+            ))}
+          </dl>
+        </div>
+      ) : (
+        <>
+          <p className={`mt-2 text-[26px] font-bold leading-none ${colorValor}`}>
+            {valor}
+          </p>
+          {nota && <p className="mt-2 text-xs text-tintaSuave">{nota}</p>}
+        </>
+      )}
     </div>
   );
 }

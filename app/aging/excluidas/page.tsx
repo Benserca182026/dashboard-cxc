@@ -12,7 +12,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { SkeletonPagina } from "@/components/Basicos";
-import { calcularAging, fmtMoneda, nombreDeCliente, type FacturaExcluida } from "@/lib/calculos";
+import { calcularAging, nombreDeCliente, type FacturaExcluida } from "@/lib/calculos";
 import { useApp } from "@/lib/store";
 
 const MOTIVO_ETIQUETA: Record<FacturaExcluida["motivo"], string> = {
@@ -22,7 +22,7 @@ const MOTIVO_ETIQUETA: Record<FacturaExcluida["motivo"], string> = {
 };
 
 export default function PaginaExcluidas() {
-  const { dataset, cargando, fechaCorte } = useApp();
+  const { dataset, cargando, fechaCorte, fmt } = useApp();
   const [busqueda, setBusqueda] = useState("");
   const [filtroMotivo, setFiltroMotivo] = useState<FacturaExcluida["motivo"] | "todos">("todos");
   const [pagina, setPagina] = useState(0);
@@ -33,7 +33,10 @@ export default function PaginaExcluidas() {
   const aging = calcularAging(dataset, fechaCorte);
   const nombreCliente = (id: string) =>
     nombreDeCliente(dataset.clientes, id);
-  const fmt = (n: number) => fmtMoneda(n, dataset.fuente === "odoo-real" ? "GTQ" : "USD");
+  // El dinero lo pinta el formateador del store: es el ÚNICO lugar donde una
+  // cifra cambia de moneda, y lo hace al PINTAR. Todo lo de arriba (umbrales,
+  // porcentajes, comparaciones, cuadres) se calculó en la moneda de registro y
+  // no se entera de esta vista. Ver components/ControlMoneda.tsx.
 
   const porMotivo = new Map<FacturaExcluida["motivo"], { n: number; saldo: number }>();
   for (const e of aging.excluidas) {

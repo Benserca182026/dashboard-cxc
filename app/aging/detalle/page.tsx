@@ -9,7 +9,7 @@ import { Suspense, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { SkeletonPagina } from "@/components/Basicos";
-import { calcularAging, fmtMoneda, nombreDeCliente, type FacturaClasificada } from "@/lib/calculos";
+import { calcularAging, nombreDeCliente, type FacturaClasificada } from "@/lib/calculos";
 import { BUCKETS, type BucketAging, type EstadoFactura } from "@/lib/types";
 import { BUCKET_INFO } from "@/lib/bucketInfo";
 import { useApp } from "@/lib/store";
@@ -36,7 +36,7 @@ const COLUMNAS: { clave: ClaveColumna; titulo: string; alinear?: "derecha" }[] =
 ];
 
 function ContenidoDetalle() {
-  const { dataset, cargando, fechaCorte } = useApp();
+  const { dataset, cargando, fechaCorte, fmt } = useApp();
   const params = useSearchParams();
   const bucketInicial = params.get("bucket") as BucketAging | null;
 
@@ -54,7 +54,10 @@ function ContenidoDetalle() {
   const aging = calcularAging(dataset, fechaCorte);
   const nombreCliente = (id: string) =>
     nombreDeCliente(dataset.clientes, id);
-  const fmt = (n: number) => fmtMoneda(n, dataset.fuente === "odoo-real" ? "GTQ" : "USD");
+  // El dinero lo pinta el formateador del store: es el ÚNICO lugar donde una
+  // cifra cambia de moneda, y lo hace al PINTAR. Todo lo de arriba (umbrales,
+  // porcentajes, comparaciones, cuadres) se calculó en la moneda de registro y
+  // no se entera de esta vista. Ver components/ControlMoneda.tsx.
 
   const filasBucket =
     filtroBucket === "todos"
