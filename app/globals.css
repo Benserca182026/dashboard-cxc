@@ -1,27 +1,350 @@
 @import "tailwindcss";
-
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
-
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: Arial, Helvetica, sans-serif;
-  --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
-    "Liberation Mono", "Courier New", monospace;
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
+@config "../tailwind.config.ts";
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  color: #16181d;
+  -webkit-font-smoothing: antialiased;
+  /* Degradado sutil, no plano — rasgo del estilo de referencia. */
+  background:
+    radial-gradient(900px 600px at 12% -10%, #ffffff 0%, transparent 60%),
+    radial-gradient(700px 500px at 88% 0%, #eef1f6 0%, transparent 55%),
+    #f4f5f7;
+  background-attachment: fixed;
+}
+
+/* Tarjeta translúcida flotante: el rasgo central del estilo de referencia. */
+.tarjeta-flotante {
+  background: rgba(255, 255, 255, 0.78);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border: 1px solid rgba(255, 255, 255, 0.9);
+  border-radius: 22px;
+  box-shadow: 0 2px 4px rgba(22, 24, 29, 0.03), 0 12px 32px rgba(22, 24, 29, 0.07);
+}
+
+/* Píldora del elemento activo — negra, como la pestaña "Cases" de la referencia. */
+.pastilla-activa {
+  background: #16181d;
+  color: #fff;
+  border-radius: 999px;
+}
+
+/* Etiqueta de fase, DEBAJO de su columna (no encima), como en la referencia. */
+.etiqueta-fase {
+  font-size: 11px;
+  font-weight: 600;
+  color: #8b93a7;
+  letter-spacing: 0.02em;
+}
+
+@keyframes entradaSuave {
+  from { opacity: 0; transform: translateY(10px) scale(0.985); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+.entrada-suave { animation: entradaSuave 0.5s cubic-bezier(0.22, 1, 0.36, 1) both; }
+
+@keyframes trazo {
+  from { stroke-dashoffset: var(--largo); }
+  to   { stroke-dashoffset: 0; }
+}
+
+/* ── Login animado ─────────────────────────────────────────────────────────
+   La línea entre cuadraditos no aparece: se DIBUJA. Es el mismo gesto de la
+   referencia (un caso atravesando fases) usado como puerta de entrada. */
+@keyframes dibujarLinea {
+  from { stroke-dashoffset: 100; }
+  to   { stroke-dashoffset: 0; }
+}
+.linea-dibujada {
+  stroke-dasharray: 100;
+  animation: dibujarLinea 0.7s cubic-bezier(0.65, 0, 0.35, 1) both;
+}
+
+@keyframes latido {
+  0%, 100% { opacity: 0.35; transform: scale(1); }
+  50%      { opacity: 1;    transform: scale(1.35); }
+}
+.latido { animation: latido 2.4s ease-in-out infinite; }
+
+@keyframes salidaPuerta {
+  to { opacity: 0; transform: translateY(-14px) scale(0.985); filter: blur(3px); }
+}
+.salida-puerta { animation: salidaPuerta 0.45s cubic-bezier(0.4, 0, 1, 1) both; }
+
+@media (prefers-reduced-motion: reduce) {
+  .entrada-suave, .linea-dibujada, .latido, .salida-puerta { animation: none !important; }
+}
+
+/* ── Piel de la referencia, aplicada A UN SOLO BLOQUE ───────────────────────
+   TRES CAPAS, que es lo que faltaba:
+     1 · .lienzo-referencia  — la base, gris neutro y opaco (hace de "página")
+     2 · .panel-columna      — lámina FRÍA y TRANSLÚCIDA sobre esa base
+     3 · .tarjeta-calada     — la tarjeta blanca sólida
+   El vidrio se percibe por la capa 2 mirándose contra la 1. Antes yo tenía
+   sólo 1 y 3: no había nada que atravesar, y por eso se veía plano. */
+/* UN SOLO RECTÁNGULO. Antes había dos cajas dibujadas: este panel y, dentro,
+   otra banda con su propio fondo. Sobraba: en la referencia el mordisco está
+   en el borde del panel grande, el mismo que contiene las tarjetas de abajo.
+   Ahora el fondo vive en el pseudo-elemento — porque `mask` recorta también el
+   contenido — y la banda interior quedó sin caja propia. */
+.lienzo-referencia {
+  position: relative;
+  isolation: isolate;
+  font-family: var(--fuente-referencia), ui-sans-serif, system-ui, sans-serif;
+  border-radius: 30px;
+  padding: 26px 26px 24px;
+  color: #16181d;
+}
+.lienzo-referencia::before {
+  /* El filo que recorre el contorno, mordisco incluido. La sombra `inset` no
+     sirve para esto: se dibuja y la máscara la corta, así que el brillo moría
+     en los bordes rectos y el hueco quedaba sin canto. `drop-shadow` se aplica
+     a la silueta YA enmascarada, así que sigue la curva del mordisco. */
+  filter:
+    drop-shadow(0 -1.5px 0 rgba(31, 46, 82, 0.40))
+    drop-shadow(0 1.5px 0 rgba(255, 255, 255, 1));
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: inherit;
+  pointer-events: none;
+  /* El brillo de la esquina superior izquierda va explícito, no confiado al
+     degradado: con 143° el blanco caía distinto según el ancho del panel, y en
+     el bloque grande se perdía. Ahora los tres tienen la misma luz entrando
+     por el mismo sitio. */
+  background:
+    radial-gradient(420px 260px at 4% -6%, rgba(255, 255, 255, 0.95) 0%, rgba(255, 255, 255, 0) 70%),
+    linear-gradient(
+      143deg,
+      #fbfcfe 0%,
+      #eaf0fa 28%,
+      #d9e3f4 62%,
+      #c7d5ec 100%
+    );
+  box-shadow: inset 0 0 0 1px rgba(22, 24, 29, 0.05);
+  -webkit-mask-image: linear-gradient(#000, #000), var(--muesca);
+  -webkit-mask-size: 100% 100%, var(--muesca-w) var(--muesca-h);
+  -webkit-mask-position: 0 0, center var(--muesca-y, 0px);
+  -webkit-mask-repeat: no-repeat, no-repeat;
+  -webkit-mask-composite: xor;
+  mask-image: linear-gradient(#000, #000), var(--muesca);
+  mask-size: 100% 100%, var(--muesca-w) var(--muesca-h);
+  mask-position: 0 0, center var(--muesca-y, 0px);
+  mask-repeat: no-repeat, no-repeat;
+  mask-composite: exclude;
+}
+
+/* CAPA 2 — la que faltaba. Fría, translúcida, con filo claro arriba. */
+.panel-columna {
+  padding: 11px 11px 5px;
+  border-radius: 22px;
+  background: linear-gradient(
+    170deg,
+    rgba(230, 237, 249, 0.95) 0%,
+    rgba(221, 229, 243, 0.72) 100%
+  );
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.7),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.45);
+  transition: background 0.25s ease, box-shadow 0.25s ease;
+}
+.panel-columna-activa {
+  background: linear-gradient(
+    170deg,
+    rgba(222, 232, 249, 0.92) 0%,
+    rgba(214, 226, 246, 0.66) 100%
+  );
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.85),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.6),
+    0 6px 18px -10px rgba(22, 24, 29, 0.22);
+}
+
+/* CAPA 3 — blanca, sólida, radio chico, filo fino además de la sombra. */
+.tarjeta-calada {
+  background: #ffffff;
+  border: 1px solid rgba(22, 24, 29, 0.055);
+  border-radius: 16px;
+  box-shadow:
+    0 1px 1px rgba(22, 24, 29, 0.04),
+    0 8px 18px -10px rgba(22, 24, 29, 0.18);
+}
+.tarjeta-oscura {
+  background: #16181d;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 16px;
+  box-shadow: 0 8px 20px -10px rgba(22, 24, 29, 0.45);
+}
+
+/* Jerarquía de texto en tres valores del mismo gris. */
+.lienzo-referencia .texto-titulo { font-weight: 700; color: #16181d; }
+.lienzo-referencia .texto-dato { color: #85878c; }
+.lienzo-referencia .etiqueta-fase { color: #9ea1a8; font-weight: 500; }
+.lienzo-referencia .text-white,
+.lienzo-referencia .tarjeta-oscura .texto-titulo { color: #ffffff; }
+
+/* ── La piel, extendida a TODA la página 1 ──────────────────────────────────
+   Acotada a un envoltorio: no se derrama a las otras 7 rutas hasta que se
+   decida. Todo lo que hay acá reescribe lo que la página ya usa
+   (.tarjeta-flotante, títulos, textos) sin tocar esos componentes. */
+.piel-referencia {
+  font-family: var(--fuente-referencia), ui-sans-serif, system-ui, sans-serif;
+}
+
+/* Vidrio: más azul, más difuso, con el filo especular arriba. Lo que hace que
+   se lea como vidrio y no como papel es ese filo, no la transparencia. */
+.piel-referencia .tarjeta-flotante {
+  background: linear-gradient(
+    152deg,
+    rgba(255, 255, 255, 0.74) 0%,
+    rgba(232, 239, 252, 0.52) 100%
+  );
+  backdrop-filter: blur(22px) saturate(1.5);
+  -webkit-backdrop-filter: blur(22px) saturate(1.5);
+  border: 1px solid rgba(255, 255, 255, 0.65);
+  border-radius: 24px;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.9),
+    0 1px 2px rgba(22, 24, 29, 0.03),
+    0 16px 36px -18px rgba(31, 46, 82, 0.28);
+}
+
+/* El fondo azulado sobre el que ese vidrio se apoya. Sin esto el vidrio no se
+   ve: no habría nada con color que atravesar. */
+.piel-referencia {
+  position: relative;
+  isolation: isolate;
+}
+.piel-referencia::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    radial-gradient(1100px 700px at 8% -8%, #ffffff 0%, transparent 62%),
+    radial-gradient(900px 620px at 82% 6%, #dbe6fb 0%, transparent 60%),
+    radial-gradient(800px 600px at 60% 100%, #cddcf7 0%, transparent 62%),
+    linear-gradient(158deg, #f3f6fc 0%, #e6ecf8 48%, #d9e2f2 100%);
+}
+
+/* El negro sigue siendo uno solo por pantalla, pero ahora convive con vidrio. */
+.piel-referencia .pastilla-activa { box-shadow: 0 8px 22px -10px rgba(22, 24, 29, 0.5); }
+
+/* ── Hendidura ──────────────────────────────────────────────────────────────
+   Un surco tallado en la página, no otra tarjeta encima. Todo lo demás en
+   esta pantalla FLOTA (sombra hacia afuera); esto se HUNDE (sombra hacia
+   adentro). Ese contraste es lo que hace que se lea como un alojamiento: los
+   agentes viven dentro de él y su resultado se abre ahí mismo, sin taparle
+   nada al resto de la página. */
+.hendidura {
+  border-radius: 26px;
+  padding: 13px 15px;
+  background: linear-gradient(178deg, rgba(203, 216, 238, 0.58) 0%, rgba(228, 236, 250, 0.34) 100%);
+  box-shadow:
+    inset 0 2px 6px rgba(31, 46, 82, 0.17),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.4),
+    0 1px 0 rgba(255, 255, 255, 0.8);
+}
+
+/* La pantallita que abre un agente, apoyada DENTRO del surco. Blanca y sólida
+   para que se lea como una pieza colocada ahí, no como parte del fondo. */
+.pantalla-agente {
+  background: #ffffff;
+  border: 1px solid rgba(22, 24, 29, 0.06);
+  border-radius: 18px;
+  box-shadow:
+    0 1px 1px rgba(22, 24, 29, 0.04),
+    0 14px 28px -16px rgba(31, 46, 82, 0.4);
+}
+
+/* Riel donde se apoyan las fichas: hueco curvo tallado en el lienzo de los
+   pasos. Va CENTRADO y encima de las columnas, como la fila de caras de la
+   referencia. La curva es el radio completo: no es una tarjeta con esquinas
+   redondeadas, es una ranura. */
+.riel-agentes {
+  border-radius: 999px;
+  padding: 7px 16px;
+  background: linear-gradient(180deg, rgba(31, 46, 82, 0.1) 0%, rgba(31, 46, 82, 0.045) 100%);
+  box-shadow:
+    inset 0 2px 5px rgba(31, 46, 82, 0.2),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.65),
+    0 1px 0 rgba(255, 255, 255, 0.6);
+}
+
+/* ── La franja del panel ────────────────────────────────────────────────────
+   CORRECCIÓN: yo había hecho una cápsula ceñida alrededor de las fichas, del
+   ancho justo de ellas. En la referencia el contenedor es OTRO: una cinta que
+   cruza todo el ancho del panel, con el rótulo pegado a la izquierda, las
+   fichas sueltas en el centro y los botones a la derecha. Los agentes no van
+   apretados contra ningún borde: flotan en el espacio libre de la banda.
+   La hendidura es la barra entera, no el envoltorio de las fichas. */
+/* La banda interior ya no es una caja: es sólo la fila que alinea rótulo,
+   fichas y acciones. El único rectángulo dibujado es el panel. */
+.franja-panel {
+  position: relative;
+  padding: 0;
+}
+
+
+/* Las fichas se asoman por el hueco y proyectan sombra SOBRE la banda. Este
+   detalle es el que vende el efecto: sin él, la muesca sola no se lee — el ojo
+   necesita ver algo saliendo del borde para entender que hay un borde. */
+.fichas-asomadas {
+  /* Con margen negativo no salían: la franja centra sus hijos y el centrado se
+     comía el desplazamiento — medido, sobresalían 1 px. Con transform la caja
+     no cambia de tamaño, así que nada lo compensa y las fichas sí se asoman. */
+  transform: translateY(-20px);
+  filter: drop-shadow(0 7px 11px rgba(31, 46, 82, 0.2));
+}
+
+/* Velo: el resto de la pantalla se aleja, no desaparece. El desenfoque deja
+   ver que el tablero sigue ahí detrás y que el hallazgo sale DE él. */
+.velo-agente {
+  background: rgba(31, 46, 82, 0.22);
+  backdrop-filter: blur(7px) saturate(0.9);
+  -webkit-backdrop-filter: blur(7px) saturate(0.9);
+}
+
+/* ── Lienzo de automatizaciones ─────────────────────────────────────────────
+   Fondo punteado y pasos conectados, en la paleta del sistema y no en la del
+   editor del que viene la idea: el mismo tablero, otra materia. */
+.lienzo-nodos {
+  background-color: #f5f7fc;
+  background-image: radial-gradient(rgba(31, 46, 82, 0.14) 1px, transparent 1px);
+  background-size: 18px 18px;
+  box-shadow: inset 0 0 0 1px rgba(22, 24, 29, 0.06);
+}
+.nodo-flujo {
+  background: #ffffff;
+  border: 1px solid rgba(22, 24, 29, 0.07);
+  border-radius: 14px;
+  padding: 12px 14px;
+  box-shadow:
+    0 1px 1px rgba(22, 24, 29, 0.04),
+    0 10px 22px -14px rgba(31, 46, 82, 0.4);
+}
+
+/* La ventana que se abre en el medio y se puede mover. */
+.ventana-agente {
+  background: #ffffff;
+  border: 1px solid rgba(22, 24, 29, 0.07);
+  border-radius: 22px;
+  box-shadow:
+    0 2px 6px rgba(22, 24, 29, 0.06),
+    0 32px 70px -24px rgba(31, 46, 82, 0.55);
+}
+.ventana-agente-asa { cursor: grab; }
+.ventana-agente-asa:active { cursor: grabbing; }
+
+/* La barra lateral, en el mismo vidrio que el resto — antes quedaba blanca
+   plana contra un fondo azul y se veía pegada de otro proyecto. */
+.piel-referencia aside {
+  background: linear-gradient(180deg, rgba(255,255,255,.62) 0%, rgba(236,242,253,.42) 100%);
+  backdrop-filter: blur(22px) saturate(1.4);
+  -webkit-backdrop-filter: blur(22px) saturate(1.4);
+  border-right: 1px solid rgba(255, 255, 255, 0.6);
 }

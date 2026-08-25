@@ -1,32 +1,185 @@
 "use client";
 
-import { useMemo, useState } from "react";
+// M1 — Resumen de cartera (paso-3-modulos-propios.md).
+// Agrega lo que M2 clasifica; no introduce reglas propias.
 
-const cartera = [
-  ["Distribuidora Central", 248500, 12, "Al día"],
-  ["Grupo Horizonte", 193200, 47, "Vencida"],
-  ["Comercial Norte", 132800, 96, "Crítica"],
-  ["Almacenes Nova", 88600, 28, "Al día"],
-  ["Servicios Atlas", 72100, 63, "Vencida"],
-] as const;
-const fmt = new Intl.NumberFormat("es-GT", { style: "currency", currency: "GTQ", maximumFractionDigits: 0 });
+import { SkeletonPagina } from "@/components/Basicos";
+import {
+  AgingRow,
+  BannerFicticioPremium,
+  PanelAging,
+} from "@/components/ResumenPremium";
+import { calcularAging } from "@/lib/calculos";
+import { concentracionRiesgo } from "@/lib/kpis";
+import { BUCKETS } from "@/lib/types";
+import { useApp } from "@/lib/store";
+import { KpisGestion } from "@/components/KpisGestion";
+import { LienzoConAgentes, RecorridoArgumental } from "@/components/Argumento";
+import { argumentoDso } from "@/lib/argumento";
+import { Encabezado } from "@/components/Encabezado";
+import { FilaAgentes } from "@/components/Agentes";
 
-export default function Home() {
-  const [q, setQ] = useState("");
-  const [vista, setVista] = useState("Resumen");
-  const rows = useMemo(() => cartera.filter(([nombre]) => nombre.toLowerCase().includes(q.toLowerCase())), [q]);
-  const total = cartera.reduce((n, [, saldo]) => n + saldo, 0);
-  const vencido = cartera.filter(([, , dias]) => dias > 30).reduce((n, [, saldo]) => n + saldo, 0);
-  return <main className="min-h-screen bg-[#f4f5f7] text-[#17191d]">
-    <header className="border-b border-black/5 bg-white px-5 py-4"><div className="mx-auto flex max-w-7xl items-center justify-between"><div><p className="text-[10px] font-bold uppercase tracking-[.2em] text-slate-500">Finanzas · control operativo</p><h1 className="text-xl font-bold">Dashboard CxC</h1></div><button className="rounded-xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white">Exportar</button></div></header>
-    <div className="mx-auto grid max-w-7xl gap-6 p-5 md:grid-cols-[180px_1fr] md:p-9">
-      <nav className="flex gap-2 overflow-auto rounded-2xl bg-white p-2 md:block md:h-fit">{["Resumen", "Aging", "Seguimiento", "Prioritarios", "Datos"].map(x => <button key={x} onClick={() => setVista(x)} className={`whitespace-nowrap rounded-xl px-4 py-3 text-left text-sm font-medium md:mb-1 md:block md:w-full ${vista === x ? "bg-slate-900 text-white" : "text-slate-600 hover:bg-slate-100"}`}>{x}</button>)}</nav>
-      <section className="space-y-6"><div><p className="text-sm text-slate-500">Corte: 25 de agosto de 2026</p><h2 className="text-3xl font-bold">{vista === "Resumen" ? "Resumen de cartera" : vista}</h2></div>
-        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4"><Metric title="Cartera pendiente" value={fmt.format(total)} note="5 clientes activos"/><Metric title="Cartera vencida" value={fmt.format(vencido)} note="61% de la cartera" tone="amber"/><Metric title="Riesgo 90+" value={fmt.format(132800)} note="gestión prioritaria" tone="rose"/><Metric title="DSO estimado" value="42 días" note="meta: 35 días" tone="blue"/></div>
-        <div className="grid gap-6 xl:grid-cols-[1.35fr_.65fr]"><article className="rounded-3xl bg-white p-6 shadow-sm"><div className="flex flex-wrap items-center justify-between gap-3"><div><h3 className="font-bold">Cartera por cliente</h3><p className="text-xs text-slate-500">Prioriza y da seguimiento a saldos pendientes.</p></div><input value={q} onChange={e=>setQ(e.target.value)} placeholder="Buscar cliente" className="rounded-xl border border-slate-200 px-3 py-2 text-sm"/></div><table className="mt-5 w-full text-left text-sm"><thead className="border-b text-xs uppercase text-slate-400"><tr><th className="pb-3">Cliente</th><th>Saldo</th><th>Días</th><th>Estado</th></tr></thead><tbody>{rows.map(([nombre,saldo,dias,estado])=><tr key={nombre} className="border-b border-slate-100"><td className="py-4 font-semibold">{nombre}</td><td>{fmt.format(saldo)}</td><td>{dias}</td><td><span className={`rounded-full px-2 py-1 text-xs font-bold ${estado === "Crítica" ? "bg-rose-100 text-rose-700" : estado === "Vencida" ? "bg-amber-100 text-amber-700" : "bg-emerald-100 text-emerald-700"}`}>{estado}</span></td></tr>)}</tbody></table></article><article className="rounded-3xl bg-slate-900 p-6 text-white"><h3 className="font-bold">Distribución por antigüedad</h3><p className="mt-1 text-xs text-white/55">Cartera clasificada por vencimiento.</p><div className="mt-8 space-y-5"><Bar label="Al día" n={47}/><Bar label="31–60 días" n={28}/><Bar label="61–90 días" n={14}/><Bar label="90+ días" n={11}/></div></article></div>
+export default function PaginaResumen() {
+  const { dataset, cargando, fechaCorte, fmt } = useApp();
+
+  if (cargando) return <SkeletonPagina />;
+
+  const aging = calcularAging(dataset, fechaCorte);
+  const carteraTotal = aging.totalClasificado + aging.saldoNoClasificable;
+  const alDia = aging.totalesPorBucket["actual"];
+  const pctAlDia = carteraTotal > 0 ? Math.round((alDia / carteraTotal) * 100) : 0;
+  const critico = aging.totalesPorBucket["90+"];
+  const concentracion = concentracionRiesgo(dataset, fechaCorte);
+  const cuentasConDisputa = new Set(
+    dataset.disputas
+      .filter((d) => d.estado_disputa === "abierta" || d.estado_disputa === "en_revision")
+      .map((d) => d.id_cliente)
+  ).size;
+  // Con datos reales de Odoo, dataset.disputas siempre viene [] (no existe
+  // esa tabla en el Supabase real — ver lib/datosReales.ts) — "0 de N" ahí NO
+  // es un hallazgo de negocio ("no hay disputas"), es "no tenemos ese dato
+  // todavía". Se muestra distinto para no confundir una cosa con la otra
+  // (hallazgo confirmado por verificación 2026-08-19).
+  const sinDatosDisputa = dataset.fuente === "odoo-real";
+  // El dinero lo pinta el formateador del store: es el ÚNICO lugar donde una
+  // cifra cambia de moneda, y lo hace al PINTAR. Todo lo de arriba (umbrales,
+  // porcentajes, comparaciones, cuadres) se calculó en la moneda de registro y
+  // no se entera de esta vista. Ver components/ControlMoneda.tsx.
+
+  const SECCIONES = [
+    { id: "sec-argumento", etiqueta: "El caso" },
+    { id: "sec-indicadores", etiqueta: "Indicadores" },
+    { id: "sec-antiguedad", etiqueta: "Antigüedad" },
+    { id: "sec-contexto", etiqueta: "Contexto" },
+  ];
+
+  return (
+    <div className="space-y-6">
+      {/* Marca + menú interno + titular grande, al modo de la referencia. */}
+      <Encabezado titulo="Resumen de cartera" secciones={SECCIONES} dataset={dataset} />
+
+      {/* Rediseño demostrativo: el tablero no enuncia el DSO, lo DEMUESTRA por
+          etapas. Los cuatro KPIs de cartera ya no abren la página en una fila
+          propia: se repartieron al pie de las tarjetas, cada uno junto a la
+          etapa que lo interroga. Arriba eran cuatro números sin conversación. */}
+      <section id="sec-argumento" className="scroll-mt-24">
+        <RecorridoArgumental
+          arg={argumentoDso(dataset, fechaCorte)}
+          agentes={<FilaAgentes dataset={dataset} fechaCorte={fechaCorte} />}
+          /* Cada anillo dibuja la proporción que afirma SU etapa. Antes los
+             cuatro KPIs iban por orden y no pegaban con la etapa de al lado;
+             ahora cada tarjeta muestra el número del que está hablando. */
+          kpis={[
+            { etiqueta: "al día · de la cartera", valor: fmt(alDia), pct: pctAlDia },
+            {
+              etiqueta: "mayor cliente · de la cartera",
+              valor: fmt(concentracion.mayorCliente?.saldo ?? 0),
+              pct: concentracion.mayorPct ?? 0,
+            },
+            {
+              etiqueta: "bucket 90+ · de la cartera",
+              valor: fmt(critico),
+              pct: carteraTotal > 0 ? (critico / carteraTotal) * 100 : 0,
+            },
+            // LA TARJETA QUE ANTES ERA MUDA. Decía "clientes con disputa · sin
+            // datos", ponía el literal "sin datos" como valor y —lo peor—
+            // mandaba pct: 0, con lo cual el anillo dibujaba un cero perfecto.
+            // Ese 0 no era un hueco: era una AFIRMACIÓN falsa, la de que
+            // ningún cliente tiene disputas. Ahora la tarjeta declara el hueco
+            // con los mismos tres campos que el popover de los agentes.
+            {
+              etiqueta: "clientes con disputa",
+              valor: sinDatosDisputa ? "" : `${cuentasConDisputa} de ${dataset.clientes.length}`,
+              ...(sinDatosDisputa
+                ? {
+                    sinDato: {
+                      queFalta:
+                        "La fuente de disputas. No está en Supabase, y el 2026-08-24 el Frente 1 confirmó que tampoco existe en Odoo: no hay modelo de disputa ni de reclamo.",
+                      consecuencia:
+                        "No se puede saber cuánta cartera está frenada por un reclamo. Un 0 acá afirmaría que no hay ninguno, que es distinto de no saberlo.",
+                      comoSeLlena:
+                        "Decidiendo primero dónde registrar los reclamos. El seguimiento de cobranza de Odoo (64 clientes) es lo más cercano, pero es gestión de cobro, no disputa.",
+                    },
+                  }
+                : {
+                    pct:
+                      dataset.clientes.length > 0
+                        ? (cuentasConDisputa / dataset.clientes.length) * 100
+                        : 0,
+                  }),
+            },
+          ]}
+        />
       </section>
+
+      {/* Dos secciones lado a lado, como el par de paneles inferiores de la
+          referencia: los indicadores a la izquierda y la distribución a la
+          derecha. Antes iban apiladas a lo ancho y obligaban a bajar para
+          comparar dos cosas que se leen juntas. */}
+      <div className="grid items-start gap-6 lg:grid-cols-2">
+      {/* Paso 7 — indicadores de gestión, cada uno abrible hasta sus facturas.
+          Los dos bloques de abajo llevan el MISMO envoltorio que el de arriba:
+          lienzo con degradado, mordisco y las fichas de agentes asomadas. Son
+          la misma pieza con distinto contenido. */}
+      <section id="sec-indicadores" className="scroll-mt-24">
+        <LienzoConAgentes
+          titulo="Indicadores de gestión"
+          agentes={<FilaAgentes dataset={dataset} fechaCorte={fechaCorte} />}
+        >
+          <KpisGestion dataset={dataset} fechaCorte={fechaCorte} />
+        </LienzoConAgentes>
+      </section>
+
+      <section id="sec-antiguedad" className="scroll-mt-24">
+      <LienzoConAgentes
+        titulo="Distribución por antigüedad"
+        agentes={<FilaAgentes dataset={dataset} fechaCorte={fechaCorte} />}
+      >
+      <PanelAging
+        titulo=""
+        nota={`La suma de los buckets (${fmt(aging.totalClasificado)}) cubre solo facturas clasificables.`}
+      >
+        {BUCKETS.map((b) => {
+          const monto = aging.totalesPorBucket[b];
+          const pct =
+            aging.totalClasificado > 0
+              ? (monto / aging.totalClasificado) * 100
+              : 0;
+          return (
+            <AgingRow key={b} bucket={b} monto={monto} pct={pct} fmtMoneda={fmt} />
+          );
+        })}
+        {/* El contexto del corte ya no es una caja suelta al final de la
+            página: vive DENTRO de este panel. En la referencia sólo hay dos
+            espacios abajo y todo lo demás va dentro de ellos — nada flotando
+            por su cuenta. */}
+        <div id="sec-contexto" className="mt-5 scroll-mt-24 border-t border-[rgba(22,24,29,.07)] pt-4">
+          <div className="flex flex-wrap items-end justify-between gap-x-6 gap-y-2">
+            <div className="min-w-0">
+              <p className="text-[9.5px] font-semibold uppercase tracking-[0.08em] text-[#a0a2a6]">
+                Contexto del corte
+              </p>
+              <p className="mt-1 text-[11.5px] leading-snug text-[#85878c]">
+                Fecha de corte: {fechaCorte} (configurable en el módulo Aging) · Fuente: {dataset.fuente}
+              </p>
+            </div>
+            <div className="shrink-0 text-right">
+              <p className="text-[9.5px] font-semibold uppercase tracking-[0.08em] text-[#a0a2a6]">
+                Cartera total pendiente
+              </p>
+              <p className="text-[22px] font-bold leading-tight tabular-nums text-tinta">
+                {fmt(carteraTotal)}
+              </p>
+            </div>
+          </div>
+          <div className="mt-3">
+            <BannerFicticioPremium fuente={dataset.fuente} />
+          </div>
+        </div>
+      </PanelAging>
+      </LienzoConAgentes>
+      </section>
+      </div>
     </div>
-  </main>;
+  );
 }
-function Metric({title,value,note,tone="plain"}:{title:string;value:string;note:string;tone?:string}) { return <article className={`rounded-3xl p-5 shadow-sm ${tone === "amber" ? "bg-amber-50" : tone === "rose" ? "bg-rose-50" : tone === "blue" ? "bg-blue-50" : "bg-white"}`}><p className="text-xs font-bold uppercase tracking-wide text-slate-500">{title}</p><p className="mt-3 text-2xl font-bold">{value}</p><p className="mt-2 text-xs text-slate-500">{note}</p></article>; }
-function Bar({label,n}:{label:string;n:number}) { return <div><div className="mb-2 flex justify-between text-xs"><span>{label}</span><span className="text-white/60">{n}%</span></div><div className="h-2 overflow-hidden rounded-full bg-white/15"><div className="h-full rounded-full bg-white" style={{width:`${n}%`}}/></div></div>; }

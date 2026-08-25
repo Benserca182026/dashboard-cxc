@@ -1,0 +1,113 @@
+{
+  "_lea_esto_primero": [
+    "Cifras de CONTROL capturadas de Odoo. Este archivo es a la vez la prueba",
+    "y la lista de pendientes: toda cifra con \"valor\": null es una cifra que TODAVIA",
+    "NO se le pidio a Odoo. scripts/test-cifras-control.ts la reporta como PENDIENTE",
+    "e imprime al lado el valor que la app calcula hoy, para que nunca pase en silencio.",
+    "",
+    "Para cerrar un pendiente: entrar al menu exacto que dice \"fuente\", copiar el numero,",
+    "poner la fecha de captura del dia, y volver a correr `npm test`.",
+    "",
+    "NUNCA se compara con igualdad exacta contra Odoo. La razon esta escrita en",
+    "lib/verificacionOdoo.ts: Odoo descuenta cosas que este esquema no tiene (anticipos",
+    "sin aplicar, redondeos por multi-moneda), asi que una diferencia chica es legitima",
+    "y una diferencia grande es un bug. La tolerancia porcentual es exactamente esa linea.",
+    "",
+    "── CADA CIFRA DECLARA SU POBLACION, SU FILTRO Y SU FECHA ──────────────────",
+    "Dos cifras con el mismo nombre y distinta poblacion es el defecto que ya rompio",
+    "este fixture una vez: \"ventas_total_confirmado\" era en realidad el total SIN",
+    "filtrar (los 3.234 pedidos, incluidos 25 cancelados, 16 borradores y 4 enviados),",
+    "mientras la app filtra a state='sale' y da otra cosa. Ambos numeros exactos, y",
+    "por eso mismo la guarda no podia pasar jamas. Ahora conviven los dos, con nombres",
+    "distintos y su poblacion escrita.",
+    "",
+    "── ORIGEN DE LAS CIFRAS AGREGADAS EL 2026-08-24 ───────────────────────────",
+    "NO salen de una lectura de pantalla de ese dia. Salen de extractos que el propio",
+    "Odoo produjo (exports XLSX del 2026-08-19 y respuestas search_read de la API web",
+    "del 2026-08-20) que sobrevivieron en disco. Es material de Odoo, con su fecha real",
+    "declarada en fecha_captura. Ver docs/hallazgos-odoo-en-vivo.md."
+  ],
+  "moneda": "GTQ",
+  "cifras": {
+    "ventas_total_confirmado": {
+      "valor": 19671235.56,
+      "tolerancia_pct": 0.5,
+      "unidad": "GTQ",
+      "fuente": "Odoo > Ventas > Pedidos > Pedidos de venta SIN filtro de estado > pie de la columna \"Total\"",
+      "fecha_captura": "2026-08-23",
+      "nota": "POBLACION: los 3.234 pedidos de TODOS los estados. Verificado el 2026-08-24 contra sale_order_api.json (search_read de sale.order, 2026-08-20): la suma de amount_total sobre los 3.234 da exactamente 19,671,235.56. El nombre 'confirmado' es ENGANOSO y se conserva solo por compatibilidad: esta cifra NO esta filtrada a confirmados. Para confirmados use ventas_total_estado_sale."
+    },
+    "ventas_pedidos_confirmados": {
+      "valor": 3234,
+      "tolerancia_pct": 0,
+      "unidad": "pedidos",
+      "fuente": "Odoo > Ventas > Pedidos > Pedidos de venta SIN filtro de estado > contador de registros de la vista de lista",
+      "fecha_captura": "2026-08-23",
+      "nota": "POBLACION: todos los estados. Desglose verificado el 2026-08-24 sobre sale_order_api.json: sale 3.189 · cancel 25 · draft 16 · sent 4 = 3.234. Mismo aviso de nombre que la cifra anterior."
+    },
+    "ventas_total_estado_sale": {
+      "valor": 19292422.91,
+      "tolerancia_pct": 0.5,
+      "unidad": "GTQ",
+      "fuente": "Odoo > sale.order, search_read con state='sale' > suma de amount_total (incluye IVA)",
+      "fecha_captura": "2026-08-20",
+      "nota": "POBLACION: los 3.189 pedidos confirmados, y SOLO esos. En esta base NO existe ningun pedido en estado 'done', asi que 'confirmado' == state 'sale' y nada mas. ES LA CIFRA CONTRA LA QUE DEBE MEDIRSE LA APP, porque la app filtra a 'sale'. IMPORTANTE: amount_total INCLUYE IVA (12%); la suma de price_subtotal de las lineas de esos mismos pedidos da 17,225,403.75, y la diferencia de 2,067,019.16 es el impuesto, no un error."
+    },
+    "ventas_pedidos_estado_sale": {
+      "valor": 3189,
+      "tolerancia_pct": 0,
+      "unidad": "pedidos",
+      "fuente": "Odoo > sale.order, search_read con state='sale' > conteo de registros",
+      "fecha_captura": "2026-08-20",
+      "nota": "POBLACION: confirmados. Conteo, no monto: tolerancia 0. 3.234 totales menos 25 cancelados, 16 borradores y 4 enviados."
+    },
+    "inventario_existencia_ed_11_7_3": {
+      "valor": 658,
+      "tolerancia_pct": 0.5,
+      "unidad": "unidades",
+      "fuente": "Odoo > Inventario > Informes > Existencia (stock.quant) > filtro Producto = ED-11.7.3 > columna \"Cantidad a mano\"",
+      "fecha_captura": "2026-08-23",
+      "nota": "Testigo del bug de saldo inicial: la app calcula -149 porque suma solo los movimientos desde 2025-08-22 y nunca carga el saldo con el que arranco la ventana. AVISO DE FECHA, leido el 2026-08-24: el export stock_quant.xlsx del 2026-08-19 da 714 para este SKU (C MAS/Stock 29 + C VEN/Stock 23 + NAC/Stock 662), no 658. Las dos cifras son de Odoo; difieren 56 unidades en 4 dias. NO se corrigio ninguna de las dos. Quien cargue un saldo inicial DEBE fechar el saldo y la ventana de movimientos contra el MISMO instante: si toma el 714 del 19 y le suma movimientos desde el 22, el resultado va a ser plausible y va a estar mal."
+    },
+    "inventario_unidades_totales": {
+      "valor": 26477,
+      "tolerancia_pct": 1,
+      "unidad": "unidades",
+      "fuente": "Odoo > Inventario > Informes > Existencia (stock.quant), export agrupado por producto y ubicacion > suma de \"Cantidad inventariada\" sobre las filas de dato",
+      "fecha_captura": "2026-08-19",
+      "nota": "POBLACION: 795 filas producto-ubicacion sobre 8 ubicaciones internas (NAC/Stock 24.907 · C VEN/Stock 560 · C CEM/Stock 395 · C MAS/Stock 360 · RESER/Stock 114 · MUEST/Stock 98 · C YAD/Stock 39 · DEFEC/Stock 4). El export trae 2.030 filas, pero 1.235 son encabezados de grupo de Odoo en DOS niveles; sumarlas todas da 79.431 = 3 x 26.477 y es el error clasico con estos archivos. CONTRASTE INDEPENDIENTE: stock_valuation_layer.xlsx, otro export distinto, acumula 26.479 unidades — dos fuentes de Odoo que coinciden dentro de 2 unidades."
+    },
+    "inventario_valor_costo_total": {
+      "valor": 2707822.74,
+      "tolerancia_pct": 1,
+      "unidad": "GTQ",
+      "fuente": "Odoo > Inventario > Informes > Valoracion de inventario (stock.valuation.layer) > suma de \"Valor total\" sobre las 30.801 filas de dato",
+      "fecha_captura": "2026-08-19",
+      "nota": "Es el acumulado del libro de valoracion (entradas menos salidas), que es como Odoo llega al valor a costo. Se espera que la app de 0 hasta que se carguen los costos: costo_unitario esta en 0 para los 751 productos porque ninguno de los dos archivos de inventario traia precio (scripts/importar-inventario-odoo.mjs, nota de cabecera). YA EXISTE EL INSUMO para arreglarlo: costos-productos.json, derivado de este mismo export, trae costo_unitario real para 745 SKU."
+    },
+    "inventario_skus_bajo_minimo": {
+      "valor": null,
+      "tolerancia_pct": 0,
+      "unidad": "SKU",
+      "fuente": "PENDIENTE DE CAPTURA — Odoo > Inventario > Configuracion > Reglas de reabastecimiento (stock.warehouse.orderpoint) > contador de reglas con cantidad a mano por debajo del minimo",
+      "fecha_captura": null,
+      "nota": "SIGUE PENDIENTE Y NO SE PUEDE CERRAR CON MATERIAL EXISTENTE: revisado el 2026-08-24, no hay ni un solo export de stock.warehouse.orderpoint en disco. Es el unico de los tres exports pedidos sin sustituto. Hoy la app dice 547 de 751 (73%) porque stock_minimo esta hardcodeado en 0 (scripts/importar-inventario-odoo.mjs:119 y :245) y la regla degenero a existencia <= 0. Junto con esta cifra hay que traer los product_min_qty reales."
+    },
+    "cxc_saldo_vencido_total": {
+      "valor": 1871193.98,
+      "tolerancia_pct": 0.5,
+      "unidad": "GTQ",
+      "fuente": "Odoo > Contabilidad > Informes > Cuentas por cobrar > Vencido por cobrar (resumen por cliente) > pie de la columna \"Total\"",
+      "fecha_captura": "2026-08-19",
+      "nota": "POBLACION: 133 clientes, corte declarado por el propio reporte en su encabezado: 'As of: 08/19/2026'. OJO CON EL NOMBRE: 1,871,193.98 es la CARTERA COMPLETA. El vencido de verdad (excluyendo el tramo corriente de 1,005,992.96) es 865,201.02. Se cargo el pie de la columna Total porque es lo que pedia 'fuente'. Tramos: corriente 1,005,992.96 · 1-30 227,890.38 · 31-60 -18,180.32 · 61-90 -19,507.10 · 91-120 89,917.14 · Older 585,080.92. Los seis suman el Total con diferencia 0.00: NO hay saldo no clasificable. Dos tramos son NEGATIVOS (saldos a favor del cliente). SE ESPERA QUE ESTA GUARDA FALLE FUERTE: el calculo de la app suma monto_original menos notas de credito y NUNCA RESTA LOS PAGOS, asi que devuelve el total facturado (~19.4 M), no un saldo. Ese es un defecto real preexistente que esta cifra acaba de hacer audible; no se bajo la guarda para taparlo."
+    },
+    "ventas_margen_bruto": {
+      "valor": null,
+      "tolerancia_pct": 1,
+      "unidad": "GTQ",
+      "fuente": "PENDIENTE DE CAPTURA — Odoo > Ventas > Informes > Ventas > medida \"Margen\" sobre pedidos confirmados",
+      "fecha_captura": null,
+      "nota": "SIGUE PENDIENTE. Revisado el 2026-08-24: el unico export de Ventas>Informes en disco (sale_report.xlsx) es una tabla dinamica de 'Total libre de impuestos' por mes y no trae ninguna medida de margen; ademas cubre solo agosto 2025 a agosto 2026 (6,555,243.12), no toda la historia, asi que tampoco sirve de control para otra cosa. Los DOS insumos para derivar el margen ya existen (price_subtotal por linea y costo_unitario real en costos-productos.json), pero derivarlo NO es capturarlo: mientras esta celda siga en null, el margen que muestre la app no tiene contra que medirse."
+    }
+  }
+}
