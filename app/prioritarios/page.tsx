@@ -4,11 +4,9 @@
 // El score es SIMULADO (pesos ficticios) — el plan maestro exige fórmula
 // aprobada por Finanzas antes de usar un score real.
 //
-// Reestructuración (M6): esta página pasa al MISMO esqueleto de "/" y
-// "/aging". De arriba abajo: Encabezado con menú interno y BarraUsuario →
-// el motor de argumentación propio de este módulo (argumentoPrioritarios,
-// con los agentes AGENTES_PRIORITARIOS asomados en el mordisco) → la
-// worklist, envuelta en el mismo LienzoConAgentes que usan los otros bloques.
+// Reorientación comercial: la página abre con agentes de decisión, un Top 10
+// accionable y un cuadrante impacto × urgencia. La worklist completa conserva
+// búsqueda, orden y paginación como capa operativa inferior.
 //
 // NADA de la lógica de la worklist se movió: el orden por score, la búsqueda,
 // la paginación y la cascada de acción sugerida (lib/simulados.ts) siguen
@@ -16,13 +14,18 @@
 
 import { SkeletonPagina } from "@/components/Basicos";
 import { BannerFicticioPremium } from "@/components/ResumenPremium";
-import { prioridadSimulada, SUPUESTOS_SCORING, type FilaPrioridad } from "@/lib/simulados";
-import { argumentoPrioritarios } from "@/lib/argumento";
+import { SUPUESTOS_SCORING, type FilaPrioridad } from "@/lib/simulados";
 import { useApp } from "@/lib/store";
 import { useMemo, useState, type ReactNode } from "react";
 import { Encabezado } from "@/components/Encabezado";
+import { DecisionPanelV2 } from "@/components/DecisionPanelV2";
 import { AGENTES_PRIORITARIOS, FilaAgentes } from "@/components/Agentes";
-import { LienzoConAgentes, RecorridoArgumental } from "@/components/Argumento";
+import { LienzoConAgentes } from "@/components/Argumento";
+import {
+  AgentesComercialesCobranza,
+  CuadrantePrioridad,
+} from "@/components/commercial/CobranzaComercial";
+import { analizarPrioritariosComercial } from "@/lib/commercial-cobranza";
 
 type DireccionOrden = "asc" | "desc" | null;
 type ClaveColumna = "score" | "cliente" | "saldo" | "dias" | "accion";
@@ -36,12 +39,13 @@ interface ColumnaLocal {
 }
 
 const SECCIONES = [
-  { id: "sec-argumento", etiqueta: "El caso" },
+  { id: "sec-decisiones-v2", etiqueta: "Decisiones" },
+  { id: "sec-comercial", etiqueta: "Top 10" },
   { id: "sec-worklist", etiqueta: "Worklist" },
 ];
 
 export default function PaginaPrioritarios() {
-  const { dataset, cargando, fechaCorte, fmt } = useApp();
+  const { dataset, cargando, fechaCorte, fmt, gestiones } = useApp();
   // El dinero lo pinta el formateador del store: es el ÚNICO lugar donde una
   // cifra cambia de moneda, y lo hace al PINTAR. Todo lo de arriba (umbrales,
   // porcentajes, comparaciones, cuadres) se calculó en la moneda de registro y
@@ -52,9 +56,24 @@ export default function PaginaPrioritarios() {
   const [pagina, setPagina] = useState(0);
   const [porPagina, setPorPagina] = useState(10);
 
-  const filas = useMemo(
-    () => (cargando ? [] : prioridadSimulada(dataset, fechaCorte)),
-    [cargando, dataset, fechaCorte]
+  const comercial = useMemo(
+    () => analizarPrioritariosComercial(dataset, fechaCorte, gestiones),
+    [dataset, fechaCorte, gestiones]
+  );
+  const filas = useMemo<FilaPrioridad[]>(
+    () =>
+      cargando
+        ? []
+        : comercial.filas.map((fila) => ({
+            idCliente: fila.idCliente,
+            nombreCliente: fila.cliente,
+            saldoTotal: fila.saldo,
+            diasMaxAtraso: fila.dias,
+            enDisputa: fila.enDisputa,
+            scoreSimulado: fila.score,
+            accionSugerida: fila.proximaAccion,
+          })),
+    [cargando, comercial.filas]
   );
 
   const columnas: ColumnaLocal[] = [
@@ -146,13 +165,6 @@ export default function PaginaPrioritarios() {
     setPagina(0);
   };
 
-  // ── Las cifras de los cuatro anillos: las mismas que arma el argumento, no
-  //    números sueltos. Cada una es la que AFIRMA su etapa.
-  const totalClientes = dataset.clientes.length;
-  const totalSaldo = filas.reduce((s, f) => s + f.saldoTotal, 0);
-  const lider = filas[0] ?? null;
-  const parteLider = lider && totalSaldo > 0 ? (lider.saldoTotal / totalSaldo) * 100 : 0;
-
   return (
     <div className="space-y-6">
       {/* Marca + menú interno + BarraUsuario, igual que "/" y "/aging". Las
@@ -165,66 +177,80 @@ export default function PaginaPrioritarios() {
         modulo="prioritarios"
       />
 
-      {/* El motor de argumentación del módulo: ¿cuántos requieren atención,
-          cuál pesa más, es un caso puntual o un patrón, y a quién priorizar
-          hoy? Las cuatro etapas se derivan en lib/argumento.ts. */}
-      <section id="sec-argumento" className="scroll-mt-24">
-        <RecorridoArgumental
-          rotulo="El caso de la worklist"
-          arg={argumentoPrioritarios(dataset, fechaCorte)}
-          agentes={<FilaAgentes dataset={dataset} fechaCorte={fechaCorte} agentes={AGENTES_PRIORITARIOS} />}
-          kpis={[
-            {
-              etiqueta: "con saldo abierto · del catálogo",
-              valor: `${filas.length} de ${totalClientes}`,
-              pct: totalClientes > 0 ? (filas.length / totalClientes) * 100 : 0,
-            },
-            // Sin worklist no hay líder. El "—" con el anillo en 0% afirmaba un
-            // score de cero, que en esta escala es un valor legítimo — se leía
-            // como "hay un líder y su urgencia es nula", que es falso.
-            lider
-              ? {
-                  etiqueta: "score del líder (simulado) · máx. 100",
-                  valor: String(lider.scoreSimulado),
-                  pct: lider.scoreSimulado,
-                }
-              : {
-                  etiqueta: "score del líder (simulado) · máx. 100",
-                  valor: "",
-                  sinDato: {
-                    queFalta:
-                      "La worklist salió vacía al corte: no hay ninguna cuenta con saldo abierto, y por lo tanto no hay líder cuyo score mostrar.",
-                    consecuencia:
-                      "No hay urgencia que priorizar. Un score de 0 sobre 100 es un valor válido en esta escala, así que pintarlo afirmaría que existe una cuenta líder sin urgencia — y no existe ninguna cuenta.",
-                    comoSeLlena:
-                      "Con facturas abiertas al corte declarado. Si las hay en Odoo y acá no aparecen, revisar la importación y el corte usado.",
-                  },
-                },
-            lider
-              ? {
-                  etiqueta: "líder · del saldo priorizado",
-                  valor: fmt(lider.saldoTotal),
-                  pct: parteLider,
-                }
-              : {
-                  etiqueta: "líder · del saldo priorizado",
-                  valor: "",
-                  sinDato: {
-                    queFalta:
-                      "La worklist salió vacía al corte: no hay saldo priorizado ni cuenta que encabece el reparto.",
-                    consecuencia:
-                      "No se puede decir cuánto del saldo priorizado pesa el primero. Sin denominador, el porcentaje no es 0: no es ningún número.",
-                    comoSeLlena:
-                      "Con facturas abiertas con saldo al corte declarado.",
-                  },
-                },
-            {
-              etiqueta: "acción sugerida · confianza del score",
-              valor: lider?.accionSugerida ?? "sin acción",
-              pct: lider?.scoreSimulado ?? 0,
-            },
-          ]}
-        />
+      <DecisionPanelV2 modulo="prioritarios" />
+
+      <section id="sec-comercial" className="scroll-mt-24 space-y-6">
+        <AgentesComercialesCobranza agentes={comercial.agentes} fmt={fmt} />
+
+        <div className="space-y-6">
+          <LienzoConAgentes titulo="Top 10 · saldo, urgencia, dueño y siguiente paso">
+            <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
+              <p className="max-w-xl text-[11px] leading-relaxed text-tintaSuave">
+                Ranking por score simulado, con desempate por saldo y días. La probabilidad no existe en el dataset y se muestra explícitamente como no disponible.
+              </p>
+              <div className="text-right">
+                <p className="text-xl font-bold tabular-nums text-tinta">{fmt(comercial.saldoTopDiez)}</p>
+                <p className="text-[9px] font-bold uppercase tracking-[.08em] text-etapa">
+                  saldo del Top 10 · {comercial.saldoTotal > 0 ? ((comercial.saldoTopDiez / comercial.saldoTotal) * 100).toFixed(1) : "0.0"}% del total
+                </p>
+              </div>
+            </div>
+
+            {comercial.topDiez.length === 0 ? (
+              <div className="rounded-[18px] bg-white/60 p-10 text-center text-sm text-tintaSuave">
+                No hay cuentas abiertas para priorizar.
+              </div>
+            ) : (
+              <div className="overflow-x-auto rounded-[18px] border border-white/80 bg-white/65">
+                <table className="w-full min-w-[920px] text-left text-[10.5px]">
+                  <thead>
+                    <tr className="border-b border-white bg-white/60 text-[9px] font-bold uppercase tracking-[.08em] text-etapa">
+                      <th className="px-3 py-3"># / cliente</th>
+                      <th className="px-3 py-3 text-right">Saldo</th>
+                      <th className="px-3 py-3 text-right">Días</th>
+                      <th className="px-3 py-3 text-right">Score</th>
+                      <th className="px-3 py-3">Probabilidad</th>
+                      <th className="px-3 py-3">Responsable</th>
+                      <th className="px-3 py-3">Próxima acción</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {comercial.topDiez.map((fila, indice) => (
+                      <tr key={fila.idCliente} className="border-b border-white/80 align-top last:border-0">
+                        <td className="px-3 py-3">
+                          <div className="flex min-w-[190px] items-start gap-2">
+                            <span className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[9px] font-bold text-white ${fila.enDisputa ? "bg-amber-500" : "bg-tinta"}`}>
+                              {indice + 1}
+                            </span>
+                            <span className="font-semibold text-tinta">{fila.cliente}</span>
+                          </div>
+                        </td>
+                        <td className="px-3 py-3 text-right font-bold tabular-nums text-tinta">{fmt(fila.saldo)}</td>
+                        <td className="px-3 py-3 text-right font-semibold tabular-nums text-tinta">{fila.dias}</td>
+                        <td className="px-3 py-3 text-right font-bold tabular-nums text-simulado">{fila.score}</td>
+                        <td className="px-3 py-3 text-tintaSuave">No disponible</td>
+                        <td className="px-3 py-3 text-tintaSuave">{fila.responsable}</td>
+                        <td className="max-w-[230px] px-3 py-3 font-medium text-tinta">
+                          {fila.proximaAccion}
+                          {fila.enDisputa && <span className="mt-1 block text-[9px] font-bold uppercase tracking-[.06em] text-amber-700">disputa: no reclamar antes de resolver</span>}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </LienzoConAgentes>
+
+          <LienzoConAgentes titulo="Cuadrante de impacto × urgencia">
+            <CuadrantePrioridad
+              filas={comercial.topDiez}
+              medianaSaldo={comercial.medianaSaldo}
+              medianaDias={comercial.medianaDias}
+              fmt={fmt}
+            />
+          </LienzoConAgentes>
+        </div>
       </section>
 
       {/* La worklist: mismo orden por score, misma búsqueda, misma

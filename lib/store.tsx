@@ -23,6 +23,7 @@ import { Cifra } from "./types";
 import { fmtMoneda } from "./calculos";
 import { datosDemo, FECHA_CORTE_DEFAULT, gestionesSemilla } from "./datos";
 import { cargarDatasetReal, FECHA_CORTE_DATOS_REALES } from "./datosReales";
+import { TIPO_CAMBIO_REFERENCIA } from "./tipo-cambio";
 
 const CLAVE_GESTIONES = "cxc-prototipo-gestiones-ficticias";
 
@@ -41,14 +42,15 @@ const CLAVE_GESTIONES = "cxc-prototipo-gestiones-ficticias";
 //                    dólares esté activa la pantalla muestra valor, fuente y
 //                    fecha de la tasa usada.
 //
-// SI RESULTA FALSO que Odoo no la trae, no se cae nada: se reemplaza este null
-// por el objeto y no hay una sola línea más que tocar.
+// HABILITACIÓN TEMPORAL PARA ESTA COPIA LOCAL: se usa el tipo de cambio de
+// referencia vigente publicado por el Banco de Guatemala. La fecha y la
+// fuente quedan visibles en pantalla mientras la vista USD esté activa.
 //
 // PROHIBIDO poner acá una tasa "razonable" de memoria (7.7, 7.8, la que sea).
 // Una tasa sin fuente y sin fecha convierte montos reales con un número
 // inventado — que es el bug original de este proyecto (quetzales rotulados
 // como dólares) disfrazado de mejora.
-const TIPO_CAMBIO: TipoCambio | null = null;
+const TIPO_CAMBIO: TipoCambio | null = TIPO_CAMBIO_REFERENCIA;
 
 // RAMA R7 — RESUELTA el 2026-08-24 por el Frente 1, y resolvió hacia ESTA
 // salida: docs/hallazgos-odoo-en-vivo.md, sección «2. ¿Hay tipo de cambio

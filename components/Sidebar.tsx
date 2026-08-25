@@ -14,12 +14,12 @@ import { useState } from "react";
 import { useApp } from "@/lib/store";
 
 const ITEMS = [
-  { href: "/", etiqueta: "Resumen de cartera", icono: "▦", grupo: "Cartera" },
+  { href: "/", etiqueta: "Centro ejecutivo", icono: "▦", grupo: "Cartera" },
   { href: "/aging", etiqueta: "Aging", icono: "▤", grupo: "Cartera" },
   { href: "/prioritarios", etiqueta: "Clientes prioritarios", icono: "▲", grupo: "Cartera" },
   { href: "/ventas", etiqueta: "Ventas", icono: "◈", grupo: "Operación" },
   { href: "/inventario", etiqueta: "Inventario", icono: "▢", grupo: "Operación" },
-  { href: "/forecast", etiqueta: "Forecast (simulado)", icono: "◔", grupo: "Proyección" },
+  { href: "/forecast", etiqueta: "Forecast comercial", icono: "◔", grupo: "Proyección" },
   { href: "/seguimiento", etiqueta: "Seguimiento de cobros", icono: "☏", grupo: "Proyección" },
   { href: "/datos", etiqueta: "Carga y calidad de datos", icono: "⇪", grupo: "Proyección" },
 ];

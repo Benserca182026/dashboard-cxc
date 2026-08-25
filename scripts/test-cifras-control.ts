@@ -278,6 +278,13 @@ async function main() {
       const x = o?.[k];
       if (typeof x === "number" && Number.isFinite(x)) return x;
       if (typeof x === "string" && x.trim() !== "" && Number.isFinite(Number(x))) return Number(x);
+      if (x && typeof x === "object" && "valorParaMostrar" in x) {
+        const leer = (x as { valorParaMostrar?: unknown }).valorParaMostrar;
+        if (typeof leer === "function") {
+          const valor = leer.call(x);
+          if (typeof valor === "number" && Number.isFinite(valor)) return valor;
+        }
+      }
     }
     return null;
   };

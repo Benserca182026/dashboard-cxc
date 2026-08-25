@@ -46,6 +46,10 @@
 // especial "sin desglose" en lib/cadena.ts.
 
 import { Cifra } from "./types";
+import {
+  coincideSnapshotMonedaVentas,
+  monedaVentaSegunSnapshot,
+} from "./moneda-ventas-odoo";
 import type {
   Cliente,
   Dataset,
@@ -185,6 +189,7 @@ interface FilaVentaSupabase {
   estado_odoo: string | null;
   /** Capa "hecho": el total que Odoo cerró para el pedido, con descuento ya aplicado. */
   total_odoo_referencia: number | null;
+  moneda_id: string | null;
 }
 
 interface FilaVentaLineaSupabase {
@@ -203,6 +208,8 @@ interface FilaMovimientoSupabase {
   cantidad: number;
   id_venta: string | null;
   motivo: string | null;
+  ubicacion_desde: string | null;
+  ubicacion_hasta: string | null;
 }
 
 export async function cargarDatasetReal(): Promise<Dataset> {
@@ -215,7 +222,7 @@ export async function cargarDatasetReal(): Promise<Dataset> {
       traerTodo<FilaVentaSupabase>(
         "ventas",
         "id_venta",
-        "id_venta,id_cliente,fecha_venta,estado_odoo,total_odoo_referencia"
+        "id_venta,id_cliente,fecha_venta,estado_odoo,total_odoo_referencia,moneda_id"
       ),
       traerTodo<FilaVentaLineaSupabase>("venta_lineas", "id_linea"),
       traerTodo<FilaMovimientoSupabase>("movimientos_inventario", "id_movimiento"),
@@ -289,13 +296,23 @@ export async function cargarDatasetReal(): Promise<Dataset> {
   // el cliente todavía puede no aceptar. Un pedido "Cancelado" tampoco.
   // Contarlos inflaba el total. Las líneas de los pedidos excluidos se caen
   // solas más abajo, porque ventaLineas se filtra por idsVentaValidos.
-  const ventas: Venta[] = ventasRaw
+  const ventasConfirmadas = ventasRaw
     .filter((v): v is FilaVentaSupabase & { id_cliente: string } => v.id_cliente !== null)
-    .filter((v) => v.estado_odoo === ESTADO_VENTA_CONFIRMADA)
+    .filter((v) => v.estado_odoo === ESTADO_VENTA_CONFIRMADA);
+  const snapshotMonedaAplicable = coincideSnapshotMonedaVentas(
+    ventasConfirmadas.map((v) => v.id_venta)
+  );
+  const ventas: Venta[] = ventasConfirmadas
     .map((v) => ({
       id_venta: v.id_venta,
       id_cliente: v.id_cliente,
       fecha_venta: v.fecha_venta,
+      moneda_id:
+        v.moneda_id === "GTQ" || v.moneda_id === "USD"
+          ? v.moneda_id
+          : snapshotMonedaAplicable
+            ? monedaVentaSegunSnapshot(v.id_venta)
+            : null,
       total_referencia:
         v.total_odoo_referencia === null ? null : Cifra.hecho(Number(v.total_odoo_referencia)),
       estado_odoo: v.estado_odoo,
@@ -320,6 +337,8 @@ export async function cargarDatasetReal(): Promise<Dataset> {
     cantidad: Number(m.cantidad),
     id_venta: m.id_venta,
     motivo: m.motivo ?? undefined,
+    ubicacion_desde: m.ubicacion_desde,
+    ubicacion_hasta: m.ubicacion_hasta,
   }));
 
   return {

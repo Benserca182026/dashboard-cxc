@@ -70,15 +70,24 @@ export function Skeleton({ className = "" }: { className?: string }) {
 
 export function SkeletonPagina() {
   return (
-    <div className="space-y-4" role="status" aria-label="Cargando">
-      <Skeleton className="h-8 w-64" />
-      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-        <Skeleton className="h-24" />
-        <Skeleton className="h-24" />
-        <Skeleton className="h-24" />
-        <Skeleton className="h-24" />
+    <div
+      className="fixed inset-0 z-[999] grid min-h-[100svh] place-items-center overflow-hidden bg-[#f4f6fa] px-6"
+      role="status"
+      aria-live="polite"
+      aria-label="Cargando datos iniciales de Benserca 18"
+    >
+      <div aria-hidden className="absolute inset-0 bg-[radial-gradient(circle_at_50%_42%,rgba(255,255,255,.98),rgba(226,233,244,.74)_58%,rgba(211,222,239,.82))]" />
+      <div className="relative w-full max-w-[1100px] text-center">
+        <p className="text-[clamp(3.4rem,11vw,9.5rem)] font-black leading-[.82] tracking-[-.075em] text-[#111318]">
+          BENSERCA 18
+        </p>
+        <div className="mx-auto mt-10 h-[3px] w-full max-w-[520px] overflow-hidden rounded-full bg-black/10">
+          <div className="h-full w-1/2 animate-pulse rounded-full bg-[#111318]" />
+        </div>
+        <p className="mt-5 text-[11px] font-semibold uppercase tracking-[.24em] text-[#596170]">
+          Cargando datos iniciales
+        </p>
       </div>
-      <Skeleton className="h-64" />
     </div>
   );
 }

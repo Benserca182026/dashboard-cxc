@@ -3,10 +3,9 @@
 // M2 — Aging (paso-6-aging.md).
 // Fecha de corte SIEMPRE explícita y configurable — nunca "hoy" automático.
 //
-// Reestructuración (M5): esta página pasa al MISMO esqueleto de la página 1.
-// De arriba abajo: Encabezado con menú interno y barra de usuario → el motor
-// de argumentación (cuatro etapas derivadas del dato, con los agentes asomados
-// en el mordisco) → los bloques de abajo, todos envueltos en LienzoConAgentes.
+// Reorientación comercial: la página abre con agentes de decisión, Pareto de
+// clientes y facturas, y carga por responsable. La distribución contable y
+// los controles técnicos permanecen abajo como evidencia auditable.
 //
 // NADA de la lógica de aging se movió (lib/calculos.ts sin tocar). Lo que sí
 // cambió (pedido explícito con datos reales): el detalle factura-por-factura
@@ -23,25 +22,39 @@ import { calcularAging } from "@/lib/calculos";
 import { BUCKETS, type BucketAging } from "@/lib/types";
 import { BUCKET_INFO } from "@/lib/bucketInfo";
 import { useApp } from "@/lib/store";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Encabezado } from "@/components/Encabezado";
 import { FilaAgentes } from "@/components/Agentes";
-import { LienzoConAgentes, RecorridoArgumental } from "@/components/Argumento";
-import { argumentoAging } from "@/lib/argumento";
+import { LienzoConAgentes } from "@/components/Argumento";
 import { BannerFicticioPremium } from "@/components/ResumenPremium";
 import { cargarComparacionOdoo, type ComparacionOdoo } from "@/lib/verificacionOdoo";
+import { DecisionPanelV2 } from "@/components/DecisionPanelV2";
+import {
+  AgentesComercialesCobranza,
+  BarrasRanking,
+} from "@/components/commercial/CobranzaComercial";
+import { analizarAgingComercial } from "@/lib/commercial-cobranza";
 
 const SECCIONES = [
-  { id: "sec-argumento", etiqueta: "El caso" },
+  { id: "sec-decisiones-v2", etiqueta: "Decisiones" },
+  { id: "sec-comercial", etiqueta: "Foco comercial" },
   { id: "sec-distribucion", etiqueta: "Distribución" },
   { id: "sec-corte", etiqueta: "Corte y exclusiones" },
 ];
 
 export default function PaginaAging() {
-  const { dataset, cargando, fechaCorte, setFechaCorte, fmt } = useApp();
+  const { dataset, cargando, fechaCorte, setFechaCorte, fmt, gestiones } = useApp();
   const [bucketActivo, setBucketActivo] = useState<BucketAging | null>(null);
   const [comparacion, setComparacion] = useState<ComparacionOdoo | null>(null);
   const [errorComparacion, setErrorComparacion] = useState<string | null>(null);
+  const aging = useMemo(
+    () => calcularAging(dataset, fechaCorte),
+    [dataset, fechaCorte]
+  );
+  const comercial = useMemo(
+    () => analizarAgingComercial(dataset, fechaCorte, gestiones, aging),
+    [dataset, fechaCorte, gestiones, aging]
+  );
 
   useEffect(() => {
     if (dataset.fuente !== "odoo-real") return;
@@ -54,7 +67,6 @@ export default function PaginaAging() {
 
   if (cargando) return <SkeletonPagina />;
 
-  const aging = calcularAging(dataset, fechaCorte);
   const advertencias = aging.clasificadas.filter((f) => f.advertenciaCorteAnterior);
   const excluidasPorMotivo = new Map<string, { n: number; saldo: number }>();
   for (const e of aging.excluidas) {
@@ -65,26 +77,7 @@ export default function PaginaAging() {
   }
   const maximoBucket = Math.max(...BUCKETS.map((b) => aging.totalesPorBucket[b]), 1);
 
-  // ── Las cifras de los cuatro anillos. Cada una es la que AFIRMA su etapa;
-  //    salen de las mismas funciones que el argumento, no de números sueltos.
   const cartera = aging.totalClasificado + aging.saldoNoClasificable;
-  const alDia = aging.totalesPorBucket["actual"];
-  const vencido = Math.max(0, aging.totalClasificado - alDia);
-  const tramosVencidos = BUCKETS.filter((b) => b !== "actual").map((b) => ({
-    bucket: b,
-    monto: aging.totalesPorBucket[b],
-  }));
-  const mayorTramo = [...tramosVencidos].sort((a, b) => b.monto - a.monto)[0];
-  const vencidoPorCliente = new Map<string, number>();
-  for (const c of aging.clasificadas) {
-    if (c.bucket === "actual") continue;
-    vencidoPorCliente.set(
-      c.factura.id_cliente,
-      (vencidoPorCliente.get(c.factura.id_cliente) ?? 0) + c.saldo
-    );
-  }
-  const mayorDeudor = [...vencidoPorCliente.entries()].sort((a, b) => b[1] - a[1])[0] ?? null;
-  const porcentaje = (parte: number, total: number) => (total > 0 ? (parte / total) * 100 : 0);
   const diferenciaOdoo = comparacion ? cartera - comparacion.total : null;
   // El dinero lo pinta el formateador del store: es el ÚNICO lugar donde una
   // cifra cambia de moneda, y lo hace al PINTAR. Todo lo de arriba (umbrales,
@@ -103,66 +96,86 @@ export default function PaginaAging() {
         modulo="aging"
       />
 
-      {/* El motor de argumentación del módulo: ¿cuánto está vencido, desde
-          cuándo, y en quién se concentra? Las cuatro etapas se derivan en
-          lib/argumento.ts — acá sólo se muestran. */}
-      <section id="sec-argumento" className="scroll-mt-24">
-        <RecorridoArgumental
-          rotulo="El caso del aging"
-          arg={argumentoAging(dataset, fechaCorte)}
-          agentes={<FilaAgentes dataset={dataset} fechaCorte={fechaCorte} />}
-          kpis={[
-            {
-              etiqueta: "vencido · de la cartera",
-              valor: fmt(vencido),
-              pct: porcentaje(vencido, cartera),
-            },
-            // Los dos de abajo se reparten el VENCIDO. Sin vencido no hay
-            // denominador, y el "—" con anillo en 0% que había acá afirmaba un
-            // reparto de cero sobre cero. Se declara el hueco en su lugar.
-            mayorTramo
-              ? {
-                  etiqueta: `tramo ${mayorTramo.bucket} · del vencido`,
-                  valor: fmt(mayorTramo.monto),
-                  pct: porcentaje(mayorTramo.monto, vencido),
-                }
-              : {
-                  etiqueta: "tramo mayor · del vencido",
-                  valor: "",
-                  sinDato: {
-                    queFalta:
-                      "No hay ni un quetzal vencido al corte: ningún tramo del aging tiene saldo, así que no hay tramo mayor que señalar.",
-                    consecuencia:
-                      "No hay reparto del vencido que describir. Un anillo en 0% se leería como «el tramo mayor es el 0% del vencido», que es una división por cero, no un dato.",
-                    comoSeLlena:
-                      "Se llena solo en cuanto haya facturas vencidas con saldo al corte. Hoy no las hay, y ésa es la buena noticia.",
-                  },
-                },
-            mayorDeudor
-              ? {
-                  etiqueta: "mayor deudor · del vencido",
-                  valor: fmt(mayorDeudor[1]),
-                  pct: porcentaje(mayorDeudor[1], vencido),
-                }
-              : {
-                  etiqueta: "mayor deudor · del vencido",
-                  valor: "",
-                  sinDato: {
-                    queFalta:
-                      "Ningún cliente tiene saldo vencido al corte: no hay deudores entre los cuales elegir al mayor.",
-                    consecuencia:
-                      "No se puede nombrar al mayor deudor ni medir cuánto pesa. El «—» anterior no distinguía esto de un fallo de carga.",
-                    comoSeLlena:
-                      "Se llena solo en cuanto haya facturas vencidas con saldo al corte.",
-                  },
-                },
-            {
-              etiqueta: "fuera del aging · de la cartera",
-              valor: fmt(aging.saldoNoClasificable),
-              pct: porcentaje(aging.saldoNoClasificable, cartera),
-            },
-          ]}
-        />
+      <DecisionPanelV2 modulo="aging" />
+
+      <section id="sec-comercial" className="scroll-mt-24 space-y-6">
+        <AgentesComercialesCobranza agentes={comercial.agentes} fmt={fmt} />
+
+        <div className="grid items-start gap-6 xl:grid-cols-[1.15fr_.85fr]">
+          <LienzoConAgentes titulo="Top 10 clientes por saldo vencido">
+            <div className="mb-5 flex flex-wrap items-end justify-between gap-3">
+              <div>
+                <p className="text-[10px] font-bold uppercase tracking-[.1em] text-etapa">
+                  Pareto de cobranza
+                </p>
+                <p className="mt-1 text-[12px] leading-relaxed text-tintaSuave">
+                  Ordenado por dinero vencido, no por el score simulado. El acumulado usa como base {fmt(comercial.vencido)}.
+                </p>
+              </div>
+              <div className="text-right">
+                <p className="text-2xl font-bold tabular-nums text-tinta">
+                  {comercial.porcentajeTopDiez.toFixed(1)}%
+                </p>
+                <p className="text-[9px] font-bold uppercase tracking-[.08em] text-etapa">
+                  del vencido está en el Top 10
+                </p>
+              </div>
+            </div>
+            <BarrasRanking
+              filas={comercial.topClientes.map((fila) => ({
+                id: fila.idCliente,
+                etiqueta: fila.nombre,
+                valor: fila.saldo,
+                acumuladoPct: fila.acumuladoPct,
+                meta: `${fila.facturas} factura(s) · ${fila.diasMax} d máx.${fila.enDisputa ? " · disputa" : ""}`,
+              }))}
+              fmt={fmt}
+            />
+          </LienzoConAgentes>
+
+          <div className="space-y-6">
+            <LienzoConAgentes titulo="Top 10 facturas por monto vencido">
+              {comercial.topFacturas.length === 0 ? (
+                <p className="rounded-[18px] bg-white/60 p-8 text-center text-[11px] text-tintaSuave">
+                  No hay facturas vencidas al corte.
+                </p>
+              ) : (
+                <div className="overflow-x-auto rounded-[18px] border border-white/80 bg-white/60">
+                  <table className="w-full min-w-[560px] text-[10.5px]">
+                    <thead>
+                      <tr className="border-b border-white bg-white/60 text-left text-[9px] font-bold uppercase tracking-[.08em] text-etapa">
+                        <th className="px-3 py-3">Factura / cliente</th>
+                        <th className="px-3 py-3 text-right">Días</th>
+                        <th className="px-3 py-3 text-right">Saldo</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {comercial.topFacturas.map((fila) => (
+                        <tr key={fila.idFactura} className="border-b border-white/80 last:border-0">
+                          <td className="px-3 py-2.5">
+                            <p className="font-bold text-tinta">{fila.numero}</p>
+                            <p className="max-w-[250px] truncate text-tintaSuave">
+                              {fila.cliente} · {fila.bucket}{fila.enDisputa ? " · disputa" : ""}
+                            </p>
+                          </td>
+                          <td className="px-3 py-2.5 text-right font-semibold tabular-nums text-tinta">{fila.dias}</td>
+                          <td className="px-3 py-2.5 text-right font-bold tabular-nums text-tinta">{fmt(fila.saldo)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </LienzoConAgentes>
+          </div>
+        </div>
+
+        {!comercial.comparacionHistoricaDisponible && (
+          <div className="rounded-tarjeta border border-dashed border-[rgba(22,24,29,.18)] bg-white/55 px-5 py-4 text-[11px] leading-relaxed text-tintaSuave">
+            <b className="text-tinta">Migración entre buckets: aún no medible.</b>{" "}
+            El archivo actual contiene el estado al corte, no snapshots históricos de saldo y bucket. Reconstruir el corte anterior con el saldo de hoy fabricaría una comparación; por eso el espacio queda declarado hasta que exista la serie.
+          </div>
+        )}
       </section>
 
       {/* Los dos bloques de abajo, lado a lado y con el MISMO envoltorio del de

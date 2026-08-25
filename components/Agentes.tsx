@@ -11,7 +11,8 @@
 // Por eso no llevan cara de persona: llevan el símbolo de su oficio (lupa,
 // balanza, reloj, sello). Poner caras sugeriría que hay alguien mirando.
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { calcularAging, diasAtraso, disputaActiva, estadoFacturaDerivado, fmtMoneda, nombreDeCliente } from "@/lib/calculos";
 import type { ResultadoAging } from "@/lib/calculos";
 import { antiguedadPonderada, calcularDso, concentracionRiesgo } from "@/lib/kpis";
@@ -27,7 +28,9 @@ import {
 import type { FilaStock, IntegridadInventario } from "@/lib/cadena";
 import { forecastSimulado, prioridadSimulada } from "@/lib/simulados";
 import type { FilaPrioridad, PuntoForecast } from "@/lib/simulados";
-import type { Dataset, Disputa, Moneda } from "@/lib/types";
+import { convertirTextoMonetario } from "@/lib/commercial-ejecutivo";
+import { useApp } from "@/lib/store";
+import type { Dataset, Disputa, Moneda, TipoCambio } from "@/lib/types";
 
 // ── El tipo de un hallazgo: TRES estados, no dos ──────────────────────────
 //
@@ -1856,6 +1859,44 @@ export const FICHA_PX = 44;
 export const FICHA_GAP_PX = 8;
 export const NUM_AGENTES = AGENTES.length;
 
+interface AgenteVisto {
+  agente: Agente;
+  hallazgo: Hallazgo;
+}
+
+// Una misma fila de agentes aparece en más de un panel de varias páginas.
+// El dataset y las listas de agentes son objetos estables del store, así que
+// podemos compartir la medición entre instancias sin conservar datos viejos:
+// cuando cambia el dataset, cambia la clave débil y todo se vuelve a medir.
+const CACHE_AGENTES = new WeakMap<
+  Dataset,
+  WeakMap<Agente[], Map<string, AgenteVisto[]>>
+>();
+
+function agentesVistos(dataset: Dataset, agentes: Agente[], fechaCorte: string): AgenteVisto[] {
+  let porLista = CACHE_AGENTES.get(dataset);
+  if (!porLista) {
+    porLista = new WeakMap<Agente[], Map<string, AgenteVisto[]>>();
+    CACHE_AGENTES.set(dataset, porLista);
+  }
+
+  let porCorte = porLista.get(agentes);
+  if (!porCorte) {
+    porCorte = new Map<string, AgenteVisto[]>();
+    porLista.set(agentes, porCorte);
+  }
+
+  const existente = porCorte.get(fechaCorte);
+  if (existente) return existente;
+
+  const medidos = agentes.map((agente) => ({
+    agente,
+    hallazgo: agente.mirar(dataset, fechaCorte),
+  }));
+  porCorte.set(fechaCorte, medidos);
+  return medidos;
+}
+
 /** El vocabulario visual de los TRES estados, en un solo lugar, para que la
  *  ficha y la ventana no puedan discrepar entre sí.
  *
@@ -1914,12 +1955,13 @@ export function FilaAgentes({
   fechaCorte: string;
   agentes?: Agente[];
 }) {
+  const { fmt, monedaRegistro, monedaVista, tipoCambio } = useApp();
   // Ya no hay borde que normalizar: los 28 agentes devuelven el tipo de tres
   // estados directamente (ver el acta del adaptador, arriba del todo).
-  const vistos = agentes.map((a) => ({
-    agente: a,
-    hallazgo: a.mirar(dataset, fechaCorte),
-  }));
+  const vistos = useMemo(
+    () => agentesVistos(dataset, agentes, fechaCorte),
+    [dataset, agentes, fechaCorte]
+  );
 
   // Arranca cerrado: ahora el resultado abre una ventana sobre el tablero, y
   // abrirla sola al entrar sería tapar la pantalla sin que nadie lo pidiera.
@@ -1970,14 +2012,21 @@ export function FilaAgentes({
         </span>
       </div>
 
-      {actual && (
-        <VentanaAgente
-          agente={actual.agente}
-          hallazgo={actual.hallazgo}
-          fechaCorte={fechaCorte}
-          onCerrar={() => setAbierto(null)}
-        />
-      )}
+      {actual && typeof document !== "undefined"
+        ? createPortal(
+            <VentanaAgente
+              agente={actual.agente}
+              hallazgo={actual.hallazgo}
+              fechaCorte={fechaCorte}
+              fmt={fmt}
+              monedaRegistro={monedaRegistro}
+              monedaVista={monedaVista}
+              tipoCambio={tipoCambio}
+              onCerrar={() => setAbierto(null)}
+            />,
+            document.body
+          )
+        : null}
     </>
   );
 }
@@ -1992,11 +2041,19 @@ function VentanaAgente({
   agente,
   hallazgo,
   fechaCorte,
+  fmt,
+  monedaRegistro,
+  monedaVista,
+  tipoCambio,
   onCerrar,
 }: {
   agente: Agente;
   hallazgo: Hallazgo;
   fechaCorte: string;
+  fmt: (monto: number) => string;
+  monedaRegistro: Moneda;
+  monedaVista: Moneda;
+  tipoCambio: TipoCambio | null;
   onCerrar: () => void;
 }) {
   const caja = useRef<HTMLDivElement | null>(null);
@@ -2044,7 +2101,7 @@ function VentanaAgente({
     // ahí sería tapar aquello que uno acaba de destapar. Al soltar, el tablero
     // queda nítido y la ventana flota encima.
     <div
-      className={`entrada-suave fixed inset-0 z-50 grid place-items-center p-6 ${pos ? "" : "velo-agente"}`}
+      className={`entrada-suave fixed inset-0 z-[900] grid place-items-center p-6 ${pos ? "" : "velo-agente"}`}
       onPointerDown={(e) => e.target === e.currentTarget && onCerrar()}
       role="dialog"
       aria-modal="true"
@@ -2097,15 +2154,17 @@ function VentanaAgente({
             <BloqueSinDato hallazgo={hallazgo} base={agente.base} />
           ) : (
             <>
-              <p className="text-[13.5px] leading-relaxed text-tinta">{hallazgo.texto}</p>
+              <p className="text-[13.5px] leading-relaxed text-tinta">
+                {convertirTextoMonetario(hallazgo.texto, monedaVista, tipoCambio)}
+              </p>
 
               {/* La base a la vista: quien discuta el resultado, discute esta línea
                   y no el color de la ficha. Ahora además con los VALORES que
                   entraron, que antes se calculaban y se tiraban. */}
-              <BloqueFormula evidencia={hallazgo.evidencia} />
+              <BloqueFormula evidencia={hallazgo.evidencia} fmt={fmt} monedaRegistro={monedaRegistro} />
 
               {"ranking" in hallazgo && hallazgo.ranking ? (
-                <TablaRanking ranking={hallazgo.ranking} />
+                <TablaRanking ranking={hallazgo.ranking} fmt={fmt} monedaRegistro={monedaRegistro} />
               ) : null}
 
               <BloqueProcedencia procedencia={hallazgo.evidencia.procedencia} />
@@ -2134,8 +2193,14 @@ function VentanaAgente({
 // ventana que ya existía. El fondo, el arrastre y el velo no se tocan.
 
 /** Un valor con su unidad. El dinero se formatea como dinero; lo demás, no. */
-function valorConUnidad(valor: number | string, unidad?: string): string {
+function valorConUnidad(
+  valor: number | string,
+  unidad: string | undefined,
+  fmt: (monto: number) => string,
+  monedaRegistro: Moneda
+): string {
   if (typeof valor === "string") return unidad ? `${valor} ${unidad}` : valor;
+  if (unidad === monedaRegistro) return fmt(valor);
   if (unidad === "GTQ" || unidad === "USD") return fmtMoneda(valor, unidad);
   const n = Number.isInteger(valor) ? valor.toLocaleString("es-GT") : valor.toLocaleString("es-GT", { maximumFractionDigits: 2 });
   return unidad ? `${n} ${unidad}` : n;
@@ -2144,7 +2209,15 @@ function valorConUnidad(valor: number | string, unidad?: string): string {
 /** La fórmula CON sus entradas. Antes sólo se mostraba la expresión: los
  *  números que entraban en ella se calculaban y se descartaban, así que quien
  *  quería auditar el resultado tenía que abrir el código. */
-function BloqueFormula({ evidencia }: { evidencia: Evidencia }) {
+function BloqueFormula({
+  evidencia,
+  fmt,
+  monedaRegistro,
+}: {
+  evidencia: Evidencia;
+  fmt: (monto: number) => string;
+  monedaRegistro: Moneda;
+}) {
   return (
     <div className="mt-3.5">
       <p className="inline-block rounded-[9px] bg-[rgba(22,24,29,.04)] px-2.5 py-1.5 font-mono text-[10.5px] text-[#7c808a]">
@@ -2161,7 +2234,7 @@ function BloqueFormula({ evidencia }: { evidencia: Evidencia }) {
             <div key={e.nombre} className="contents">
               <dt className="text-[11px] text-[#7c808a]">{e.nombre}</dt>
               <dd className="text-right font-mono text-[11px] tabular-nums text-tinta">
-                {valorConUnidad(e.valor, e.unidad)}
+                {valorConUnidad(e.valor, e.unidad, fmt, monedaRegistro)}
               </dd>
             </div>
           ))}
@@ -2174,12 +2247,20 @@ function BloqueFormula({ evidencia }: { evidencia: Evidencia }) {
 /** El ranking. Sólo aparece cuando el agente lo tiene: una pregunta de conteo
  *  ("¿hay facturas sin cliente?") no admite un top N, y fabricarle uno sería
  *  inventar un orden donde no lo hay. */
-function TablaRanking({ ranking }: { ranking: Ranking }) {
+function TablaRanking({
+  ranking,
+  fmt,
+  monedaRegistro,
+}: {
+  ranking: Ranking;
+  fmt: (monto: number) => string;
+  monedaRegistro: Moneda;
+}) {
   if (ranking.filas.length === 0) return null;
   return (
     <div className="mt-3.5">
       <p className="text-[10.5px] font-semibold uppercase tracking-wide text-[#8b8f98]">
-        Las {ranking.filas.length} mayores · sobre {valorConUnidad(ranking.total, ranking.unidad)}
+        Las {ranking.filas.length} mayores · sobre {valorConUnidad(ranking.total, ranking.unidad, fmt, monedaRegistro)}
       </p>
       <ul className="mt-1.5 space-y-1">
         {ranking.filas.map((f) => (
@@ -2188,7 +2269,7 @@ function TablaRanking({ ranking }: { ranking: Ranking }) {
               {f.etiqueta}
             </span>
             <span className="font-mono text-[11px] tabular-nums text-[#6b6f78]">
-              {valorConUnidad(f.valor, ranking.unidad)}
+              {valorConUnidad(f.valor, ranking.unidad, fmt, monedaRegistro)}
             </span>
             <span className="w-[46px] text-right font-mono text-[11px] tabular-nums text-[#8b8f98]">
               {f.pct.toFixed(1)}%

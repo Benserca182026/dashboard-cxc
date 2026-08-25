@@ -153,11 +153,11 @@ export function ControlMoneda() {
           con el mismo vocabulario del estado "sin-dato" de los agentes. Un
           control gris sin motivo se lee como una falla de la aplicación. */}
       {!puedeVerEnDolares && !yaEstaEnDolares && (
-        <div
+        <details
           className="rounded-[9px] border px-2.5 py-2"
           style={{ borderColor: "rgba(91,122,153,.3)", background: TINTE_SIN_DATO.fondoPastilla }}
         >
-          <p className="flex items-center gap-1.5">
+          <summary className="flex cursor-pointer list-none items-center gap-1.5">
             <span
               aria-hidden
               className="grid h-4 w-4 shrink-0 place-items-center rounded-full text-[9px] font-bold text-white"
@@ -171,8 +171,9 @@ export function ControlMoneda() {
             >
               Vista en dólares no disponible
             </span>
-          </p>
-          <dl className="mt-1.5 space-y-1.5">
+            <span className="ml-auto text-[9px] text-[#5b7a99]">ver motivo ↘</span>
+          </summary>
+          <dl className="mt-2 space-y-1.5 border-t border-[#5b7a99]/15 pt-2">
             {(
               [
                 ["Qué falta", motivoSinTipoCambio.queFalta],
@@ -191,7 +192,7 @@ export function ControlMoneda() {
               </div>
             ))}
           </dl>
-        </div>
+        </details>
       )}
 
       {yaEstaEnDolares && (

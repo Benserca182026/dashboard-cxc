@@ -1,0 +1,133 @@
+{
+  "schemaVersion": 1,
+  "estado": "parcial-conciliado",
+  "generadoEn": "2026-08-25T18:54:13.159Z",
+  "snapshot": {
+    "corrida": "20260825T185142Z",
+    "inicioUtc": "2026-08-25T18:51:42.493Z",
+    "finUtc": "2026-08-25T18:52:40.797Z",
+    "host": "https://3digitalgt-benserca.odoo.com",
+    "company": "Benserca 18 SA",
+    "monedaEmpresa": "GTQ",
+    "metodosOdoo": [
+      "fields_get",
+      "search_count",
+      "search_read"
+    ]
+  },
+  "formula": {
+    "ingresoNetoEmpresa": "-Σ account.move.line.balance (posted, sale_line_ids; facturas y notas de credito)",
+    "costoValoradoHistorico": "-Σ stock.valuation.layer.value por stock_move_id -> sale_line_id",
+    "margenBruto": "ingreso neto empresa - costo valorado historico, solo donde cantidad facturada neta = cantidad entregada neta"
+  },
+  "configuracionOdoo": {
+    "categorias": [
+      {
+        "id": 1,
+        "categoria": "All",
+        "metodoCosto": "standard",
+        "valoracion": "manual_periodic"
+      },
+      {
+        "id": 4,
+        "categoria": "All / EDGE HELMETS",
+        "metodoCosto": "standard",
+        "valoracion": "manual_periodic"
+      },
+      {
+        "id": 5,
+        "categoria": "All / EDGE ACCESSORIES",
+        "metodoCosto": "standard",
+        "valoracion": "manual_periodic"
+      },
+      {
+        "id": 8,
+        "categoria": "All / EDGE TYRE",
+        "metodoCosto": "standard",
+        "valoracion": "manual_periodic"
+      }
+    ],
+    "metodoCostoUnico": "standard",
+    "valoracionUnica": "manual_periodic",
+    "campoCostoEnCapas": "unit_cost/value historico de stock.valuation.layer",
+    "esCostoRealFifoOAvco": false
+  },
+  "cobertura": {
+    "pedidosSale": 3209,
+    "pedidosConciliados": 2995,
+    "pedidosParciales": 92,
+    "pedidosSinActividad": 122,
+    "lineasVenta": 23858,
+    "lineasActivas": 22897,
+    "lineasConciliadas": 22487,
+    "estadosLinea": {
+      "conciliada": 22487,
+      "sin-actividad": 961,
+      "servicio-sin-costo-inventario": 1,
+      "entregada-no-facturada": 226,
+      "facturada-no-entregada": 183
+    },
+    "movimientos": 25317,
+    "movimientosTerminados": 25067,
+    "movimientosTerminadosSinCapa": 0,
+    "capasValoracionVenta": 25067,
+    "capasSalida": 23875,
+    "capasDevolucion": 1192,
+    "lineasConDevolucion": 1188,
+    "facturasPublicadas": 3215,
+    "notasCreditoPublicadas": 241,
+    "apuntesIngreso": 25204,
+    "apuntesIngresoNoPublicados": 74,
+    "asientosIngresoNoPublicados": {
+      "draft": 13,
+      "cancel": 2
+    }
+  },
+  "poblacionConciliada": {
+    "ingresoNetoSinIvaGTQ": 15794034.13,
+    "costoHistoricoEstandarGTQ": 9520651.33,
+    "margenBrutoGTQ": 6273382.8,
+    "margenPct": 39.72,
+    "coberturaIngresoPct": 98.729,
+    "coberturaCostoPct": 99.0059
+  },
+  "poblacionCompletaObservada": {
+    "ingresoNetoSinIvaGTQ": 15997356.64,
+    "costoHistoricoEstandarGTQ": 9616241.87,
+    "cantidadFacturadaNeta": 81942,
+    "cantidadEntregadaNeta": 81789
+  },
+  "reconciliacion": {
+    "cantidadEntregadaSaleOrderLine": 81789,
+    "cantidadEntregadaDesdeSVL": 81789,
+    "diferenciaCantidadEntrega": 0,
+    "valorCapasVenta": -9616241.87,
+    "costoReconstruido": 9616241.87,
+    "diferenciaValor": 0,
+    "apuntesConMultiplesLineasVenta": 0,
+    "diferenciaQtyInvoicedVsApuntes": 103,
+    "cantidadEnAsientosNoPublicadosNoCancelados": -7,
+    "lineasQtyInvoicedNoReconstruibleDesdeSaleLineIds": 166
+  },
+  "universoValoracion": {
+    "capasGlobales": 31013,
+    "capasConMovimiento": 30843,
+    "capasSinMovimiento": 170,
+    "capasVenta": 25067,
+    "capasNoVenta": 5946,
+    "ajustesManualesSinMovimientoValorGTQ": 110587.57,
+    "valorNetoGlobalGTQ": 2650656.72
+  },
+  "controlContableCosto": {
+    "disponible": false,
+    "apuntes": 0,
+    "razon": "Todas las capas de venta tienen account_move_id=false; las categorias usan valoracion manual_periodic y Odoo no genero asientos automaticos COGS enlazables."
+  },
+  "limitaciones": [
+    "El costo es el costo estandar historico que Odoo grabo en cada capa, no FIFO/AVCO ni costo de compra identificado por lote.",
+    "La valoracion de inventario es manual_periodic; no existe un asiento COGS automatico por capa para control contable independiente.",
+    "170 ajustes manuales de valor no tienen stock_move_id y no se asignan a pedidos sin inventar una regla.",
+    "El margen publicado corresponde solo a lineas con igualdad entre cantidad facturada neta y cantidad entregada neta.",
+    "166 lineas tienen qty_invoiced historico que no se reconstruye solo con sale_line_ids; se excluyen si impiden conciliar cantidades."
+  ]
+}

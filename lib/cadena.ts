@@ -51,9 +51,15 @@ export interface FilaStock {
 }
 
 export function stockPorProducto(d: Dataset): FilaStock[] {
+  const movimientosPorProducto = new Map<string, MovimientoInventario[]>();
+  for (const movimiento of d.movimientosInventario ?? []) {
+    const propios = movimientosPorProducto.get(movimiento.id_producto);
+    if (propios) propios.push(movimiento);
+    else movimientosPorProducto.set(movimiento.id_producto, [movimiento]);
+  }
+
   return (d.productos ?? []).map((p) => {
-    const movimientos = (d.movimientosInventario ?? [])
-      .filter((m) => m.id_producto === p.id_producto)
+    const movimientos = [...(movimientosPorProducto.get(p.id_producto) ?? [])]
       .sort((a, b) => a.fecha.localeCompare(b.fecha));
     const existencia = movimientos.reduce((s, m) => s + m.cantidad, 0);
     return {
@@ -102,14 +108,25 @@ export interface VentaConTotal {
 export function ventasConTotal(d: Dataset): VentaConTotal[] {
   const nombreCliente = (id: string) =>
     nombreDeCliente(d.clientes, id);
-  const producto = (id: string) => (d.productos ?? []).find((p) => p.id_producto === id);
+  const productosPorId = new Map((d.productos ?? []).map((p) => [p.id_producto, p]));
+  const lineasPorVenta = new Map<string, NonNullable<Dataset["ventaLineas"]>>();
+  for (const linea of d.ventaLineas ?? []) {
+    const lineas = lineasPorVenta.get(linea.id_venta);
+    if (lineas) lineas.push(linea);
+    else lineasPorVenta.set(linea.id_venta, [linea]);
+  }
+  const facturaPorVenta = new Map<string, string>();
+  for (const factura of d.facturas) {
+    if (factura.id_venta && !facturaPorVenta.has(factura.id_venta)) {
+      facturaPorVenta.set(factura.id_venta, factura.id_factura);
+    }
+  }
 
   return (d.ventas ?? [])
     .map((v) => {
-      const lineas = (d.ventaLineas ?? [])
-        .filter((l) => l.id_venta === v.id_venta)
+      const lineas = (lineasPorVenta.get(v.id_venta) ?? [])
         .map((l) => {
-          const p = producto(l.id_producto);
+          const p = productosPorId.get(l.id_producto);
           return {
             producto: p?.nombre_producto ?? l.id_producto,
             sku: p?.sku ?? "?",
@@ -134,7 +151,7 @@ export function ventasConTotal(d: Dataset): VentaConTotal[] {
         totalLista: Cifra.composicion(total),
         totalReferencia: v.total_referencia ?? null,
         margenPct: total > 0 ? redondear2((margen / total) * 100) : null,
-        id_factura: d.facturas.find((f) => f.id_venta === v.id_venta)?.id_factura ?? null,
+        id_factura: facturaPorVenta.get(v.id_venta) ?? null,
       };
     })
     .sort((a, b) => b.fecha.localeCompare(a.fecha));
@@ -410,12 +427,17 @@ export interface IntegridadInventario {
 export function integridadInventario(d: Dataset): IntegridadInventario {
   const productos = d.productos ?? [];
   const movimientos = d.movimientosInventario ?? [];
+  const movimientosPorProducto = new Map<string, MovimientoInventario[]>();
+  for (const movimiento of movimientos) {
+    const propios = movimientosPorProducto.get(movimiento.id_producto);
+    if (propios) propios.push(movimiento);
+    else movimientosPorProducto.set(movimiento.id_producto, [movimiento]);
+  }
   const seriesTruncadas: SerieTruncada[] = [];
   let productosConMovimiento = 0;
 
   for (const p of productos) {
-    const propios = movimientos
-      .filter((m) => m.id_producto === p.id_producto)
+    const propios = [...(movimientosPorProducto.get(p.id_producto) ?? [])]
       .sort((a, b) => a.fecha.localeCompare(b.fecha));
     if (propios.length === 0) continue;
     productosConMovimiento++;

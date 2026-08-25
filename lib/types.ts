@@ -111,6 +111,8 @@ export interface Venta {
   id_venta: string;
   id_cliente: string;
   fecha_venta: string;
+  /** Moneda propia del pedido, recuperada de sale.order.currency_id. */
+  moneda_id?: Moneda | null;
   /**
    * Capa "hecho": el total que Odoo cerró para este pedido
    * (ventas.total_odoo_referencia), con el descuento YA aplicado.
@@ -144,6 +146,10 @@ export interface MovimientoInventario {
   /** Si nació de una venta, queda dicho cuál: el descuento es auditable. */
   id_venta: string | null;
   motivo?: string;
+  /** Ubicaciones que Odoo sí entregó para entradas/salidas. Son trazabilidad
+   *  del movimiento, no una afirmación de existencia actual por bodega. */
+  ubicacion_desde?: string | null;
+  ubicacion_hasta?: string | null;
 }
 
 export interface CondicionPago {
