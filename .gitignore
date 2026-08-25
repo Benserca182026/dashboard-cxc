@@ -4,7 +4,11 @@ out/
 *.tsbuildinfo
 next-env.d.ts
 .vercel
+.odoo-extracts/
 .env*.local
 
 .vercel
+.env*
+!.env.example
+
 .env*

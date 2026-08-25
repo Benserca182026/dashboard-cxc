@@ -16,7 +16,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import type { Dataset } from "@/lib/types";
-import { fmtMoneda } from "@/lib/calculos";
+import { useApp } from "@/lib/store";
 
 type Panel = "buscar" | "correo" | "avisos" | null;
 
@@ -74,9 +74,13 @@ function Ventana({
 
 /** Buscador con filtros. Busca de verdad: clientes y facturas del dataset
  *  cargado, con los filtros aplicándose en vivo sobre el resultado. */
-function PanelBuscar({ dataset }: { dataset: Dataset }) {
-  const moneda = dataset.fuente === "odoo-real" ? "GTQ" : "USD";
-  const fmt = (n: number) => fmtMoneda(n, moneda);
+function PanelBuscar({
+  dataset,
+  fmt,
+}: {
+  dataset: Dataset;
+  fmt: (monto: number) => string;
+}) {
   const [texto, setTexto] = useState("");
   const [filtros, setFiltros] = useState<string[]>([]);
 
@@ -621,6 +625,7 @@ export function BarraUsuario({
   dataset: Dataset;
   modulo?: ModuloFlujo;
 }) {
+  const { fmt } = useApp();
   const textos = TEXTOS_MODULO[modulo];
   const { correo: flujoCorreo, avisos: flujoAvisos } = FLUJOS_MODULO[modulo];
   const [panel, setPanel] = useState<Panel>(null);
@@ -667,7 +672,7 @@ export function BarraUsuario({
           bajada="Busca sobre los datos cargados en esta vista. Los filtros se acumulan."
           onCerrar={() => setPanel(null)}
         >
-          <PanelBuscar dataset={dataset} />
+          <PanelBuscar dataset={dataset} fmt={fmt} />
         </Ventana>
       )}
 

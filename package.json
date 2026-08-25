@@ -8,7 +8,14 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "test": "node verificacion/correr-todo.mjs"
+    "test": "node verificacion/correr-todo.mjs",
+    "test:v2": "tsx scripts/test-dashboard-v2.ts",
+    "test:inventario": "tsx scripts/test-commercial-inventario.ts",
+    "test:moneda-ventas": "tsx scripts/test-moneda-ventas.ts",
+    "test:costo-historico": "node scripts/test-costo-historico-odoo.mjs",
+    "odoo:extraer-costos": "node scripts/extraer-costos-historicos-odoo.mjs --puerto 9444",
+    "odoo:calcular-costos": "node scripts/calcular-costos-historicos-odoo.mjs",
+    "v2:seed": "node scripts/importar-snapshot-v2.mjs"
   },
   "dependencies": {
     "next": "14.2.35",

@@ -1,493 +1,156 @@
 "use client";
 
-// M4 — Forecast (Decisión B: SOLO simulación con datos ficticios).
-//
-// Reestructuración (M6): mismo esqueleto de "/" y "/aging". De arriba abajo:
-// Encabezado con menú interno y BarraUsuario → el motor de argumentación
-// propio de este módulo (argumentoForecast, con los agentes AGENTES_FORECAST
-// asomados en el mordisco — cada uno insiste en que esto es SIMULACIÓN, nunca
-// dato real) → los tres escenarios y la curva, envueltos en el mismo
-// LienzoConAgentes del resto.
-//
-// SOLO cambia la presentación de la página. Curvas (mismos puntos de datos),
-// importes, horizonte de 13 semanas, escenarios, cálculos (lib/simulados.ts) y
-// todos los avisos de simulación/Finanzas permanecen intactos. La suavización
-// de línea es interpolación monótona (Fritsch–Carlson): pasa exactamente por
-// cada punto semanal y no crea subidas/bajadas falsas entre puntos.
-
 import { SkeletonPagina } from "@/components/Basicos";
-import { BannerFicticioPremium } from "@/components/ResumenPremium";
-import { forecastSimulado, SUPUESTOS_FORECAST } from "@/lib/simulados";
-import { argumentoForecast } from "@/lib/argumento";
-import { useApp } from "@/lib/store";
-import { useRef, useState } from "react";
 import { Encabezado } from "@/components/Encabezado";
-import { AGENTES_FORECAST, FilaAgentes } from "@/components/Agentes";
-import { LienzoConAgentes, RecorridoArgumental } from "@/components/Argumento";
-
-const ANCHO = 760;
-const ALTO = 330;
-const M_IZQ = 58;
-const M_DER = 92;
-const M_SUP = 30;
-const M_INF = 44;
-
-type ClaveSerie = "optimista" | "base" | "pesimista";
-
-const SERIES: {
-  clave: ClaveSerie;
-  etiqueta: string;
-  linea: string;
-  gradiente: string;
-  chipFondo: string;
-  glifo: string;
-}[] = [
-  {
-    clave: "optimista",
-    etiqueta: "Optimista",
-    linea: "#f4756b",
-    gradiente: "linear-gradient(135deg,#ffe0cd 0%,#ffd0d8 55%,#f6c9ee 100%)",
-    chipFondo: "rgba(255,255,255,0.55)",
-    glifo: "↗",
-  },
-  {
-    clave: "base",
-    etiqueta: "Base",
-    linea: "#8b7cf6",
-    gradiente: "linear-gradient(135deg,#ded4fc 0%,#d2d3fc 55%,#c7ddfd 100%)",
-    chipFondo: "rgba(255,255,255,0.55)",
-    glifo: "→",
-  },
-  {
-    clave: "pesimista",
-    etiqueta: "Pesimista",
-    linea: "#2fbfae",
-    gradiente: "linear-gradient(135deg,#c9f5e9 0%,#c9ecf6 55%,#cadffd 100%)",
-    chipFondo: "rgba(255,255,255,0.55)",
-    glifo: "↘",
-  },
-];
+import { FilaAgentes } from "@/components/Agentes";
+import { LienzoConAgentes } from "@/components/Argumento";
+import { DecisionPanelV2 } from "@/components/DecisionPanelV2";
+import { AGENTES_COMERCIALES_FORECAST } from "@/components/commercial/OperacionAgentes";
+import {
+  OperacionControl,
+  OperacionKpi,
+  OperacionPuente,
+  OperacionRanking,
+} from "@/components/commercial/OperacionVisuales";
+import { analiticaForecast, type PuntoForecastComercial } from "@/lib/commercial-operacion";
+import { SUPUESTOS_FORECAST } from "@/lib/simulados";
+import { useApp } from "@/lib/store";
 
 const SECCIONES = [
-  { id: "sec-argumento", etiqueta: "El caso" },
+  { id: "sec-decisiones-v2", etiqueta: "Decisiones" },
+  { id: "sec-puente", etiqueta: "Brecha" },
   { id: "sec-escenarios", etiqueta: "Escenarios" },
-  { id: "sec-curva", etiqueta: "Curva" },
+  { id: "sec-contribuyentes", etiqueta: "Contribuyentes" },
+  { id: "sec-reactivacion", etiqueta: "Reactivación" },
+  { id: "sec-control", etiqueta: "Confianza" },
 ];
 
-/**
- * Ruta SVG suave por interpolación cúbica monótona (Fritsch–Carlson).
- * Pasa exactamente por todos los puntos y no sobrepasa los valores reales —
- * en una serie acumulada nunca dibuja descensos que no existen en los datos.
- */
-function rutaMonotona(pts: { x: number; y: number }[]): string {
-  const n = pts.length;
-  if (n < 2) return "";
-  const dx: number[] = [];
-  const pend: number[] = [];
-  for (let i = 0; i < n - 1; i++) {
-    dx.push(pts[i + 1].x - pts[i].x);
-    pend.push((pts[i + 1].y - pts[i].y) / (pts[i + 1].x - pts[i].x));
-  }
-  const m: number[] = [pend[0]];
-  for (let i = 1; i < n - 1; i++) {
-    if (pend[i - 1] * pend[i] <= 0) m.push(0);
-    else {
-      const w1 = 2 * dx[i] + dx[i - 1];
-      const w2 = dx[i] + 2 * dx[i - 1];
-      m.push((w1 + w2) / (w1 / pend[i - 1] + w2 / pend[i]));
-    }
-  }
-  m.push(pend[n - 2]);
-  let d = `M${pts[0].x},${pts[0].y}`;
-  for (let i = 0; i < n - 1; i++) {
-    const h = dx[i] / 3;
-    d += ` C${pts[i].x + h},${pts[i].y + m[i] * h} ${pts[i + 1].x - h},${
-      pts[i + 1].y - m[i + 1] * h
-    } ${pts[i + 1].x},${pts[i + 1].y}`;
-  }
-  return d;
+const SERIES = [
+  { clave: "optimista" as const, etiqueta: "Optimista", color: "#f4756b" },
+  { clave: "base" as const, etiqueta: "Base", color: "#796de0" },
+  { clave: "pesimista" as const, etiqueta: "Pesimista", color: "#2fbfae" },
+];
+
+function CurvaEscenarios({ puntos, fmt }: { puntos: PuntoForecastComercial[]; fmt: (valor: number) => string }) {
+  const ancho = 820;
+  const alto = 300;
+  const margen = { izquierda: 55, derecha: 28, arriba: 25, abajo: 38 };
+  const maximo = Math.max(1, ...puntos.map((p) => p.optimista));
+  const x = (semana: number) => margen.izquierda + ((semana - 1) / 12) * (ancho - margen.izquierda - margen.derecha);
+  const y = (valor: number) => alto - margen.abajo - (valor / maximo) * (alto - margen.arriba - margen.abajo);
+  const ruta = (clave: "optimista" | "base" | "pesimista") => puntos.map((p, i) => `${i === 0 ? "M" : "L"}${x(p.semana)},${y(p[clave])}`).join(" ");
+
+  return (
+    <article className="rounded-[28px] border border-white/90 bg-white/65 p-5 shadow-flotante">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h3 className="text-sm font-bold text-tinta">Cobro acumulado por escenario</h3>
+          <p className="mt-1 text-[11px] text-tintaSuave">13 semanas · curva mecánica, no probabilidad de caja</p>
+        </div>
+        <div className="flex flex-wrap gap-3">
+          {SERIES.map((serie) => (
+            <span key={serie.clave} className="flex items-center gap-1.5 text-[10px] font-semibold text-tintaSuave">
+              <span className="h-2 w-2 rounded-full" style={{ backgroundColor: serie.color }} />{serie.etiqueta}
+            </span>
+          ))}
+        </div>
+      </div>
+      <svg viewBox={`0 0 ${ancho} ${alto}`} className="mt-4 w-full" role="img" aria-label="Curvas de cobro acumulado de los escenarios optimista, base y pesimista">
+        {[0, 0.5, 1].map((proporcion) => (
+          <g key={proporcion}>
+            <line x1={margen.izquierda} y1={y(maximo * proporcion)} x2={ancho - margen.derecha} y2={y(maximo * proporcion)} stroke="#dfe5ef" strokeDasharray="3 6" />
+            <text x={margen.izquierda - 9} y={y(maximo * proporcion) + 4} textAnchor="end" fontSize="9" fill="#8d96a8">{fmt(maximo * proporcion)}</text>
+          </g>
+        ))}
+        {SERIES.map((serie) => <path key={serie.clave} d={ruta(serie.clave)} fill="none" stroke={serie.color} strokeWidth="3" strokeLinejoin="round" strokeLinecap="round" />)}
+        {puntos.map((p) => <text key={p.semana} x={x(p.semana)} y={alto - 13} textAnchor="middle" fontSize="9" fill="#8d96a8">{p.semana}</text>)}
+      </svg>
+    </article>
+  );
 }
 
 export default function PaginaForecast() {
   const { dataset, cargando, fechaCorte, fmt } = useApp();
-  // El dinero lo pinta el formateador del store: es el ÚNICO lugar donde una
-  // cifra cambia de moneda, y lo hace al PINTAR. Todo lo de arriba (umbrales,
-  // porcentajes, comparaciones, cuadres) se calculó en la moneda de registro y
-  // no se entera de esta vista. Ver components/ControlMoneda.tsx.
-  const [serieActiva, setSerieActiva] = useState<ClaveSerie | null>(null);
-  const [semanaHover, setSemanaHover] = useState<number | null>(null);
-  const svgRef = useRef<SVGSVGElement>(null);
+  const analitica = analiticaForecast(dataset, fechaCorte);
 
   if (cargando) return <SkeletonPagina />;
 
-  const puntos = forecastSimulado(dataset, fechaCorte);
-  const maximo = Math.max(...puntos.map((p) => p.optimista), 1);
-  const ultimo = puntos[puntos.length - 1];
-
-  const x = (semana: number) =>
-    M_IZQ + ((semana - 1) / (puntos.length - 1)) * (ANCHO - M_IZQ - M_DER);
-  const y = (v: number) => ALTO - M_INF - (v / maximo) * (ALTO - M_SUP - M_INF);
-
-  const rutas = SERIES.map((s) => ({
-    ...s,
-    d: rutaMonotona(puntos.map((p) => ({ x: x(p.semana), y: y(p[s.clave]) }))),
-  }));
-
-  const finales = SERIES.map((s) => ({ ...s, yFin: y(ultimo[s.clave]) })).sort(
-    (a, b) => a.yFin - b.yFin
+  const agentes = (
+    <FilaAgentes dataset={dataset} fechaCorte={fechaCorte} agentes={AGENTES_COMERCIALES_FORECAST} />
   );
-  for (let i = 1; i < finales.length; i++) {
-    if (finales[i].yFin - finales[i - 1].yFin < 16) {
-      finales[i].yFin = finales[i - 1].yFin + 16;
-    }
-  }
-
-  const opacidad = (clave: ClaveSerie) =>
-    serieActiva === null || serieActiva === clave ? 1 : 0.18;
-
-  const moverCursor = (e: React.MouseEvent<SVGSVGElement>) => {
-    const rect = svgRef.current?.getBoundingClientRect();
-    if (!rect) return;
-    const xVista = ((e.clientX - rect.left) / rect.width) * ANCHO;
-    if (xVista < M_IZQ - 10 || xVista > ANCHO - M_DER + 10) {
-      setSemanaHover(null);
-      return;
-    }
-    const fr =
-      ((xVista - M_IZQ) / (ANCHO - M_IZQ - M_DER)) * (puntos.length - 1) + 1;
-    setSemanaHover(Math.min(puntos.length, Math.max(1, Math.round(fr))));
-  };
-
-  const pHover = semanaHover ? puntos[semanaHover - 1] : null;
-
-  // ── Las cifras de los cuatro anillos — las mismas que arma el argumento. ──
-  const spread = ultimo.optimista - ultimo.pesimista;
-  const pctSpread = ultimo.base > 0 ? (spread / ultimo.base) * 100 : 0;
-  const mitad = ultimo.base / 2;
-  const semanaMitad = ultimo.base > 0 ? puntos.find((p) => p.base >= mitad)?.semana ?? null : null;
 
   return (
     <div className="space-y-6">
-      {/* Marca + menú interno + BarraUsuario, igual que "/" y "/aging". La
-          etiqueta "(simulado)" no se oculta ni acá ni en el riel lateral. */}
-      <Encabezado titulo="Forecast de cobro (simulado)" secciones={SECCIONES} dataset={dataset} modulo="forecast" />
+      <Encabezado titulo="Forecast comercial" secciones={SECCIONES} dataset={dataset} modulo="forecast" />
+      <DecisionPanelV2 modulo="forecast" />
 
-      {/* El motor de argumentación del módulo: el propio simulacro contado en
-          cuatro etapas. La lectura ingenua y cada etapa insisten en que esto
-          es SIMULACIÓN, nunca una proyección de caja real. */}
-      <section id="sec-argumento" className="scroll-mt-24">
-        <RecorridoArgumental
-          rotulo="El caso del forecast"
-          arg={argumentoForecast(dataset, fechaCorte)}
-          agentes={<FilaAgentes dataset={dataset} fechaCorte={fechaCorte} agentes={AGENTES_FORECAST} />}
-          kpis={[
-            {
-              etiqueta: "base semana 13 · del optimista",
-              valor: fmt(ultimo.base),
-              pct: ultimo.optimista > 0 ? (ultimo.base / ultimo.optimista) * 100 : 0,
-            },
-            {
-              etiqueta: "brecha optimista−pesimista · del base",
-              valor: fmt(spread),
-              pct: pctSpread,
-            },
-            // El "—" con anillo en 0% decía "semana 0 de 13", que no existe.
-            semanaMitad !== null
-              ? {
-                  etiqueta: "semana del punto medio · de 13",
-                  valor: `semana ${semanaMitad}`,
-                  pct: (semanaMitad / 13) * 100,
-                }
-              : {
-                  etiqueta: "semana del punto medio · de 13",
-                  valor: "",
-                  sinDato: {
-                    queFalta:
-                      "La curva base simulada no llega a la mitad de su propio total dentro de las 13 semanas: no hay semana que cruce ese punto.",
-                    consecuencia:
-                      "No se puede decir cuándo se junta la mitad del cobro simulado. Un anillo en 0% señalaría una «semana 0», que no existe en un horizonte que empieza en la 1.",
-                    comoSeLlena:
-                      "Con facturas abiertas al corte que alimenten la simulación. Si las hay en Odoo y acá no aparecen, revisar la importación y el corte usado.",
-                  },
-                },
-            {
-              etiqueta: "pesimista · del optimista",
-              valor: fmt(ultimo.pesimista),
-              pct: ultimo.optimista > 0 ? (ultimo.pesimista / ultimo.optimista) * 100 : 0,
-            },
-          ]}
-        />
-      </section>
-
-      {/* Los tres escenarios: mismos supuestos declarados, mismas tarjetas
-          gradiente de siempre. */}
-      <section id="sec-escenarios" className="scroll-mt-24">
-        <LienzoConAgentes
-          titulo="Los tres escenarios (simulados)"
-          agentes={<FilaAgentes dataset={dataset} fechaCorte={fechaCorte} agentes={AGENTES_FORECAST} />}
-        >
-          <p className="flex items-center gap-2.5 text-[11.5px] font-semibold text-simulado">
-            <span aria-hidden className="inline-block h-2 w-2 rounded-full bg-simulado" />
-            SIMULACIÓN — pendiente de validación por Finanzas
-          </p>
-          <ul className="mt-2.5 grid gap-x-8 gap-y-1.5 pl-5 text-[10.5px] leading-relaxed text-[#85878c] sm:grid-cols-2">
-            {SUPUESTOS_FORECAST.map((s, i) => (
-              <li key={i} className="list-disc marker:text-[#c6cad2]">
-                {s}
-              </li>
-            ))}
-          </ul>
-
-          <div className="mt-5 grid gap-4 sm:grid-cols-3">
-            {SERIES.map((s, i) => (
-              <article
-                key={s.clave}
-                tabIndex={0}
-                onMouseEnter={() => setSerieActiva(s.clave)}
-                onMouseLeave={() => setSerieActiva(null)}
-                onFocus={() => setSerieActiva(s.clave)}
-                onBlur={() => setSerieActiva(null)}
-                style={{ animationDelay: `${i * 90}ms` }}
-                className="tarjeta-calada entrada-suave group p-6 outline-none transition duration-200 hover:-translate-y-1 focus-visible:ring-2 focus-visible:ring-tinta/30"
-              >
-                <div className="flex items-start justify-between">
-                  <p className="text-sm font-semibold leading-snug text-tinta">
-                    {s.etiqueta}
-                    <span className="mt-0.5 block text-[10px] font-bold uppercase tracking-wider text-tinta/50">
-                      simulado
-                    </span>
-                  </p>
-                  <span
-                    aria-hidden
-                    style={{ background: s.chipFondo }}
-                    className="grid h-9 w-9 place-items-center rounded-pastilla text-base text-tinta/80"
-                  >
-                    {s.glifo}
-                  </span>
-                </div>
-                <p className="mt-7 text-[1.9rem] font-bold leading-none tabular-nums tracking-tight text-tinta">
-                  {fmt(ultimo[s.clave])}
-                </p>
-                <p className="mt-2 text-xs font-medium text-tinta/60">
-                  cobro acumulado · 13 semanas
-                </p>
-              </article>
-            ))}
+      <section id="sec-puente" className="scroll-mt-24">
+        <LienzoConAgentes titulo="Brecha actual y horizonte" agentes={agentes}>
+          <div className="flex flex-wrap items-end justify-between gap-3">
+            <div>
+              <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-[#6876d8]">Lectura ejecutiva</p>
+              <h2 className="mt-1 text-xl font-bold text-tinta">Cuánto podría entrar y qué queda fuera</h2>
+            </div>
+            <p className="text-[11px] text-tintaSuave">Corte {fechaCorte} · 13 semanas simuladas</p>
           </div>
-
-          <div className="mt-4">
-            <BannerFicticioPremium fuente={dataset.fuente} />
+          <div className="mt-5">
+            <OperacionPuente
+              titulo="Puente desde la cartera actual"
+              subtitulo="La cartera abierta es una referencia operativa, no una meta comercial aprobada."
+              pasos={[
+                { etiqueta: "Cartera abierta", valor: fmt(analitica.saldoAbierto), nota: `${analitica.facturasAbiertas} facturas con saldo` },
+                { etiqueta: "Elegible", valor: fmt(analitica.saldoElegible), nota: `${analitica.facturasElegibles} con vencimiento` },
+                { etiqueta: "Base semana 13", valor: fmt(analitica.base13), nota: "escenario mecánico", tono: "positivo" },
+                { etiqueta: "Brecha a cartera", valor: fmt(analitica.brechaHorizonte), nota: "fuera del base o sin dato", tono: "alerta" },
+              ]}
+            />
+          </div>
+          <div className="mt-4 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+            <OperacionKpi etiqueta="Escenario base" valor={fmt(analitica.base13)} nota="Cobro acumulado simulado a semana 13" tono="positivo" />
+            <OperacionKpi etiqueta="Brecha de escenarios" valor={fmt(analitica.brechaEscenarios)} nota="Optimista menos pesimista · incertidumbre del simulacro" tono="alerta" />
+            <OperacionKpi etiqueta="Saldo disputado" valor={fmt(analitica.saldoDisputado)} nota="El pesimista lo excluye por supuesto" tono={analitica.saldoDisputado > 0 ? "alerta" : "normal"} />
+            <OperacionKpi etiqueta="Meta comercial" valor="Sin dato" nota="No existe una meta aprobada en el dataset; no se inventa cumplimiento" tono="alerta" />
           </div>
         </LienzoConAgentes>
       </section>
 
-      {/* La curva: mismas tres bandas, mismo indicador flotante al pasar el
-          mouse, sin cambios de comportamiento. */}
-      <section id="sec-curva" className="scroll-mt-24">
-        <LienzoConAgentes
-          titulo="Cobro acumulado simulado"
-          agentes={<FilaAgentes dataset={dataset} fechaCorte={fechaCorte} agentes={AGENTES_FORECAST} />}
-        >
-          <div className="flex flex-wrap items-start justify-between gap-4">
-            <p className="text-[11.5px] leading-snug text-[#85878c]">
-              Tres bandas ilustrativas por escenario — no una proyección real
-            </p>
-            <div className="flex flex-wrap gap-2">
-              {SERIES.map((s) => (
-                <button
-                  key={s.clave}
-                  type="button"
-                  onMouseEnter={() => setSerieActiva(s.clave)}
-                  onMouseLeave={() => setSerieActiva(null)}
-                  onFocus={() => setSerieActiva(s.clave)}
-                  onBlur={() => setSerieActiva(null)}
-                  className="flex items-center gap-2 rounded-pastilla border border-white/90 bg-white/70 px-3.5 py-1.5 text-xs font-medium text-tinta/80 shadow-flotante outline-none transition hover:shadow-flotanteAlta"
-                  style={
-                    serieActiva === s.clave
-                      ? { boxShadow: `0 0 0 2px ${s.linea}` }
-                      : undefined
-                  }
-                >
-                  <span
-                    aria-hidden
-                    className="inline-block h-2 w-2 rounded-full"
-                    style={{ backgroundColor: s.linea }}
-                  />
-                  {s.etiqueta}
-                </button>
-              ))}
-            </div>
+      <section id="sec-escenarios" className="scroll-mt-24">
+        <LienzoConAgentes titulo="Escenarios y supuestos" agentes={agentes}>
+          <div className="grid gap-4 sm:grid-cols-3">
+            <OperacionKpi etiqueta="Optimista · semana 13" valor={fmt(analitica.optimista13)} nota="Cobro 10 días después del vencimiento o corte" />
+            <OperacionKpi etiqueta="Base · semana 13" valor={fmt(analitica.base13)} nota="Cobro 30 días después del vencimiento o corte" tono="positivo" />
+            <OperacionKpi etiqueta="Pesimista · semana 13" valor={fmt(analitica.pesimista13)} nota="Cobro a 60 días; disputas fuera del horizonte" />
           </div>
+          <div className="mt-4"><CurvaEscenarios puntos={analitica.puntos} fmt={fmt} /></div>
+          <p className="mt-3 text-[10.5px] leading-relaxed text-tintaSuave">
+            Ningún escenario tiene probabilidad asignada: no existe histórico de cobro para calibrarla. Elegir “base” no significa 50% ni “más probable”.
+          </p>
+        </LienzoConAgentes>
+      </section>
 
-          <div className="relative mt-4">
-            {pHover && (
-              <div
-                className="pointer-events-none absolute z-10 -translate-x-1/2 rounded-2xl bg-white px-4 py-2.5 shadow-[0_12px_32px_-10px_rgba(15,23,42,0.35)] ring-1 ring-[rgba(22,24,29,.07)]"
-                style={{ left: `${(x(pHover.semana) / ANCHO) * 100}%`, top: "-6px" }}
-              >
-                <p className="text-center text-xs font-bold text-tinta">
-                  Semana {pHover.semana}
-                </p>
-                <div className="mt-1 space-y-0.5">
-                  {SERIES.map((s) => (
-                    <p
-                      key={s.clave}
-                      className="flex items-center gap-1.5 text-[10px] font-medium text-tintaSuave"
-                    >
-                      <span
-                        aria-hidden
-                        className="inline-block h-1.5 w-1.5 rounded-full"
-                        style={{ backgroundColor: s.linea }}
-                      />
-                      {s.etiqueta}:{" "}
-                      <span className="tabular-nums text-tinta">
-                        {fmt(pHover[s.clave])}
-                      </span>
-                    </p>
-                  ))}
-                </div>
-              </div>
-            )}
+      <section id="sec-contribuyentes" className="scroll-mt-24">
+        <LienzoConAgentes titulo="Quién sostiene el escenario base" agentes={agentes}>
+          <OperacionRanking titulo="Clientes por contribución al base" subtitulo="Saldo pendiente elegible que cae dentro del horizonte de 13 semanas" filas={analitica.topContribuyentes} formatear={fmt} vacio="No hay facturas elegibles dentro del horizonte base." />
+        </LienzoConAgentes>
+      </section>
 
-            <svg
-              ref={svgRef}
-              viewBox={`0 0 ${ANCHO} ${ALTO}`}
-              className="w-full"
-              role="img"
-              aria-label="Curvas simuladas de cobro acumulado: optimista, base y pesimista"
-              onMouseMove={moverCursor}
-              onMouseLeave={() => setSemanaHover(null)}
-            >
-              <defs>
-                <pattern id="puntosFondo" width="20" height="20" patternUnits="userSpaceOnUse">
-                  <circle cx="1.6" cy="1.6" r="1.3" fill="#e2e8f0" />
-                </pattern>
-              </defs>
-              <rect
-                x={M_IZQ}
-                y={M_SUP}
-                width={ANCHO - M_IZQ - M_DER}
-                height={ALTO - M_SUP - M_INF}
-                fill="url(#puntosFondo)"
-                opacity="0.5"
-              />
-              {[0.5, 1].map((f) => (
-                <g key={f}>
-                  <line
-                    x1={M_IZQ}
-                    y1={y(maximo * f)}
-                    x2={ANCHO - M_DER}
-                    y2={y(maximo * f)}
-                    stroke="#e2e8f0"
-                    strokeDasharray="1 7"
-                    strokeLinecap="round"
-                  />
-                  <text
-                    x={M_IZQ - 10}
-                    y={y(maximo * f) + 3.5}
-                    fontSize="10"
-                    fill="#94a3b8"
-                    textAnchor="end"
-                  >
-                    {fmt(maximo * f)}
-                  </text>
-                </g>
-              ))}
+      <section id="sec-reactivacion" className="scroll-mt-24">
+        <LienzoConAgentes titulo="Oportunidades de reactivación" agentes={agentes}>
+          <OperacionRanking titulo={`Top reactivación · ${analitica.reactivacionTotal} clientes perdidos`} subtitulo={`${fmt(analitica.reactivacionValorHistorico)} facturado por ellos el año anterior · no afirma probabilidad ni ingreso futuro`} filas={analitica.reactivacion} formatear={fmt} vacio="No hay dos años de facturación comparables o no existen clientes perdidos bajo esta definición." />
+        </LienzoConAgentes>
+      </section>
 
-              {pHover && (
-                <line
-                  x1={x(pHover.semana)}
-                  y1={M_SUP}
-                  x2={x(pHover.semana)}
-                  y2={ALTO - M_INF}
-                  stroke="#cbd5e1"
-                  strokeDasharray="3 4"
-                />
-              )}
-
-              {rutas.map((s) => (
-                <g
-                  key={s.clave}
-                  style={{ opacity: opacidad(s.clave), transition: "opacity 160ms" }}
-                >
-                  <path
-                    d={s.d}
-                    fill="none"
-                    stroke={s.linea}
-                    strokeWidth="3"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  />
-                  <circle
-                    cx={x(ultimo.semana)}
-                    cy={y(ultimo[s.clave])}
-                    r="4.5"
-                    fill="#ffffff"
-                    stroke={s.linea}
-                    strokeWidth="2.5"
-                  />
-                  {pHover && (
-                    <circle
-                      cx={x(pHover.semana)}
-                      cy={y(pHover[s.clave])}
-                      r="5"
-                      fill="#ffffff"
-                      stroke={s.linea}
-                      strokeWidth="2.5"
-                    />
-                  )}
-                </g>
-              ))}
-
-              {finales.map((s) => (
-                <text
-                  key={s.clave}
-                  x={ANCHO - M_DER + 14}
-                  y={s.yFin + 4}
-                  fontSize="11"
-                  fontWeight="700"
-                  fill={s.linea}
-                  style={{ opacity: opacidad(s.clave), transition: "opacity 160ms" }}
-                >
-                  {s.etiqueta}
-                </text>
-              ))}
-
-              {puntos.map((p) => (
-                <text
-                  key={p.semana}
-                  x={x(p.semana)}
-                  y={ALTO - M_INF + 20}
-                  fontSize="10"
-                  fill={semanaHover === p.semana ? "#334155" : "#94a3b8"}
-                  fontWeight={semanaHover === p.semana ? 700 : 400}
-                  textAnchor="middle"
-                >
-                  {p.semana}
-                </text>
-              ))}
-              <text
-                x={M_IZQ + (ANCHO - M_IZQ - M_DER) / 2}
-                y={ALTO - 4}
-                fontSize="10"
-                fill="#94a3b8"
-                textAnchor="middle"
-              >
-                semana
-              </text>
-            </svg>
-          </div>
-
-          <div className="mt-2 flex justify-end">
-            <div className="text-right">
-              <p className="text-4xl font-bold tabular-nums tracking-tight text-tinta">
-                {fmt(ultimo.base)}
-              </p>
-              <p className="text-xs font-medium text-tintaSuave">
-                escenario base · semana 13 · simulado
-              </p>
-            </div>
-          </div>
+      <section id="sec-control" className="scroll-mt-24">
+        <LienzoConAgentes titulo="Confianza y controles" agentes={agentes}>
+          <OperacionControl
+            titulo="Por qué esto sigue siendo una simulación"
+            items={[
+              "No existe meta comercial aprobada en el esquema; la brecha mostrada es contra la cartera abierta, no contra una cuota.",
+              "No hay histórico de promesas y cobros para estimar probabilidades por cliente o factura.",
+              `${fmt(analitica.saldoSinVencimiento)} de saldo no entra a las curvas porque no tiene fecha de vencimiento.`,
+              ...SUPUESTOS_FORECAST.slice(0, 2),
+            ]}
+          />
         </LienzoConAgentes>
       </section>
     </div>
