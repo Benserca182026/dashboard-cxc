@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import type { FilaImpactoEjecutivo } from "@/lib/commercial-ejecutivo";
+import type { AnaliticaVentas } from "@/lib/commercial-operacion";
 
 export function KpiExplorable({
   etiqueta,
@@ -69,6 +70,34 @@ export function MapaImpactoCobranza({
   const seleccionado = filas.find((f) => f.id === activo) ?? filas[0];
   const x = (d: number) => 64 + (d / maxDias) * 650;
   const y = (m: number) => 252 - (m / maxMonto) * 184;
+  // La ancla siempre es el dato real. Sólo se desplaza la representación para
+  // evitar que dos clientes con coordenadas cercanas se oculten mutuamente.
+  const posiciones = useMemo(() => {
+    const ocupadas: { x: number; y: number; r: number }[] = [];
+    const candidatos = [{ x: 0, y: 0 }];
+    for (let anillo = 1; anillo <= 7; anillo += 1) {
+      const radio = anillo * 15;
+      const pasos = Math.max(8, anillo * 8);
+      for (let paso = 0; paso < pasos; paso += 1) {
+        const angulo = (paso / pasos) * Math.PI * 2;
+        candidatos.push({ x: Math.cos(angulo) * radio, y: Math.sin(angulo) * radio });
+      }
+    }
+    return filas.map((fila) => {
+      const r = 10 + Math.sqrt(fila.monto / maxMonto) * 14;
+      const anclaX = x(fila.dias);
+      const anclaY = y(fila.monto);
+      const candidato = candidatos.find((desplazamiento) => {
+        const px = Math.max(64 + r, Math.min(714 - r, anclaX + desplazamiento.x));
+        const py = Math.max(28 + r, Math.min(252 - r, anclaY + desplazamiento.y));
+        return ocupadas.every((ocupada) => Math.hypot(px - ocupada.x, py - ocupada.y) >= r + ocupada.r + 6);
+      }) ?? candidatos.at(-1)!;
+      const px = Math.max(64 + r, Math.min(714 - r, anclaX + candidato.x));
+      const py = Math.max(28 + r, Math.min(252 - r, anclaY + candidato.y));
+      ocupadas.push({ x: px, y: py, r });
+      return { id: fila.id, anclaX, anclaY, x: px, y: py, r };
+    });
+  }, [filas, maxMonto, maxDias]);
   return (
     <section className="rounded-[28px] border border-white/90 bg-white/70 p-5 shadow-flotante">
       <div className="flex flex-wrap items-start justify-between gap-4">
@@ -87,11 +116,13 @@ export function MapaImpactoCobranza({
             <text transform="translate(18 150) rotate(-90)" textAnchor="middle" fontSize="11" fill="#667085">SALDO VENCIDO →</text>
             <text x="66" y="270" fontSize="9" fill="#8b96a8">0 d</text><text x="685" y="270" fontSize="9" fill="#8b96a8">{maxDias} d</text>
             {filas.map((fila, i) => {
-              const r = 10 + Math.sqrt(fila.monto / maxMonto) * 14;
+              const posicion = posiciones[i];
               const isActive = seleccionado?.id === fila.id;
               return <g key={fila.id} className="cursor-pointer" onClick={() => setActivo(fila.id)} onMouseEnter={() => setActivo(fila.id)}>
-                <circle cx={x(fila.dias)} cy={y(fila.monto)} r={r + (isActive ? 4 : 0)} fill={fila.critico ? "#c2703a" : "#536b91"} opacity={isActive ? 1 : .76} stroke="white" strokeWidth="3" />
-                <text x={x(fila.dias)} y={y(fila.monto) + 4} textAnchor="middle" fontSize="10" fontWeight="700" fill="white">{i + 1}</text>
+                <circle cx={posicion.anclaX} cy={posicion.anclaY} r="2.5" fill="#687487" opacity=".6" />
+                {(posicion.x !== posicion.anclaX || posicion.y !== posicion.anclaY) && <line x1={posicion.anclaX} y1={posicion.anclaY} x2={posicion.x} y2={posicion.y} stroke="#8792a5" strokeWidth="1.25" strokeDasharray="3 3" />}
+                <circle cx={posicion.x} cy={posicion.y} r={posicion.r + (isActive ? 4 : 0)} fill={fila.critico ? "#c2703a" : "#536b91"} opacity={isActive ? 1 : .84} stroke="white" strokeWidth="3" />
+                <text x={posicion.x} y={posicion.y + 4} textAnchor="middle" fontSize="10" fontWeight="700" fill="white">{i + 1}</text>
               </g>;
             })}
           </svg>
@@ -99,9 +130,47 @@ export function MapaImpactoCobranza({
             <div><p className="text-[10px] font-bold uppercase tracking-wider text-white/55">Caso seleccionado</p><p className="mt-1 text-sm font-bold">{seleccionado.nombre}</p><p className="mt-1 text-[11px] text-white/70">{seleccionado.detalle} · {seleccionado.participacion.toFixed(1)}% del vencido</p></div>
             <p className="self-center text-xl font-bold tabular-nums">{fmt(seleccionado.monto)}</p>
           </div>}
-          <p className="mt-3 text-[10px] text-tintaSuave">Cada burbuja es un cliente. Tamaño = exposición; eje horizontal = atraso; color naranja = aparece en mora crítica. Base de cartera vencida: {fmt(total)}.</p>
+          <p className="mt-3 text-[10px] text-tintaSuave">Cada burbuja es un cliente. Punto gris = coordenada real; línea punteada = separación visual por colisión. Tamaño = exposición; eje horizontal = atraso; naranja = mora crítica. Base: {fmt(total)}.</p>
         </>
       )}
+    </section>
+  );
+}
+
+export function ResumenVentasEjecutivo({
+  ventas,
+  fmt,
+}: {
+  ventas: AnaliticaVentas;
+  fmt: (n: number) => string;
+}) {
+  const [activo, setActivo] = useState<string | null>(null);
+  const puntos = ventas.tendencia.slice(-8);
+  const maximo = Math.max(1, ...puntos.map((p) => p.valor));
+  const seleccion = puntos.find((p) => p.periodo === activo) ?? puntos.at(-1);
+  if (!ventas.disponible) return null;
+  return (
+    <section className="rounded-[28px] border border-white/90 bg-white/70 p-5 shadow-flotante">
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <p className="text-[10px] font-bold uppercase tracking-[.14em] text-[#796de0]">Ventas · contexto comercial separado</p>
+          <h3 className="mt-1 text-base font-bold text-tinta">La señal comercial debajo de la cobranza</h3>
+        </div>
+        <a href="/ventas" className="rounded-full bg-[#edf1f8] px-3 py-1.5 text-[10px] font-semibold text-[#536b91] hover:bg-white">abrir Ventas ↗</a>
+      </div>
+      <div className="mt-4 grid gap-3 sm:grid-cols-3">
+        <div className="rounded-2xl bg-[#f4f6fb] p-3"><p className="text-[9px] font-bold uppercase tracking-wider text-tintaSuave">Venta registrada</p><p className="mt-1 text-lg font-extrabold tabular-nums text-tinta">{fmt(ventas.vendidoOdoo)}</p></div>
+        <div className="rounded-2xl bg-[#f4f6fb] p-3"><p className="text-[9px] font-bold uppercase tracking-wider text-tintaSuave">Top 5 clientes</p><p className="mt-1 text-lg font-extrabold tabular-nums text-tinta">{ventas.concentracionTop5 === null ? "—" : `${ventas.concentracionTop5.toFixed(1)}%`}</p></div>
+        <div className="rounded-2xl bg-[#f4f6fb] p-3"><p className="text-[9px] font-bold uppercase tracking-wider text-tintaSuave">MTD comparable</p><p className="mt-1 text-lg font-extrabold tabular-nums text-tinta">{ventas.variacionUltimoPeriodo === null ? "—" : `${ventas.variacionUltimoPeriodo >= 0 ? "▲" : "▼"} ${Math.abs(ventas.variacionUltimoPeriodo).toFixed(1)}%`}</p></div>
+      </div>
+      {puntos.length > 0 && <div className="mt-5 flex h-24 items-end gap-2" role="img" aria-label="Tendencia reciente de ventas registradas">
+        {puntos.map((p) => <button key={p.periodo} type="button" onClick={() => setActivo(p.periodo)} className="group flex h-full min-w-0 flex-1 flex-col justify-end gap-1.5" aria-label={`${p.periodo}: ${fmt(p.valor)}`}>
+          <span className="hidden text-[9px] font-semibold tabular-nums text-tinta group-hover:block sm:block">{fmt(p.valor)}</span>
+          <span className={`w-full rounded-t-lg transition ${seleccion?.periodo === p.periodo ? "bg-[#796de0]" : "bg-[#c6c0f5] hover:bg-[#9b91e7]"}`} style={{ height: `${Math.max(6, (p.valor / maximo) * 64)}px` }} />
+          <span className="text-[9px] text-tintaSuave">{p.periodo.slice(5)}</span>
+        </button>)}
+      </div>}
+      <p className="mt-3 text-[10px] text-tintaSuave">Ventas usa pedidos y líneas de venta, con ventana {ventas.desde ?? "—"} a {ventas.hasta ?? "—"}. Es contexto comercial: no altera cartera, aging ni las posiciones del mapa.</p>
     </section>
   );
 }

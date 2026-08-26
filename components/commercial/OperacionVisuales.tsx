@@ -28,11 +28,11 @@ export function OperacionKpi({
       >
         {valor}
       </p>
-      <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-[#e9edf4]"><span className={`block h-full rounded-full ${tono === "positivo" ? "bg-emerald-500" : tono === "alerta" ? "bg-amber-500" : "bg-[#6677ee]"}`} style={{ width: "68%" }} /></div>
+      <div className={`mt-3 h-1.5 rounded-full ${tono === "positivo" ? "bg-emerald-500" : tono === "alerta" ? "bg-amber-500" : "bg-[#6677ee]"}`} aria-hidden />
       <p className="mt-2 text-[11px] leading-snug text-tintaSuave">{nota}</p>
       <p className="mt-3 text-[9px] font-bold uppercase tracking-wider text-[#6677ee] group-open:hidden">ver alcance ↘</p>
       </summary>
-      <p className="mt-3 border-t border-slate-100 pt-3 text-[10.5px] leading-relaxed text-tintaSuave">Este indicador conserva su cálculo actual. La barra es una señal visual de lectura, no una escala financiera ni una meta inventada.</p>
+      <p className="mt-3 border-t border-slate-100 pt-3 text-[10.5px] leading-relaxed text-tintaSuave">Este indicador conserva su cálculo actual. El color declara su estado; no se dibuja una escala ni una meta que el dato no contiene.</p>
     </details>
   );
 }

@@ -10,7 +10,7 @@ import {
   type FilaImpactoEjecutivo,
 } from "@/lib/commercial-ejecutivo";
 import { analiticaForecast, analiticaVentas } from "@/lib/commercial-operacion";
-import { KpiExplorable, MapaImpactoCobranza } from "@/components/commercial/VisualesInteractivas";
+import { KpiExplorable, MapaImpactoCobranza, ResumenVentasEjecutivo } from "@/components/commercial/VisualesInteractivas";
 
 const ESTADO_LIMITE = {
   complete: { etiqueta: "calculado", clase: "bg-emerald-500/10 text-emerald-800" },
@@ -283,6 +283,8 @@ export function EjecutivoPanel() {
         <p className="mt-2 text-[10px] text-[#8b8f98]">
           Cambio por cuenta: sin histórico comparable disponible · {lectura.sinFechaVencimiento} factura(s) con saldo sin fecha de vencimiento quedan fuera del ranking.
         </p>
+
+        <div className="mt-5"><ResumenVentasEjecutivo ventas={ventas} fmt={fmt} /></div>
 
         <div className="mt-5 grid gap-4 lg:grid-cols-[1.05fr_.95fr]">
           <div id="sec-acciones" className="scroll-mt-24 rounded-[20px] border border-white/70 bg-white/45 p-4 shadow-[inset_0_1px_0_rgba(255,255,255,.75)]">
