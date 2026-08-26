@@ -10,6 +10,7 @@ import {
   type FilaImpactoEjecutivo,
 } from "@/lib/commercial-ejecutivo";
 import { analiticaForecast, analiticaVentas } from "@/lib/commercial-operacion";
+import { KpiExplorable, MapaImpactoCobranza } from "@/components/commercial/VisualesInteractivas";
 
 const ESTADO_LIMITE = {
   complete: { etiqueta: "calculado", clase: "bg-emerald-500/10 text-emerald-800" },
@@ -163,6 +164,10 @@ export function EjecutivoPanel() {
   const metricaCambio = metricas.find((metrica) => /vs|frente|−|\+/.test(metrica.comparison));
   const primeraOportunidad = lectura.oportunidades[0];
   const primeraAccion = acciones[0];
+  const concentracionTop5 = lectura.totalVencido > 0
+    ? (lectura.oportunidades.slice(0, 5).reduce((s, fila) => s + fila.monto, 0) / lectura.totalVencido) * 100
+    : 0;
+  const moraCriticaPct = lectura.totalVencido > 0 ? (lectura.totalMoraCritica / lectura.totalVencido) * 100 : 0;
   const corteSnapshot = new Intl.DateTimeFormat("es-GT", {
     dateStyle: "medium",
     timeStyle: "short",
@@ -267,53 +272,14 @@ export function EjecutivoPanel() {
         ) : null}
 
         <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-          {metricas.map((metrica) => {
-            const estado = presentacion(metrica.key, metrica.status);
-            const valorMostrado = mostrar(metrica.displayValue);
-            const valorLargo = valorMostrado.length > 12;
-            return (
-              <details key={metrica.key} className="group tarjeta-calada min-w-0 p-4 open:sm:col-span-2">
-                <summary className="cursor-pointer list-none">
-                  <div className="flex items-start justify-between gap-2">
-                    <p className="text-[11.5px] font-semibold leading-snug text-[#606776]">{metrica.label}</p>
-                    <span className={`rounded-full px-2 py-1 text-[9px] font-bold uppercase tracking-[0.06em] ${estado.clase}`}>{estado.etiqueta}</span>
-                  </div>
-                  <p className={`mt-3 max-w-full font-extrabold leading-none tracking-[-0.025em] tabular-nums text-tinta ${valorLargo ? "text-[clamp(1rem,1.1vw,1.2rem)]" : "text-[25px]"}`}>{valorMostrado}</p>
-                  <p className="mt-2 text-[11px] leading-snug text-[#7c808a]">{mostrar(metrica.comparison)}</p>
-                  <p className="mt-2 text-[9.5px] leading-snug text-[#8b8f98]">{estado.procedencia}</p>
-                  <p className="mt-3 text-[10px] font-semibold text-[#9a643d] group-open:hidden">ver definición y fuente ↘</p>
-                </summary>
-                <div className="mt-4 border-t border-black/[.06] pt-3 text-[11px] leading-relaxed text-[#5f6673]">
-                  <p><span className="font-semibold">Definición:</span> {mostrar(metrica.definition)}</p>
-                  <p className="mt-1 font-mono text-[10px]">{metrica.sourceModel} · {metrica.sourceFilter}</p>
-                  <p className="mt-2 rounded-xl bg-[#f3f6fb] px-3 py-2 text-[#4f5a70]"><span className="font-semibold">Decisión:</span> {mostrar(metrica.action)}</p>
-                </div>
-              </details>
-            );
-          })}
+          <KpiExplorable etiqueta="Cartera vencida" valor={fmt(lectura.totalVencido)} nota={`${porcentajeVencido.toFixed(1)}% de cartera clasificable`} porcentaje={porcentajeVencido} tono="rojo" detalle={<><b>Hecho:</b> saldo pendiente con vencimiento anterior al corte {fechaCorte}.<br /><b>Fórmula:</b> saldo pendiente clasificado, bucket actual excluido.<br /><b>Fuente:</b> {dataset.fuente}.</>} />
+          <KpiExplorable etiqueta="Mora crítica · 90+" valor={fmt(lectura.totalMoraCritica)} nota={`${moraCriticaPct.toFixed(1)}% de lo vencido`} porcentaje={moraCriticaPct} tono="ambar" detalle={<><b>Hecho:</b> saldo vencido clasificado en 90+ días.<br /><b>Acción:</b> revisar escalamiento, disputa o negociación; no significa pérdida automática.</>} />
+          <KpiExplorable etiqueta="Concentración Top 5" valor={`${concentracionTop5.toFixed(1)}%`} nota="del vencido depende de cinco clientes" porcentaje={concentracionTop5} tono="violeta" detalle={<><b>Fórmula:</b> saldo de los cinco clientes vencidos principales ÷ cartera vencida.<br /><b>Uso:</b> detecta dependencia comercial; no estima probabilidad de cobro.</>} />
+          <KpiExplorable etiqueta="Brecha de control" valor={`${lectura.sinFechaVencimiento}`} nota="facturas con saldo sin vencimiento" porcentaje={lectura.sinFechaVencimiento > 0 ? 100 : 0} tono="azul" detalle={<><b>Consecuencia:</b> estas facturas quedan fuera de aging y del ranking por atraso.<br /><b>Acción:</b> completar vencimiento y responsable antes de exigir gestión.</>} />
         </div>
-        <p className="mt-2 text-[10px] text-[#8b8f98]">
-          Cartera, rankings y antigüedad: {dataset.fuente}, corte {fechaCorte}. Facturación y margen: snapshot {corteSnapshot}. Inventario: controles Odoo del 19 ago 2026.
-        </p>
+        <details className="mt-3 rounded-xl border border-dashed border-slate-200 bg-white/45 px-3 py-2 text-[10.5px] text-tintaSuave"><summary className="cursor-pointer font-semibold text-[#536b91]">Contexto separado: facturación, margen e inventario ↘</summary><div className="mt-2 grid gap-2 sm:grid-cols-3">{metricas.filter((m) => m.key !== "resumen_cartera_vencida").map((m) => <div key={m.key}><b>{m.label}:</b> {mostrar(m.displayValue)} · {mostrar(m.comparison)}</div>)}</div></details>
 
-        <div id="sec-impacto" className="mt-5 scroll-mt-24 grid gap-4 lg:grid-cols-2">
-          <ListaImpacto
-            filas={lectura.oportunidades}
-            total={lectura.totalVencido}
-            titulo="Top 5 oportunidades de recuperación"
-            subtitulo="Clientes ordenados por saldo vencido; sin estimar probabilidad de cobro."
-            tono="oportunidad"
-            fmt={fmt}
-          />
-          <ListaImpacto
-            filas={lectura.riesgos}
-            total={lectura.totalMoraCritica}
-            titulo="Top 5 riesgos por mora crítica"
-            subtitulo="Clientes ordenados por saldo con más de 90 días."
-            tono="riesgo"
-            fmt={fmt}
-          />
-        </div>
+        <div id="sec-impacto" className="mt-5 scroll-mt-24"><MapaImpactoCobranza oportunidades={lectura.oportunidades} riesgos={lectura.riesgos} total={lectura.totalVencido} fmt={fmt} /></div>
         <p className="mt-2 text-[10px] text-[#8b8f98]">
           Cambio por cuenta: sin histórico comparable disponible · {lectura.sinFechaVencimiento} factura(s) con saldo sin fecha de vencimiento quedan fuera del ranking.
         </p>
@@ -326,7 +292,7 @@ export function EjecutivoPanel() {
             </div>
             {acciones.length > 0 ? (
               <ol className="mt-3 space-y-2">
-                {acciones.map((accion, indice) => (
+                {acciones.slice(0, 3).map((accion, indice) => (
                   <li key={accion.key} className="grid grid-cols-[24px_1fr_auto] items-center gap-2 rounded-xl bg-white/75 px-3 py-2.5">
                     <span className="grid h-6 w-6 place-items-center rounded-full bg-tinta text-[10px] font-bold text-white">{indice + 1}</span>
                     <div className="min-w-0">

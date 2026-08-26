@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import type {
   AgenteComercial,
   CargaResponsable,
@@ -39,11 +40,12 @@ export function AgentesComercialesCobranza({
 
       <div className={`mt-5 grid gap-3 md:grid-cols-2 ${agentes.length === 3 ? "xl:grid-cols-3" : "xl:grid-cols-4"}`}>
         {agentes.map((agente, indice) => (
-          <article
+          <details
             key={agente.id}
-            className={`entrada-suave min-h-[220px] rounded-[18px] border p-4 shadow-flotante ${tonos[agente.estado]}`}
+            className={`group entrada-suave min-h-[150px] rounded-[18px] border p-4 shadow-flotante ${tonos[agente.estado]}`}
             style={{ animationDelay: `${indice * 70}ms` }}
           >
+            <summary className="cursor-pointer list-none">
             <div className="flex items-center justify-between gap-3">
               <span className="rounded-pastilla border border-current/15 px-2.5 py-1 text-[9px] font-bold uppercase tracking-[.1em] opacity-75">
                 {agente.nombre}
@@ -56,6 +58,8 @@ export function AgentesComercialesCobranza({
               {agente.pregunta}
             </p>
             <p className="mt-2 text-[14px] font-bold leading-snug">{agente.respuesta}</p>
+            <p className="mt-3 text-[9px] font-bold uppercase tracking-wider opacity-60 group-open:hidden">tocar para evidencia ↘</p>
+            </summary>
             {agente.impacto != null && (
               <div className="mt-4 border-t border-current/10 pt-3">
                 <p className="text-[9px] font-bold uppercase tracking-[.1em] opacity-55">Impacto observado</p>
@@ -65,7 +69,7 @@ export function AgentesComercialesCobranza({
             <p className="mt-3 text-[11px] leading-relaxed opacity-75">
               <b>Siguiente paso:</b> {agente.accion}
             </p>
-          </article>
+          </details>
         ))}
       </div>
     </section>
@@ -81,6 +85,7 @@ export function BarrasRanking({
   fmt: (valor: number) => string;
   vacio?: string;
 }) {
+  const [seleccionado, setSeleccionado] = useState<string | null>(null);
   const maximo = Math.max(...filas.map((fila) => fila.valor), 0);
   if (filas.length === 0 || maximo <= 0) {
     return <EstadoSinDatos texto={vacio} />;
@@ -89,7 +94,8 @@ export function BarrasRanking({
   return (
     <ol className="space-y-3">
       {filas.map((fila, indice) => (
-        <li key={fila.id} className="grid grid-cols-[24px_minmax(0,1fr)_auto] items-center gap-3">
+        <li key={fila.id}>
+        <button type="button" onClick={() => setSeleccionado(seleccionado === fila.id ? null : fila.id)} className={`grid w-full grid-cols-[24px_minmax(0,1fr)_auto] items-center gap-3 rounded-xl p-1.5 text-left transition ${seleccionado === fila.id ? "bg-[#edf1f8]" : "hover:bg-white/70"}`}>
           <span className="text-right text-[10px] font-bold tabular-nums text-etapa">{indice + 1}</span>
           <div className="min-w-0">
             <div className="mb-1 flex items-baseline justify-between gap-3">
@@ -111,6 +117,8 @@ export function BarrasRanking({
               </p>
             )}
           </div>
+        </button>
+        {seleccionado === fila.id && <p className="ml-9 mt-1 rounded-xl bg-white/80 px-3 py-2 text-[10px] leading-relaxed text-tintaSuave"><b className="text-tinta">{fila.etiqueta}</b> · {fmt(fila.valor)}. {fila.meta ?? "Sin metadato adicional registrado."}</p>}
         </li>
       ))}
     </ol>

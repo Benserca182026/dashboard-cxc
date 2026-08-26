@@ -15,6 +15,7 @@ import {
 import { analiticaForecast, type PuntoForecastComercial } from "@/lib/commercial-operacion";
 import { SUPUESTOS_FORECAST } from "@/lib/simulados";
 import { useApp } from "@/lib/store";
+import { useState } from "react";
 
 const SECCIONES = [
   { id: "sec-decisiones-v2", etiqueta: "Decisiones" },
@@ -32,6 +33,7 @@ const SERIES = [
 ];
 
 function CurvaEscenarios({ puntos, fmt }: { puntos: PuntoForecastComercial[]; fmt: (valor: number) => string }) {
+  const [activa, setActiva] = useState<"optimista" | "base" | "pesimista">("base");
   const ancho = 820;
   const alto = 300;
   const margen = { izquierda: 55, derecha: 28, arriba: 25, abajo: 38 };
@@ -49,9 +51,9 @@ function CurvaEscenarios({ puntos, fmt }: { puntos: PuntoForecastComercial[]; fm
         </div>
         <div className="flex flex-wrap gap-3">
           {SERIES.map((serie) => (
-            <span key={serie.clave} className="flex items-center gap-1.5 text-[10px] font-semibold text-tintaSuave">
+            <button type="button" onClick={() => setActiva(serie.clave)} key={serie.clave} className={`flex items-center gap-1.5 rounded-full px-2 py-1 text-[10px] font-semibold transition ${activa === serie.clave ? "bg-slate-100 text-tinta" : "text-tintaSuave"}`}>
               <span className="h-2 w-2 rounded-full" style={{ backgroundColor: serie.color }} />{serie.etiqueta}
-            </span>
+            </button>
           ))}
         </div>
       </div>
@@ -62,9 +64,10 @@ function CurvaEscenarios({ puntos, fmt }: { puntos: PuntoForecastComercial[]; fm
             <text x={margen.izquierda - 9} y={y(maximo * proporcion) + 4} textAnchor="end" fontSize="9" fill="#8d96a8">{fmt(maximo * proporcion)}</text>
           </g>
         ))}
-        {SERIES.map((serie) => <path key={serie.clave} d={ruta(serie.clave)} fill="none" stroke={serie.color} strokeWidth="3" strokeLinejoin="round" strokeLinecap="round" />)}
+        {SERIES.map((serie) => <path key={serie.clave} d={ruta(serie.clave)} fill="none" stroke={serie.color} strokeWidth={activa === serie.clave ? "4" : "2"} opacity={activa === serie.clave ? "1" : ".28"} strokeLinejoin="round" strokeLinecap="round" onClick={() => setActiva(serie.clave)} className="cursor-pointer" />)}
         {puntos.map((p) => <text key={p.semana} x={x(p.semana)} y={alto - 13} textAnchor="middle" fontSize="9" fill="#8d96a8">{p.semana}</text>)}
       </svg>
+      <p className="mt-2 rounded-xl bg-slate-50 px-3 py-2 text-[10px] text-tintaSuave"><b className="text-tinta">Escenario seleccionado: {activa}.</b> Tocá otra curva para aislarla. Esto cambia sólo la lectura visual; no transforma el supuesto mecánico en probabilidad.</p>
     </article>
   );
 }

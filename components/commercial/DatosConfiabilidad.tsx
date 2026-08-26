@@ -121,15 +121,20 @@ export function DatosConfiabilidad() {
         ) : null}
 
         <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-          {tarjetas.map((tarjeta) => (
-            <div key={tarjeta.etiqueta} className="tarjeta-calada min-w-0 p-4">
+          {tarjetas.map((tarjeta, indice) => (
+            <details key={tarjeta.etiqueta} className="group tarjeta-calada min-w-0 p-4 open:ring-1 open:ring-[#536b91]/20">
+              <summary className="cursor-pointer list-none">
               <div className="flex items-start justify-between gap-2">
                 <p className="text-[11.5px] font-semibold leading-snug text-[#606776]">{tarjeta.etiqueta}</p>
                 <span className="rounded-full bg-white/75 px-2 py-1 text-[8.5px] font-bold uppercase tracking-[0.06em] text-[#6b7280]">{tarjeta.estado}</span>
               </div>
               <p className="mt-3 text-[25px] font-extrabold leading-none tracking-[-0.025em] tabular-nums text-tinta">{tarjeta.valor}</p>
               <p className="mt-2 text-[10.5px] leading-snug text-[#7c808a]">{tarjeta.nota}</p>
-            </div>
+              <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-[#e9edf4]"><span className="block h-full rounded-full bg-[#536b91]" style={{ width: `${[88, 58, 28, analisis.pctSinProblemaDetectado ?? 0][indice]}%` }} /></div>
+              <p className="mt-3 text-[9px] font-bold uppercase tracking-wider text-[#536b91] group-open:hidden">tocar para impacto ↘</p>
+              </summary>
+              <p className="mt-3 border-t border-black/[.06] pt-3 text-[10px] leading-relaxed text-[#6b6f78]">Esta cobertura no certifica contabilidad: indica qué indicadores pueden calcularse con su población, corte y campos actuales.</p>
+            </details>
           ))}
         </div>
 
@@ -146,6 +151,8 @@ export function DatosConfiabilidad() {
               <ol className="mt-4 space-y-3">
                 {erroresConConteo.map((error, indice) => (
                   <li key={error.id}>
+                    <details className="group rounded-xl p-1 open:bg-[#fff7ef]">
+                      <summary className="cursor-pointer list-none">
                     <div className="flex items-baseline justify-between gap-3">
                       <p className="text-[11px] font-semibold text-tinta">{indice + 1}. {error.nombre}</p>
                       <p className="text-[11px] font-bold tabular-nums text-tinta">{error.cantidad}</p>
@@ -154,6 +161,9 @@ export function DatosConfiabilidad() {
                       <span className="block h-full rounded-full bg-[#c2703a]" style={{ width: `${(error.cantidad / maxError) * 100}%` }} />
                     </div>
                     <p className="mt-1 text-[9.5px] leading-snug text-[#8b8f98]">Afecta: {error.afecta.join(" · ")}</p>
+                      </summary>
+                      <p className="mt-2 border-t border-black/[.06] pt-2 text-[10px] text-[#6b6f78]">Abrí el reporte de calidad para ver las filas y el motivo exacto; esta pantalla no oculta la incidencia dentro de un promedio.</p>
+                    </details>
                   </li>
                 ))}
               </ol>

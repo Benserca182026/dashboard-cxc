@@ -1,5 +1,7 @@
 "use client";
 
+import { useState } from "react";
+
 import type { FilaComercial, PuntoTendencia } from "@/lib/commercial-operacion";
 
 export function OperacionKpi({
@@ -16,7 +18,8 @@ export function OperacionKpi({
   const color = tono === "positivo" ? "text-emerald-700" : tono === "alerta" ? "text-amber-700" : "text-tinta";
   const valorLargo = valor.length > 12;
   return (
-    <article className="min-w-0 overflow-hidden rounded-[24px] border border-white/90 bg-white/75 p-5 shadow-flotante">
+    <details className="group min-w-0 overflow-hidden rounded-[24px] border border-white/90 bg-white/75 p-5 shadow-flotante open:ring-1 open:ring-[#6677ee]/20">
+      <summary className="cursor-pointer list-none">
       <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-tintaSuave">{etiqueta}</p>
       <p
         className={`mt-2 max-w-full font-bold leading-none tabular-nums tracking-tight ${
@@ -25,8 +28,12 @@ export function OperacionKpi({
       >
         {valor}
       </p>
+      <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-[#e9edf4]"><span className={`block h-full rounded-full ${tono === "positivo" ? "bg-emerald-500" : tono === "alerta" ? "bg-amber-500" : "bg-[#6677ee]"}`} style={{ width: "68%" }} /></div>
       <p className="mt-2 text-[11px] leading-snug text-tintaSuave">{nota}</p>
-    </article>
+      <p className="mt-3 text-[9px] font-bold uppercase tracking-wider text-[#6677ee] group-open:hidden">ver alcance ↘</p>
+      </summary>
+      <p className="mt-3 border-t border-slate-100 pt-3 text-[10.5px] leading-relaxed text-tintaSuave">Este indicador conserva su cálculo actual. La barra es una señal visual de lectura, no una escala financiera ni una meta inventada.</p>
+    </details>
   );
 }
 
@@ -45,6 +52,7 @@ export function OperacionRanking({
   vacio: string;
   maxFilas?: number;
 }) {
+  const [seleccionado, setSeleccionado] = useState<string | null>(null);
   const visibles = filas.slice(0, maxFilas);
   return (
     <article className="rounded-[28px] border border-white/90 bg-white/65 p-5 shadow-flotante">
@@ -66,7 +74,8 @@ export function OperacionRanking({
       ) : (
         <ol className="mt-5 space-y-3">
           {visibles.map((fila, indice) => (
-            <li key={fila.id} className="grid grid-cols-[1.5rem_minmax(0,1fr)_auto] items-center gap-2.5">
+            <li key={fila.id}>
+            <button type="button" onClick={() => setSeleccionado(seleccionado === fila.id ? null : fila.id)} className={`grid w-full grid-cols-[1.5rem_minmax(0,1fr)_auto] items-center gap-2.5 rounded-xl p-1.5 text-left transition ${seleccionado === fila.id ? "bg-[#edf1f8]" : "hover:bg-slate-50"}`}>
               <span className="grid h-6 w-6 place-items-center rounded-full bg-[#17191e] text-[9px] font-bold text-white">
                 {indice + 1}
               </span>
@@ -86,6 +95,8 @@ export function OperacionRanking({
                   <span className="shrink-0 tabular-nums">{fila.pct.toFixed(1)}%</span>
                 </div>
               </div>
+            </button>
+            {seleccionado === fila.id && <p className="ml-9 mt-1 rounded-xl bg-slate-50 px-3 py-2 text-[10px] leading-relaxed text-tintaSuave"><b className="text-tinta">{fila.etiqueta}</b> representa {fila.pct.toFixed(1)}% de la población de este ranking. {fila.detalle ?? "Tocá otra fila para comparar."}</p>}
             </li>
           ))}
         </ol>
@@ -176,16 +187,19 @@ export function OperacionPuente({
 
 export function OperacionControl({ titulo, items }: { titulo: string; items: string[] }) {
   return (
-    <aside className="rounded-[24px] border border-amber-200 bg-amber-50/85 p-5 text-amber-950">
+    <details className="group rounded-[24px] border border-amber-200 bg-amber-50/85 p-5 text-amber-950">
+      <summary className="cursor-pointer list-none">
       <div className="flex items-start gap-3">
         <span aria-hidden className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-amber-200 text-sm">!</span>
         <div>
           <h3 className="text-sm font-bold">{titulo}</h3>
-          <ul className="mt-2 space-y-1.5 text-[11px] leading-relaxed">
-            {items.map((item) => <li key={item}>• {item}</li>)}
-          </ul>
+          <p className="mt-1 text-[10px] opacity-70 group-open:hidden">tocar para ver límites y datos faltantes ↘</p>
         </div>
       </div>
-    </aside>
+      </summary>
+      <ul className="mt-3 space-y-1.5 border-t border-amber-200/70 pt-3 text-[11px] leading-relaxed">
+        {items.map((item) => <li key={item}>• {item}</li>)}
+      </ul>
+    </details>
   );
 }
