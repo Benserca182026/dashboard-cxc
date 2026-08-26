@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 
-import type { FilaComercial, PuntoTendencia } from "@/lib/commercial-operacion";
+import type { FilaComercial, FilaInventarioComercial, PuntoTendencia } from "@/lib/commercial-operacion";
 
 export function OperacionKpi({
   etiqueta,
@@ -101,6 +101,97 @@ export function OperacionRanking({
           ))}
         </ol>
       )}
+    </article>
+  );
+}
+
+const COLORES_INVENTARIO = ["#6677ee", "#8f7cf6", "#45a7a0", "#f1a54c", "#d66f9c", "#a8b2c5"];
+
+/** Vista estrictamente sobre flujo observado: los montos representan salidas
+ * valorizadas, nunca existencia ni rotación de inventario. */
+export function InventarioMovimientoVisual({
+  filas,
+  total,
+  formatear,
+}: {
+  filas: FilaInventarioComercial[];
+  total: number;
+  formatear: (valor: number) => string;
+}) {
+  const [seleccionado, setSeleccionado] = useState<string | "resto" | null>(null);
+  const principales = filas.slice(0, 5);
+  const valorPrincipal = principales.reduce((suma, fila) => suma + fila.valor, 0);
+  const pctPrincipal = principales.reduce((suma, fila) => suma + fila.pct, 0);
+  const resto = Math.max(0, total - valorPrincipal);
+  const pctResto = Math.max(0, 100 - pctPrincipal);
+  const segmentos = [
+    ...principales.map((fila, indice) => ({ id: fila.id, etiqueta: fila.etiqueta, valor: fila.valor, pct: fila.pct, color: COLORES_INVENTARIO[indice], detalle: fila.detalle })),
+    ...(resto > 0 ? [{ id: "resto" as const, etiqueta: "Resto de productos", valor: resto, pct: pctResto, color: COLORES_INVENTARIO[5], detalle: "Productos fuera del Top 5" }] : []),
+  ];
+  let inicio = 0;
+  const gradiente = segmentos.map((segmento) => {
+    const fin = inicio + segmento.pct;
+    const regla = `${segmento.color} ${inicio}% ${fin}%`;
+    inicio = fin;
+    return regla;
+  }).join(", ");
+  const activo = segmentos.find((segmento) => segmento.id === seleccionado);
+  const maximo = Math.max(1, ...filas.slice(0, 8).map((fila) => fila.valor));
+
+  if (!filas.length || total <= 0) return null;
+
+  return (
+    <article className="rounded-[28px] border border-white/90 bg-white/65 p-5 shadow-flotante">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h3 className="text-sm font-bold text-tinta">Dónde se concentra la salida valorizada</h3>
+          <p className="mt-1 text-[11px] text-tintaSuave">Monto observado por producto · tocá una porción o una barra para ver el detalle</p>
+        </div>
+        <span className="rounded-full bg-[#edf1f8] px-3 py-1 text-[10px] font-bold tabular-nums text-[#536b91]">Total: {formatear(total)}</span>
+      </div>
+
+      <div className="mt-5 grid gap-6 lg:grid-cols-[minmax(210px,.75fr)_minmax(0,1.25fr)] lg:items-center">
+        <div className="mx-auto w-full max-w-[250px]">
+          <button
+            type="button"
+            aria-label="Distribución de salidas valorizadas por producto"
+            onClick={() => setSeleccionado(null)}
+            className="relative mx-auto grid h-48 w-48 place-items-center rounded-full transition hover:scale-[1.02] focus:outline-none focus:ring-2 focus:ring-[#6677ee]/40"
+            style={{ background: `conic-gradient(${gradiente})` }}
+          >
+            <span className="grid h-[116px] w-[116px] place-items-center rounded-full bg-white text-center shadow-sm">
+              <span>
+                <span className="block text-[9px] font-bold uppercase tracking-wider text-tintaSuave">Salida observada</span>
+                <span className="mt-1 block text-[17px] font-bold tabular-nums text-tinta">{formatear(total)}</span>
+              </span>
+            </span>
+          </button>
+          <div className="mt-4 grid grid-cols-2 gap-x-3 gap-y-2">
+            {segmentos.map((segmento) => (
+              <button key={segmento.id} type="button" onClick={() => setSeleccionado(segmento.id)} className={`flex min-w-0 items-center gap-1.5 rounded-lg px-1 py-1 text-left transition ${seleccionado === segmento.id ? "bg-[#edf1f8]" : "hover:bg-slate-50"}`}>
+                <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: segmento.color }} />
+                <span className="truncate text-[9px] font-medium text-tintaSuave" title={segmento.etiqueta}>{segmento.etiqueta}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="space-y-3">
+          {filas.slice(0, 8).map((fila, indice) => (
+            <button key={fila.id} type="button" onClick={() => setSeleccionado(fila.id)} className={`w-full rounded-xl p-2 text-left transition ${seleccionado === fila.id ? "bg-[#edf1f8]" : "hover:bg-slate-50"}`}>
+              <div className="flex items-end justify-between gap-3">
+                <p className="min-w-0 truncate text-[10.5px] font-semibold text-tinta" title={fila.etiqueta}>{fila.etiqueta}</p>
+                <p className="shrink-0 text-[10.5px] font-bold tabular-nums text-tinta">{formatear(fila.valor)}</p>
+              </div>
+              <div className="mt-1.5 h-3 overflow-hidden rounded-full bg-[#e9edf4]">
+                <div className="h-full rounded-full transition-all" style={{ width: `${Math.max(2, (fila.valor / maximo) * 100)}%`, background: COLORES_INVENTARIO[indice % 5] }} />
+              </div>
+              <div className="mt-1 flex justify-between text-[9px] text-tintaSuave"><span>{fila.detalle}</span><span>{fila.pct.toFixed(1)}%</span></div>
+            </button>
+          ))}
+        </div>
+      </div>
+      {activo ? <p className="mt-4 rounded-xl bg-[#f4f6fb] px-3 py-2 text-[10px] text-tintaSuave"><b className="text-tinta">{activo.etiqueta}</b> · {formatear(activo.valor)} · {activo.pct.toFixed(1)}% de la salida valorizada. {activo.detalle}</p> : null}
     </article>
   );
 }
