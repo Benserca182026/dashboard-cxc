@@ -162,7 +162,7 @@ export const AGENTES_COMERCIALES_VENTAS: Agente[] = [
       if (!a.vinculoFacturaDisponible) faltantes.push("vínculo venta↔factura");
       return {
         estado: "hallazgo",
-        texto: `El snapshot Odoo concilia un margen de ${margen.margenPct.toFixed(2)}% sobre ${margen.coberturaIngresoPct.toFixed(2)}% del ingreso vinculado. Es margen sobre costo estándar histórico, no costo real FIFO/AVCO. Todavía faltan ${faltantes.join(", ")}.`,
+        texto: `El snapshot Odoo concilia un margen de ${margen.margenPct.toFixed(2)}% sobre ${margen.coberturaIngresoPct.toFixed(2)}% del ingreso vinculado. “Costo estándar histórico” significa el valor que Odoo dejó registrado en la capa de inventario cuando salió cada unidad: se suman esos valores para leer el margen de las ventas conciliadas. Es una referencia registrada por Odoo; no es el precio real de compra de cada lote ni un costo FIFO/AVCO. Todavía faltan ${faltantes.join(", ")}.`,
         evidencia: evidencia(
           "account.move.line + sale.order.line + stock.move + stock.valuation.layer",
           "sólo líneas con factura/nota publicada y cantidad facturada neta = cantidad entregada neta",
@@ -170,7 +170,7 @@ export const AGENTES_COMERCIALES_VENTAS: Agente[] = [
           "−Σ balance − (−Σ SVL.value); devoluciones y notas de crédito conservan signo",
           [
             { nombre: "ingreso neto conciliado", valor: margen.ingresoNetoSinIvaGTQ, unidad: "GTQ" },
-            { nombre: "costo estándar histórico", valor: margen.costoHistoricoEstandarGTQ, unidad: "GTQ" },
+            { nombre: "costo registrado por Odoo al salir el inventario", valor: margen.costoHistoricoEstandarGTQ, unidad: "GTQ" },
             { nombre: "margen bruto", valor: margen.margenBrutoGTQ, unidad: "GTQ" },
             { nombre: "margen", valor: margen.margenPct, unidad: "%" },
             { nombre: "líneas conciliadas", valor: costoHistoricoOdoo.cobertura.lineasConciliadas },

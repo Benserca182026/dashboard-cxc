@@ -122,7 +122,7 @@ export default function PaginaVentas() {
             subtitulo={`Snapshot ${costoHistoricoOdoo.snapshot.finUtc.slice(0, 16).replace("T", " ")} UTC · ${costoHistoricoOdoo.cobertura.lineasConciliadas.toLocaleString("es-GT")} líneas con cantidad facturada neta = cantidad entregada neta.`}
             pasos={[
               { etiqueta: "Ingreso neto sin IVA", valor: fmt(costoHistorico.ingresoNetoSinIvaGTQ), nota: "−Σ balance de facturas publicadas y notas de crédito vinculadas" },
-              { etiqueta: "Costo histórico estándar", valor: fmt(costoHistorico.costoHistoricoEstandarGTQ), nota: "−Σ stock.valuation.layer.value por movimiento de entrega/devolución", tono: "alerta" },
+              { etiqueta: "Costo registrado por Odoo", valor: fmt(costoHistorico.costoHistoricoEstandarGTQ), nota: "valor estándar guardado en cada salida; referencia histórica, no costo real FIFO/AVCO", tono: "alerta" },
               { etiqueta: "Margen bruto", valor: fmt(costoHistorico.margenBrutoGTQ), nota: "ingreso conciliado − valoración histórica estándar", tono: "positivo" },
               { etiqueta: "Margen sobre población", valor: `${costoHistorico.margenPct.toFixed(2)}%`, nota: `cobertura ${costoHistorico.coberturaIngresoPct.toFixed(2)}% del ingreso vinculado`, tono: "positivo" },
             ]}
@@ -141,7 +141,7 @@ export default function PaginaVentas() {
             items={[
               `El ingreso neto ya sale de ${costoHistoricoOdoo.cobertura.facturasPublicadas.toLocaleString("es-GT")} facturas y ${costoHistoricoOdoo.cobertura.notasCreditoPublicadas.toLocaleString("es-GT")} notas de crédito publicadas, usando account.move.line.balance en GTQ.`,
               `La cadena por ID está demostrada: ${costoHistoricoOdoo.cobertura.movimientosTerminados.toLocaleString("es-GT")} movimientos terminados y la misma cantidad de capas; diferencia de cantidad y valor = 0.`,
-              "El costo sigue siendo estándar histórico: las cuatro categorías están configuradas como standard + manual_periodic. No debe llamarse costo real FIFO/AVCO ni margen contable definitivo.",
+              "El costo sigue siendo estándar histórico: es el valor que Odoo guardó al salir el inventario, no el precio real de compra de cada lote. Las cuatro categorías están configuradas como standard + manual_periodic; no debe llamarse costo real FIFO/AVCO ni margen contable definitivo.",
               `${costoHistoricoOdoo.universoValoracion.capasSinMovimiento} ajustes manuales de valor, por ${fmt(costoHistoricoOdoo.universoValoracion.ajustesManualesSinMovimientoValorGTQ)}, no tienen stock_move_id y no se reparten entre pedidos.`,
               "El XLSX original trae la columna Comercial, pero el importador actual no la guarda; por eso el Top vendedores sigue bloqueado.",
             ]}
