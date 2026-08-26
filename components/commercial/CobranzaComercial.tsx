@@ -17,61 +17,57 @@ export function AgentesComercialesCobranza({
   fmt: (valor: number) => string;
 }) {
   const tonos = {
-    accion: "border-[#16181d] bg-[#16181d] text-white",
-    atencion: "border-amber-200 bg-amber-50 text-amber-950",
-    control: "border-white/90 bg-white/75 text-tinta",
+    accion: { barra: "bg-[#536b91]", acento: "text-[#536b91]", fondo: "bg-[#eef2f9]" },
+    atencion: { barra: "bg-[#c2703a]", acento: "text-[#b45f2c]", fondo: "bg-[#fdf3ed]" },
+    control: { barra: "bg-slate-400", acento: "text-slate-600", fondo: "bg-slate-50" },
   } as const;
 
   return (
-    <section className="rounded-tarjeta border border-white/90 bg-[linear-gradient(135deg,rgba(255,255,255,.86),rgba(225,234,249,.76))] p-5 shadow-flotante sm:p-6">
-      <div className="flex flex-wrap items-end justify-between gap-3">
+    <section className="border-y border-slate-200/80 bg-white/45 px-1 py-4 sm:px-2">
+      <div className="flex flex-wrap items-end justify-between gap-3 px-3">
         <div>
           <p className="text-[10px] font-bold uppercase tracking-[.13em] text-etapa">
-            Agentes de decisión comercial
+            Decisiones de cobranza
           </p>
-          <h2 className="mt-1 text-xl font-bold tracking-[-.025em] text-tinta">
-            Preguntas que terminan en una acción
+          <h2 className="mt-1 text-lg font-bold tracking-[-.025em] text-tinta">
+            Lo que requiere gestión primero
           </h2>
         </div>
-        <p className="max-w-md text-right text-[11px] leading-relaxed text-tintaSuave">
-          Hallazgo, impacto monetario y siguiente paso. Los controles técnicos permanecen como soporte abajo.
-        </p>
+        <p className="text-right text-[10px] text-tintaSuave">cada señal abre su evidencia</p>
       </div>
 
-      <div className={`mt-5 grid gap-3 md:grid-cols-2 ${agentes.length === 3 ? "xl:grid-cols-3" : "xl:grid-cols-4"}`}>
+      <div className={`mt-4 grid gap-px overflow-hidden rounded-[22px] border border-slate-200 bg-slate-200 md:grid-cols-2 ${agentes.length === 3 ? "xl:grid-cols-3" : "xl:grid-cols-4"}`}>
         {agentes.map((agente, indice) => (
           <details
             key={agente.id}
-            className={`group entrada-suave min-h-[150px] rounded-[18px] border p-4 shadow-flotante ${tonos[agente.estado]}`}
+            className="group min-w-0 bg-white p-4 transition hover:bg-slate-50 open:bg-slate-50"
             style={{ animationDelay: `${indice * 70}ms` }}
           >
             <summary className="cursor-pointer list-none">
-            <div className="flex items-center justify-between gap-3">
-              <span className="rounded-pastilla border border-current/15 px-2.5 py-1 text-[9px] font-bold uppercase tracking-[.1em] opacity-75">
-                {agente.nombre}
-              </span>
-              <span aria-hidden className="text-lg opacity-55">
-                {agente.estado === "accion" ? "→" : agente.estado === "atencion" ? "△" : "✓"}
-              </span>
-            </div>
-            {agente.visual ? (() => {
-              const pct = agente.visual.total > 0 ? Math.max(0, Math.min(100, (agente.visual.valor / agente.visual.total) * 100)) : 0;
-              const color = agente.visual.tono === "rojo" ? "#f38b63" : agente.visual.tono === "ambar" ? "#d6a13c" : "#9bb0df";
-              return <div className="mt-4 flex items-center gap-3 rounded-2xl border border-current/10 bg-white/10 p-3"><svg viewBox="0 0 44 44" className="h-14 w-14 shrink-0 -rotate-90"><circle cx="22" cy="22" r="17" fill="none" stroke="currentColor" opacity=".15" strokeWidth="5"/><circle cx="22" cy="22" r="17" fill="none" stroke={color} strokeLinecap="round" strokeWidth="5" strokeDasharray={`${pct * 1.068} 107`}/></svg><div><p className="text-xl font-extrabold tabular-nums">{pct.toFixed(0)}%</p><p className="text-[9px] font-bold uppercase tracking-wider opacity-65">{agente.visual.etiqueta}</p></div></div>;
-            })() : null}
-            <p className="mt-3 text-[9px] font-bold uppercase tracking-wider opacity-60 group-open:hidden">tocar para evidencia ↘</p>
+              {(() => {
+                const visual = agente.visual;
+                const pct = visual && visual.total > 0 ? Math.max(0, Math.min(100, (visual.valor / visual.total) * 100)) : null;
+                const tono = tonos[agente.estado];
+                return <>
+                  <div className="flex items-center justify-between gap-3">
+                    <p className={`text-[10px] font-bold uppercase tracking-[.12em] ${tono.acento}`}>{agente.nombre}</p>
+                    <span className={`grid h-7 w-7 place-items-center rounded-full ${tono.fondo} text-[12px] ${tono.acento}`} aria-hidden>{agente.estado === "accion" ? "→" : agente.estado === "atencion" ? "!" : "?"}</span>
+                  </div>
+                  <p className="mt-4 text-2xl font-extrabold tracking-tight tabular-nums text-tinta">{visual ? `${pct?.toFixed(0)}%` : "—"}</p>
+                  <p className="mt-1 h-3 text-[9px] font-bold uppercase tracking-wider text-tintaSuave">{visual?.etiqueta ?? "dato no publicable"}</p>
+                  <div className="mt-3 h-2 overflow-hidden rounded-full bg-slate-100"><span className={`block h-full rounded-full ${tono.barra}`} style={{ width: `${pct ?? 0}%` }} /></div>
+                  <p className="mt-3 text-[10px] font-semibold leading-snug text-tinta">{agente.accion}</p>
+                  <p className="mt-3 text-[9px] font-bold uppercase tracking-wider text-[#536b91] group-open:hidden">ver evidencia ↘</p>
+                </>;
+              })()}
             </summary>
-            <p className="mt-3 text-[12px] font-semibold leading-snug opacity-70">{agente.pregunta}</p>
-            <p className="mt-2 text-[12px] leading-snug">{agente.respuesta}</p>
-            {agente.impacto != null && (
-              <div className="mt-4 border-t border-current/10 pt-3">
-                <p className="text-[9px] font-bold uppercase tracking-[.1em] opacity-55">Impacto observado</p>
-                <p className="mt-0.5 text-lg font-bold tabular-nums">{fmt(agente.impacto)}</p>
+            <div className="mt-4 border-t border-slate-200 pt-3 text-[11px] leading-relaxed text-tintaSuave">
+              <p><b className="text-tinta">Pregunta:</b> {agente.pregunta}</p>
+              <p className="mt-1">{agente.respuesta}</p>
+              {agente.impacto != null && (
+                <p className="mt-2 font-bold tabular-nums text-tinta">Impacto observado: {fmt(agente.impacto)}</p>
+              )}
               </div>
-            )}
-            <p className="mt-3 text-[11px] leading-relaxed opacity-75">
-              <b>Siguiente paso:</b> {agente.accion}
-            </p>
           </details>
         ))}
       </div>
