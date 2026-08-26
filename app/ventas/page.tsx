@@ -42,6 +42,10 @@ export default function PaginaVentas() {
   const etiquetaComparacion = analitica.diaCorteComparacion
     ? `MTD comparable al día ${analitica.diaCorteComparacion}`
     : "MTD comparable";
+  const anioTendencia = analitica.tendencia.at(-1)?.periodo.slice(0, 4) ?? null;
+  const totalAnualTendencia = anioTendencia
+    ? analitica.tendencia.filter((punto) => punto.periodo.startsWith(anioTendencia)).reduce((suma, punto) => suma + punto.valor, 0)
+    : 0;
 
   if (cargando) return <SkeletonPagina />;
 
@@ -105,6 +109,8 @@ export default function PaginaVentas() {
             variacion={analitica.variacionUltimoPeriodo}
             etiquetaComparacion={etiquetaComparacion}
             notaCorte={`última venta ${analitica.hasta ?? "sin fecha"}`}
+            totalAnual={totalAnualTendencia}
+            anio={anioTendencia}
           />
         </LienzoConAgentes>
       </section>

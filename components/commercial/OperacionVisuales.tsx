@@ -111,12 +111,16 @@ export function OperacionTendencia({
   variacion,
   etiquetaComparacion,
   notaCorte,
+  totalAnual,
+  anio,
 }: {
   puntos: PuntoTendencia[];
   formatear: (valor: number) => string;
   variacion: number | null;
   etiquetaComparacion: string;
   notaCorte: string;
+  totalAnual: number;
+  anio: string | null;
 }) {
   const visibles = puntos.slice(-12);
   const maximo = Math.max(1, ...visibles.map((p) => p.valor));
@@ -127,11 +131,14 @@ export function OperacionTendencia({
           <h3 className="text-sm font-bold text-tinta">Tendencia de venta registrada</h3>
           <p className="mt-1 text-[11px] text-tintaSuave">Total Odoo por mes · no usa precio de lista · {notaCorte}</p>
         </div>
-        <span className={`rounded-full px-3 py-1 text-[10px] font-bold ${
-          variacion === null ? "bg-slate-100 text-slate-500" : variacion >= 0 ? "bg-emerald-100 text-emerald-700" : "bg-red-100 text-red-700"
-        }`}>
-          {variacion === null ? "Sin comparación" : `${variacion >= 0 ? "▲" : "▼"} ${Math.abs(variacion).toFixed(1)}% · ${etiquetaComparacion}`}
-        </span>
+        <div className="flex flex-wrap justify-end gap-2">
+          <span className="rounded-full bg-[#edf1f8] px-3 py-1 text-[10px] font-bold tabular-nums text-[#536b91]">Total {anio ?? "del año"}: {formatear(totalAnual)}</span>
+          <span className={`rounded-full px-3 py-1 text-[10px] font-bold ${
+            variacion === null ? "bg-slate-100 text-slate-500" : variacion >= 0 ? "bg-emerald-100 text-emerald-700" : "bg-red-100 text-red-700"
+          }`}>
+            {variacion === null ? "Sin comparación" : `${variacion >= 0 ? "▲" : "▼"} ${Math.abs(variacion).toFixed(1)}% · ${etiquetaComparacion}`}
+          </span>
+        </div>
       </div>
       {visibles.length === 0 ? (
         <p className="mt-5 text-xs text-tintaSuave">No hay pedidos con total de referencia y fecha para construir la tendencia.</p>
