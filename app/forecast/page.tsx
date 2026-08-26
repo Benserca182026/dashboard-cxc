@@ -6,6 +6,7 @@ import { FilaAgentes } from "@/components/Agentes";
 import { LienzoConAgentes } from "@/components/Argumento";
 import { DecisionPanelV2 } from "@/components/DecisionPanelV2";
 import { AGENTES_COMERCIALES_FORECAST } from "@/components/commercial/OperacionAgentes";
+import { PanelAgentesVisuales } from "@/components/commercial/PanelAgentesVisuales";
 import {
   OperacionControl,
   OperacionKpi,
@@ -86,6 +87,7 @@ export default function PaginaForecast() {
     <div className="space-y-6">
       <Encabezado titulo="Forecast comercial" secciones={SECCIONES} dataset={dataset} modulo="forecast" />
       <DecisionPanelV2 modulo="forecast" />
+      <PanelAgentesVisuales dataset={dataset} fechaCorte={fechaCorte} agentes={AGENTES_COMERCIALES_FORECAST} fmt={fmt} />
 
       <section id="sec-puente" className="scroll-mt-24">
         <LienzoConAgentes titulo="Brecha actual y horizonte" agentes={agentes}>

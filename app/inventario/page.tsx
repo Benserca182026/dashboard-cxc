@@ -6,6 +6,7 @@ import { FilaAgentes } from "@/components/Agentes";
 import { LienzoConAgentes } from "@/components/Argumento";
 import { DecisionPanelV2 } from "@/components/DecisionPanelV2";
 import { AGENTES_COMERCIALES_INVENTARIO } from "@/components/commercial/OperacionAgentes";
+import { PanelAgentesVisuales } from "@/components/commercial/PanelAgentesVisuales";
 import {
   OperacionControl,
   OperacionKpi,
@@ -36,6 +37,7 @@ export default function PaginaInventario() {
     <div className="space-y-6">
       <Encabezado titulo="Inventario" secciones={SECCIONES} dataset={dataset} modulo="inventario" />
       <DecisionPanelV2 modulo="inventario" modoAuditable />
+      <PanelAgentesVisuales dataset={dataset} fechaCorte={fechaCorte} agentes={AGENTES_COMERCIALES_INVENTARIO} fmt={fmt} />
 
       <section className="rounded-[20px] border border-white/80 bg-white/60 px-4 py-3 shadow-flotante">
         <p className="text-[10px] font-bold uppercase tracking-[0.1em] text-[#6876d8]">Cortes que conviven sin mezclarse</p>

@@ -6,6 +6,7 @@ import { FilaAgentes } from "@/components/Agentes";
 import { LienzoConAgentes } from "@/components/Argumento";
 import { DecisionPanelV2 } from "@/components/DecisionPanelV2";
 import { AGENTES_COMERCIALES_VENTAS } from "@/components/commercial/OperacionAgentes";
+import { PanelAgentesVisuales } from "@/components/commercial/PanelAgentesVisuales";
 import {
   OperacionControl,
   OperacionKpi,
@@ -52,6 +53,7 @@ export default function PaginaVentas() {
     <div className="space-y-6">
       <Encabezado titulo="Ventas" secciones={SECCIONES} dataset={dataset} modulo="ventas" />
       <DecisionPanelV2 modulo="ventas" />
+      <PanelAgentesVisuales dataset={dataset} fechaCorte={fechaCorte} agentes={AGENTES_COMERCIALES_VENTAS} fmt={fmt} />
 
       <section id="sec-pulso" className="scroll-mt-24">
         <LienzoConAgentes titulo="Pulso comercial del período" agentes={agentes}>

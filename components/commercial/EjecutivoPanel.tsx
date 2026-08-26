@@ -324,9 +324,15 @@ export function EjecutivoPanel() {
                       <span className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-white/10 text-[11px]">{agente.glifo}</span>
                       <p className="text-[10px] font-semibold uppercase tracking-[0.06em] text-white/55">{agente.nombre}</p>
                     </div>
-                    <p className="mt-2 text-[11.5px] font-semibold leading-snug text-white">{agente.pregunta}</p>
+                    <div className="mt-3 h-14 rounded-xl bg-white/[.07] p-2">
+                      {agente.clave === "oportunidad" ? <div className="flex h-full items-end gap-1.5"><span className="h-[28%] flex-1 rounded-t bg-[#9bb0df]"/><span className="h-[48%] flex-1 rounded-t bg-[#7590c8]"/><span className="h-[76%] flex-1 rounded-t bg-[#536b91]"/><span className="h-full flex-1 rounded-t bg-[#c2703a]"/></div> : null}
+                      {agente.clave === "cambio" ? <div className="grid h-full grid-cols-4 gap-1"><span className="rounded bg-white/15"/><span className="rounded bg-white/15"/><span className="rounded bg-white/15"/><span className="grid place-items-center rounded border border-dashed border-white/30 text-xs text-white/60">?</span></div> : null}
+                      {agente.clave === "accion" ? <div className="flex h-full items-center gap-1"><span className="grid h-6 w-6 place-items-center rounded-full bg-[#9bb0df] text-[9px] text-[#16181d]">1</span><i className="h-px flex-1 bg-white/30"/><span className="grid h-6 w-6 place-items-center rounded-full bg-white/20 text-[9px]">2</span><i className="h-px flex-1 bg-white/30"/><span className="grid h-6 w-6 place-items-center rounded-full bg-white/20 text-[9px]">3</span></div> : null}
+                      {agente.clave === "control" ? <div className="grid h-full grid-cols-4 items-end gap-1"><span className="h-[82%] rounded-t bg-emerald-400"/><span className="h-[55%] rounded-t bg-amber-300"/><span className="h-[36%] rounded-t bg-amber-300"/><span className="h-[18%] rounded-t bg-slate-400"/></div> : null}
+                    </div>
+                    <p className="mt-2 text-[9px] font-bold uppercase tracking-wider text-white/55 group-open:hidden">tocar evidencia ↘</p>
                   </summary>
-                  <p className="mt-2 text-[10.5px] leading-relaxed text-white/70">{agente.respuesta}</p>
+                  <p className="mt-2 text-[10.5px] leading-relaxed text-white/70"><b>{agente.pregunta}</b><br/>{agente.respuesta}</p>
                 </details>
               ))}
             </div>

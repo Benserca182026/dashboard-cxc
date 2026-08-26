@@ -12,6 +12,7 @@ export interface AgenteComercial {
   accion: string;
   impacto?: number;
   estado: EstadoAgenteComercial;
+  visual?: { etiqueta: string; valor: number; total: number; tono?: "azul" | "ambar" | "rojo" };
 }
 
 export interface ClienteVencido {
@@ -265,7 +266,7 @@ export function analizarAgingComercial(
   const agentes: AgenteComercial[] = [
     {
       id: "prioridad",
-      nombre: "Prioridad",
+      nombre: "Cobro hoy",
       pregunta: "¿A quién debemos gestionar primero?",
       respuesta: lider
         ? `${lider.nombre}: ${lider.diasMax} días de atraso${lider.enDisputa ? " y disputa activa" : ""}.`
@@ -277,6 +278,7 @@ export function analizarAgingComercial(
           : "Asignar responsable y registrar el próximo contacto."
         : "Mantener vigilancia sobre el siguiente corte.",
       estado: lider ? "accion" : "control",
+      visual: lider ? { etiqueta: "del vencido", valor: lider.saldo, total: vencido, tono: "rojo" } : undefined,
     },
     {
       id: "concentracion",
@@ -289,10 +291,11 @@ export function analizarAgingComercial(
       impacto: vencido,
       accion: "Trabajar el Pareto antes de repartir esfuerzos sobre toda la cartera.",
       estado: clientesParaOchentaPct > 0 ? "atencion" : "control",
+      visual: clientesParaOchentaPct > 0 ? { etiqueta: "clientes para 80%", valor: clientesParaOchentaPct, total: clientesOrdenados.length, tono: "ambar" } : undefined,
     },
     {
       id: "recuperacion",
-      nombre: "Plan de recuperación",
+      nombre: "Monto gestionable",
       pregunta: "¿Qué monto puede ponerse en gestión primero?",
       respuesta:
         gestionables.length > 0
@@ -301,6 +304,7 @@ export function analizarAgingComercial(
       impacto: saldoGestionable,
       accion: "Asignar dueño, fecha y resultado esperado a cada cuenta del Top 5.",
       estado: gestionables.length > 0 ? "accion" : "control",
+      visual: gestionables.length > 0 ? { etiqueta: "vencido no disputado", valor: saldoGestionable, total: vencido, tono: "azul" } : undefined,
     },
   ];
 
@@ -360,7 +364,7 @@ export function analizarPrioritariosComercial(
   const agentes: AgenteComercial[] = [
     {
       id: "impacto",
-      nombre: "Impacto",
+      nombre: "Impacto × urgencia",
       pregunta: "¿Qué cuenta combina mayor impacto y urgencia?",
       respuesta: lider
         ? `${lider.cliente} encabeza la worklist con score simulado ${lider.score}.`
@@ -368,10 +372,11 @@ export function analizarPrioritariosComercial(
       impacto: lider?.saldo,
       accion: lider ? lider.proximaAccion : "Mantener vigilancia del próximo corte.",
       estado: lider ? "accion" : "control",
+      visual: lider ? { etiqueta: "saldo de la worklist", valor: lider.saldo, total: saldoTotal, tono: "rojo" } : undefined,
     },
     {
       id: "pareto",
-      nombre: "Foco",
+      nombre: "Concentración",
       pregunta: "¿Dónde se concentra el saldo de la worklist?",
       respuesta:
         paraOchenta > 0
@@ -380,19 +385,21 @@ export function analizarPrioritariosComercial(
       impacto: saldoTotal,
       accion: "Revisar primero las cuentas que forman el 80%, no solo el score aislado.",
       estado: paraOchenta > 0 ? "atencion" : "control",
+      visual: paraOchenta > 0 ? { etiqueta: "cuentas para 80%", valor: paraOchenta, total: filas.length, tono: "ambar" } : undefined,
     },
     {
       id: "mora",
-      nombre: "Mora crítica",
+      nombre: "Escalamiento 90+",
       pregunta: "¿Cuánto está por encima de 90 días?",
       respuesta: `${moraCritica.length} cuenta(s) superan 90 días de atraso máximo.`,
       impacto: saldoCritico,
       accion: "Separar disputa, escalamiento y cobro normal antes del contacto.",
       estado: moraCritica.length > 0 ? "atencion" : "control",
+      visual: moraCritica.length > 0 ? { etiqueta: "saldo en 90+", valor: saldoCritico, total: saldoTotal, tono: "rojo" } : undefined,
     },
     {
       id: "accion",
-      nombre: "Próxima acción",
+      nombre: "Cobertura de dueño",
       pregunta: "¿Qué prioridad todavía no tiene dueño registrado?",
       respuesta: primeroSinResponsable
         ? `${primeroSinResponsable.cliente} es la primera cuenta sin responsable registrado.`
@@ -402,6 +409,7 @@ export function analizarPrioritariosComercial(
         ? `Asignar dueño y ejecutar: ${primeroSinResponsable.proximaAccion}.`
         : "Revisar fechas de las próximas acciones.",
       estado: primeroSinResponsable ? "accion" : "control",
+      visual: { etiqueta: "cuentas con dueño", valor: filas.length - sinResponsable.length, total: filas.length, tono: "azul" },
     },
   ];
 
@@ -534,10 +542,11 @@ export function analizarSeguimientoComercial(
     moraSinAccion.reduce((suma, fila) => suma + fila.saldo, 0)
   );
 
+  const saldoVencidoSeguimiento = redondear2(vencidos.reduce((suma, fila) => suma + fila.saldo, 0));
   const agentes: AgenteComercial[] = [
     {
       id: "siguiente",
-      nombre: "Siguiente contacto",
+      nombre: "Cola sin gestión",
       pregunta: "¿A quién debe contactar cobranza ahora?",
       respuesta: primeroSinGestion
         ? `${primeroSinGestion.cliente} es la cuenta vencida de mayor prioridad sin gestión.`
@@ -547,32 +556,36 @@ export function analizarSeguimientoComercial(
         ? primeroSinGestion.proximaAccion
         : "Continuar con las próximas acciones ya registradas.",
       estado: primeroSinGestion ? "accion" : "control",
+      visual: primeroSinGestion ? { etiqueta: "saldo sin gestión", valor: primeroSinGestion.saldo, total: saldoVencidoSeguimiento, tono: "rojo" } : undefined,
     },
     {
       id: "promesas",
-      nombre: "Promesas",
+      nombre: "Embudo de promesas",
       pregunta: "¿Qué compromisos están vencidos o próximos?",
       respuesta: `${vencidasSinCierre.length} promesa(s) con fecha vencida sin cierre registrado y ${proximas.length} con fecha dentro de 7 días.`,
       accion: "Verificar primero las fechas vencidas; el dato no permite llamarlas incumplidas sin confirmar el resultado.",
       estado: vencidasSinCierre.length > 0 ? "atencion" : "control",
+      visual: { etiqueta: "promesas con fecha vencida", valor: vencidasSinCierre.length, total: Math.max(promesas.length, 1), tono: "ambar" },
     },
     {
       id: "cobertura",
-      nombre: "Cobertura",
+      nombre: "Cobertura de gestión",
       pregunta: "¿Cuánto vencido todavía no tiene gestión?",
       respuesta: `${sinGestion.length} de ${vencidos.length} clientes vencidos no tienen contacto registrado.`,
       impacto: saldoSinGestion,
       accion: "Asignar responsable y fecha de primer contacto al Top sin gestión.",
       estado: sinGestion.length > 0 ? "accion" : "control",
+      visual: { etiqueta: "saldo con gestión", valor: saldoVencidoSeguimiento - saldoSinGestion, total: saldoVencidoSeguimiento, tono: "azul" },
     },
     {
       id: "riesgo",
-      nombre: "Riesgo de recuperación",
+      nombre: "Mora sin acción",
       pregunta: "¿Qué mora crítica sigue sin acción?",
       respuesta: `${moraSinAccion.length} cuenta(s) por encima de 90 días siguen sin gestión registrada.`,
       impacto: saldoMoraSinAccion,
       accion: "Separar disputa, escalamiento y cobranza normal antes de asignar el siguiente paso.",
       estado: moraSinAccion.length > 0 ? "atencion" : "control",
+      visual: { etiqueta: "saldo 90+ sin gestión", valor: saldoMoraSinAccion, total: saldoVencidoSeguimiento, tono: "rojo" },
     },
   ];
 

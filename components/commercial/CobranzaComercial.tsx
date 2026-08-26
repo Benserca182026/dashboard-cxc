@@ -54,12 +54,15 @@ export function AgentesComercialesCobranza({
                 {agente.estado === "accion" ? "→" : agente.estado === "atencion" ? "△" : "✓"}
               </span>
             </div>
-            <p className="mt-4 text-[12px] font-semibold leading-snug opacity-70">
-              {agente.pregunta}
-            </p>
-            <p className="mt-2 text-[14px] font-bold leading-snug">{agente.respuesta}</p>
+            {agente.visual ? (() => {
+              const pct = agente.visual.total > 0 ? Math.max(0, Math.min(100, (agente.visual.valor / agente.visual.total) * 100)) : 0;
+              const color = agente.visual.tono === "rojo" ? "#f38b63" : agente.visual.tono === "ambar" ? "#d6a13c" : "#9bb0df";
+              return <div className="mt-4 flex items-center gap-3 rounded-2xl border border-current/10 bg-white/10 p-3"><svg viewBox="0 0 44 44" className="h-14 w-14 shrink-0 -rotate-90"><circle cx="22" cy="22" r="17" fill="none" stroke="currentColor" opacity=".15" strokeWidth="5"/><circle cx="22" cy="22" r="17" fill="none" stroke={color} strokeLinecap="round" strokeWidth="5" strokeDasharray={`${pct * 1.068} 107`}/></svg><div><p className="text-xl font-extrabold tabular-nums">{pct.toFixed(0)}%</p><p className="text-[9px] font-bold uppercase tracking-wider opacity-65">{agente.visual.etiqueta}</p></div></div>;
+            })() : null}
             <p className="mt-3 text-[9px] font-bold uppercase tracking-wider opacity-60 group-open:hidden">tocar para evidencia ↘</p>
             </summary>
+            <p className="mt-3 text-[12px] font-semibold leading-snug opacity-70">{agente.pregunta}</p>
+            <p className="mt-2 text-[12px] leading-snug">{agente.respuesta}</p>
             {agente.impacto != null && (
               <div className="mt-4 border-t border-current/10 pt-3">
                 <p className="text-[9px] font-bold uppercase tracking-[.1em] opacity-55">Impacto observado</p>
