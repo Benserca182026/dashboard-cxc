@@ -148,6 +148,10 @@ export function ResumenVentasEjecutivo({
   const puntos = ventas.tendencia.slice(-8);
   const maximo = Math.max(1, ...puntos.map((p) => p.valor));
   const seleccion = puntos.find((p) => p.periodo === activo) ?? puntos.at(-1);
+  const anioActual = ventas.tendencia.at(-1)?.periodo.slice(0, 4) ?? null;
+  const totalAnioActual = anioActual
+    ? ventas.tendencia.filter((punto) => punto.periodo.startsWith(anioActual)).reduce((suma, punto) => suma + punto.valor, 0)
+    : 0;
   if (!ventas.disponible) return null;
   return (
     <section className="rounded-[28px] border border-white/90 bg-white/70 p-5 shadow-flotante">
@@ -158,8 +162,9 @@ export function ResumenVentasEjecutivo({
         </div>
         <a href="/ventas" className="rounded-full bg-[#edf1f8] px-3 py-1.5 text-[10px] font-semibold text-[#536b91] hover:bg-white">abrir Ventas ↗</a>
       </div>
-      <div className="mt-4 grid gap-3 sm:grid-cols-3">
-        <div className="rounded-2xl bg-[#f4f6fb] p-3"><p className="text-[9px] font-bold uppercase tracking-wider text-tintaSuave">Venta registrada</p><p className="mt-1 text-lg font-extrabold tabular-nums text-tinta">{fmt(ventas.vendidoOdoo)}</p></div>
+      <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <div className="rounded-2xl bg-[#f4f6fb] p-3"><p className="text-[9px] font-bold uppercase tracking-wider text-tintaSuave">Total histórico</p><p className="mt-1 text-lg font-extrabold tabular-nums text-tinta">{fmt(ventas.vendidoOdoo)}</p><p className="mt-1 text-[9px] text-tintaSuave">{ventas.desde ?? "—"} → {ventas.hasta ?? "—"}</p></div>
+        <div className="rounded-2xl bg-[#f0eefc] p-3"><p className="text-[9px] font-bold uppercase tracking-wider text-[#796de0]">Acumulado {anioActual ?? "actual"}</p><p className="mt-1 text-lg font-extrabold tabular-nums text-tinta">{fmt(totalAnioActual)}</p><p className="mt-1 text-[9px] text-tintaSuave">suma de los meses mostrados</p></div>
         <div className="rounded-2xl bg-[#f4f6fb] p-3"><p className="text-[9px] font-bold uppercase tracking-wider text-tintaSuave">Top 5 clientes</p><p className="mt-1 text-lg font-extrabold tabular-nums text-tinta">{ventas.concentracionTop5 === null ? "—" : `${ventas.concentracionTop5.toFixed(1)}%`}</p></div>
         <div className="rounded-2xl bg-[#f4f6fb] p-3"><p className="text-[9px] font-bold uppercase tracking-wider text-tintaSuave">MTD comparable</p><p className="mt-1 text-lg font-extrabold tabular-nums text-tinta">{ventas.variacionUltimoPeriodo === null ? "—" : `${ventas.variacionUltimoPeriodo >= 0 ? "▲" : "▼"} ${Math.abs(ventas.variacionUltimoPeriodo).toFixed(1)}%`}</p></div>
       </div>
@@ -170,7 +175,7 @@ export function ResumenVentasEjecutivo({
           <span className="text-[9px] text-tintaSuave">{p.periodo.slice(5)}</span>
         </button>)}
       </div>}
-      <p className="mt-3 text-[10px] text-tintaSuave">Ventas usa pedidos y líneas de venta, con ventana {ventas.desde ?? "—"} a {ventas.hasta ?? "—"}. Es contexto comercial: no altera cartera, aging ni las posiciones del mapa.</p>
+      <p className="mt-3 text-[10px] text-tintaSuave">Histórico = toda la ventana {ventas.desde ?? "—"} a {ventas.hasta ?? "—"}; acumulado = sólo {anioActual ?? "el año de la última serie"}. Es contexto comercial: no altera cartera, aging ni las posiciones del mapa.</p>
     </section>
   );
 }
