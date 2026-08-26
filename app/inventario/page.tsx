@@ -31,7 +31,7 @@ export default function PaginaInventario() {
       <section className="rounded-[20px] border border-white/80 bg-white/60 px-4 py-3 shadow-flotante">
         <p className="text-[10px] font-bold uppercase tracking-[0.1em] text-[#6876d8]">Movimiento observado</p>
         <p className="mt-1 text-[11.5px] leading-relaxed text-tintaSuave">
-          Salidas registradas entre {analitica.desde ?? "sin inicio"} y {analitica.hasta ?? "sin fin"} desde {dataset.fuente}. Esta vista prioriza monto y unidades que sí están observados por producto.
+          <b>Salida</b> = una unidad que el registro marca como salida del almacén. Puede ser una entrega, una venta u otro movimiento; esta vista no supone que toda salida fue una venta. Se muestran las salidas registradas entre {analitica.desde ?? "sin inicio"} y {analitica.hasta ?? "sin fin"}.
         </p>
       </section>
 
@@ -53,9 +53,9 @@ export default function PaginaInventario() {
             </div>
           ) : (
             <div className="mt-5 grid gap-4 sm:grid-cols-3">
-              <OperacionKpi etiqueta="Valor de salidas" valor={fmt(analitica.valorSalidas)} nota="Unidades de salida × costo unitario de cada producto" tono="positivo" />
-              <OperacionKpi etiqueta="Unidades de salida" valor={Math.round(analitica.unidadesSalida).toLocaleString("es-GT")} nota={`${analitica.productosConMovimiento} productos con movimiento`} />
-              <OperacionKpi etiqueta="Productos con salida valorizada" valor={analitica.productosConSalidaValorizada.toLocaleString("es-GT")} nota="Productos que aportan monto al análisis" />
+              <OperacionKpi etiqueta="Valor que salió del almacén" valor={fmt(analitica.valorSalidas)} nota="Unidades de salida × costo unitario de cada producto" tono="positivo" />
+              <OperacionKpi etiqueta="Unidades que salieron" valor={Math.round(analitica.unidadesSalida).toLocaleString("es-GT")} nota={`Registradas en ${analitica.productosConMovimiento} productos con movimiento`} />
+              <OperacionKpi etiqueta="Productos con salida valorizada" valor={analitica.productosConSalidaValorizada.toLocaleString("es-GT")} nota="Productos cuyo movimiento de salida aporta monto al análisis" />
             </div>
           )}
         </LienzoConAgentes>

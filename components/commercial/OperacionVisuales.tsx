@@ -144,8 +144,8 @@ export function InventarioMovimientoVisual({
     <article className="rounded-[28px] border border-white/90 bg-white/65 p-5 shadow-flotante">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h3 className="text-sm font-bold text-tinta">Dónde se concentra la salida valorizada</h3>
-          <p className="mt-1 text-[11px] text-tintaSuave">Monto observado por producto · tocá una porción o una barra para ver el detalle</p>
+          <h3 className="text-sm font-bold text-tinta">Dónde se concentra lo que salió del almacén</h3>
+          <p className="mt-1 text-[11px] text-tintaSuave">Salida = entrega, venta u otro movimiento registrado · monto por producto</p>
         </div>
         <span className="rounded-full bg-[#edf1f8] px-3 py-1 text-[10px] font-bold tabular-nums text-[#536b91]">Total: {formatear(total)}</span>
       </div>
@@ -154,14 +154,14 @@ export function InventarioMovimientoVisual({
         <div className="mx-auto w-full max-w-[250px]">
           <button
             type="button"
-            aria-label="Distribución de salidas valorizadas por producto"
+            aria-label="Distribución del valor que salió del almacén por producto"
             onClick={() => setSeleccionado(null)}
             className="relative mx-auto grid h-48 w-48 place-items-center rounded-full transition hover:scale-[1.02] focus:outline-none focus:ring-2 focus:ring-[#6677ee]/40"
             style={{ background: `conic-gradient(${gradiente})` }}
           >
             <span className="grid h-[116px] w-[116px] place-items-center rounded-full bg-white text-center shadow-sm">
               <span>
-                <span className="block text-[9px] font-bold uppercase tracking-wider text-tintaSuave">Salida observada</span>
+                <span className="block text-[9px] font-bold uppercase tracking-wider text-tintaSuave">Valor que salió</span>
                 <span className="mt-1 block text-[17px] font-bold tabular-nums text-tinta">{formatear(total)}</span>
               </span>
             </span>
@@ -191,7 +191,7 @@ export function InventarioMovimientoVisual({
           ))}
         </div>
       </div>
-      {activo ? <p className="mt-4 rounded-xl bg-[#f4f6fb] px-3 py-2 text-[10px] text-tintaSuave"><b className="text-tinta">{activo.etiqueta}</b> · {formatear(activo.valor)} · {activo.pct.toFixed(1)}% de la salida valorizada. {activo.detalle}</p> : null}
+      {activo ? <p className="mt-4 rounded-xl bg-[#f4f6fb] px-3 py-2 text-[10px] text-tintaSuave"><b className="text-tinta">{activo.etiqueta}</b> · {formatear(activo.valor)} · {activo.pct.toFixed(1)}% del valor que salió del almacén. {activo.detalle}</p> : null}
     </article>
   );
 }
