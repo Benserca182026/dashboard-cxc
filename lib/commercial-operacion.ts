@@ -14,6 +14,19 @@ export interface PuntoTendencia {
   valor: number;
 }
 
+/** Total histórico por cliente en la moneda de registro. Mantiene la misma
+ * regla que la analítica comercial: total cerrado por Odoo, no suma de líneas
+ * a precio de lista. Esta salida permite construir vistas nuevas sin inventar
+ * una clasificación que el dataset no trae. */
+export interface AcumuladoClienteVenta {
+  id: string;
+  etiqueta: string;
+  valor: number;
+  pedidos: number;
+  desde: string | null;
+  hasta: string | null;
+}
+
 export interface AnaliticaVentas {
   disponible: boolean;
   pedidos: number;
@@ -155,6 +168,33 @@ function equivalenteEnMonedaRegistro(valor: number, moneda: Moneda | null, datas
   return monedaRegistro === "GTQ"
     ? valor * TIPO_CAMBIO_REFERENCIA.quetzalesPorDolar
     : valor / TIPO_CAMBIO_REFERENCIA.quetzalesPorDolar;
+}
+
+export function acumuladosVentasPorCliente(dataset: Dataset): AcumuladoClienteVenta[] {
+  const nombres = new Map(dataset.clientes.map((cliente) => [cliente.id_cliente, cliente.nombre_cliente]));
+  const acumulados = new Map<string, AcumuladoClienteVenta>();
+
+  for (const venta of (dataset.ventas ?? []).filter(ventaNoCancelada)) {
+    const referencia = valorReferencia(venta);
+    if (referencia === null) continue;
+    const actual = acumulados.get(venta.id_cliente) ?? {
+      id: venta.id_cliente,
+      etiqueta: nombres.get(venta.id_cliente) ?? venta.id_cliente,
+      valor: 0,
+      pedidos: 0,
+      desde: null,
+      hasta: null,
+    };
+    actual.valor += equivalenteEnMonedaRegistro(referencia, monedaDeVenta(venta, dataset), dataset);
+    actual.pedidos += 1;
+    if (!actual.desde || venta.fecha_venta < actual.desde) actual.desde = venta.fecha_venta;
+    if (!actual.hasta || venta.fecha_venta > actual.hasta) actual.hasta = venta.fecha_venta;
+    acumulados.set(venta.id_cliente, actual);
+  }
+
+  return [...acumulados.values()]
+    .map((fila) => ({ ...fila, valor: DOS_DECIMALES(fila.valor) }))
+    .sort((a, b) => b.valor - a.valor || a.etiqueta.localeCompare(b.etiqueta));
 }
 
 const cacheVentas = new WeakMap<Dataset, AnaliticaVentas>();
