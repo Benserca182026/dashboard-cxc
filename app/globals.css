@@ -404,11 +404,6 @@ body {
 .agent-zone-centro { --agent-color: #263047; --agent-soft: #edf0f5; }
 .agent-zone-ventas .agent-core, .agent-zone-clientes .agent-core, .agent-zone-productos .agent-core, .agent-zone-cartera .agent-core, .agent-zone-centro .agent-core { background: var(--agent-soft); color: var(--agent-color); box-shadow: 0 0 0 4px color-mix(in srgb, var(--agent-color) 17%, transparent), 0 8px 16px rgba(34, 47, 82, .15); }
 .agent-zone-ventas .agent-name, .agent-zone-clientes .agent-name, .agent-zone-productos .agent-name, .agent-zone-cartera .agent-name, .agent-zone-centro .agent-name { color: var(--agent-color); }
-.agent-zone-ventas::after, .agent-zone-clientes::after, .agent-zone-productos::after, .agent-zone-cartera::after, .agent-zone-centro::after { content: ""; position: absolute; z-index: -1; width: 34px; height: 1px; background: var(--agent-color); opacity: .56; transform-origin: left; }
-.agent-zone-ventas::after { left: 57px; top: 22px; transform: rotate(175deg); }
-.agent-zone-clientes::after { left: -26px; top: 23px; transform: rotate(0deg); }
-.agent-zone-productos::after { left: 55px; top: 23px; transform: rotate(170deg); }
-.agent-zone-cartera::after { left: -29px; top: 22px; transform: rotate(0deg); }
 .agent-insight { display: grid; grid-template-columns: minmax(120px,.7fr) minmax(0,1.65fr) minmax(160px,.9fr); gap: 14px; align-items: center; margin-top: 14px; border: 1px solid rgba(119,136,179,.25); border-radius: 20px; padding: 13px 16px; background: rgba(255,255,255,.76); }
 .agent-insight-evidence { color: #30394c; font-size: 11px; font-weight: 600; line-height: 1.4; }
 .agent-investigate { justify-self: end; border-radius: 999px; padding: 8px 12px; background: #1d2230; color: white; font-size: 9px; font-weight: 800; }
