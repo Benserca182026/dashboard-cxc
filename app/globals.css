@@ -242,12 +242,12 @@ body.producto-lienzo-blanco::before {
 @keyframes productoFlotarA { 0%, 100% { transform: translate3d(0, 0, 0); } 50% { transform: translate3d(7px, -8px, 0); } }
 @keyframes productoFlotarB { 0%, 100% { transform: translate3d(0, 0, 0); } 50% { transform: translate3d(-8px, 6px, 0); } }
 @keyframes productoNucleo { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.045); } }
-.producto-nodo-flotante { animation: productoFlotarA 5.5s ease-in-out infinite; }
-.producto-nodo-b, .producto-nodo-c { animation-name: productoFlotarB; animation-duration: 6.6s; }
-.producto-nodo-d { animation-duration: 7.4s; animation-delay: -1.5s; }
+.producto-nodo-esquina { animation: productoFlotarA 5.5s ease-in-out infinite; }
+.producto-nodo-2, .producto-nodo-3 { animation-name: productoFlotarB; animation-duration: 6.6s; }
+.producto-nodo-4 { animation-duration: 7.4s; animation-delay: -1.5s; }
 .producto-nucleo-activo { animation: productoNucleo 3.3s ease-in-out infinite; }
 @media (prefers-reduced-motion: reduce) {
-  .producto-nodo-flotante, .producto-nucleo-activo { animation: none !important; }
+  .producto-nodo-esquina, .producto-nucleo-activo { animation: none !important; }
 }
 
 /* El negro sigue siendo uno solo por pantalla, pero ahora convive con vidrio. */

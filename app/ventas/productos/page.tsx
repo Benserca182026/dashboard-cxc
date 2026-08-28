@@ -128,5 +128,5 @@ export default function PaginaCategoriasProducto() {
     id, iniciales: LECTURAS[id].iniciales, nombre: LECTURAS[id].nombre, senal: LECTURAS[id].senal, color: "#4b80ee", suave: "#eaf1ff",
   }));
 
-  return <div className="space-y-5"><Encabezado titulo="Categorías de producto" secciones={SECCIONES} dataset={dataset} modulo="ventas" /><div id="sec-productos" className="scroll-mt-24"><PanelAgentesReferencia agentes={agentes} activo={activo} onSeleccionar={setActivo} handoff={<p>{lectura.hallazgo}</p>}><BarrasDeLectura lectura={lectura} fmt={fmt} /></PanelAgentesReferencia></div></div>;
+  return <div className="space-y-5"><Encabezado titulo="Categorías de producto" secciones={SECCIONES} dataset={dataset} modulo="ventas" /><div id="sec-productos" className="scroll-mt-24"><PanelAgentesReferencia agentes={agentes} activo={activo} onSeleccionar={setActivo}><BarrasDeLectura lectura={lectura} fmt={fmt} /></PanelAgentesReferencia></div></div>;
 }
