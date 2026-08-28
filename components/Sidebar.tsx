@@ -19,6 +19,7 @@ const ITEMS = [
   { href: "/prioritarios", etiqueta: "Clientes prioritarios", icono: "▲", grupo: "Cartera" },
   { href: "/ventas", etiqueta: "Ventas", icono: "◈", grupo: "Operación" },
   { href: "/ventas/canales", etiqueta: "Canales de venta", icono: "◌", grupo: "Operación" },
+  { href: "/ventas/productos", etiqueta: "Categorías de producto", icono: "◇", grupo: "Operación" },
   { href: "/inventario", etiqueta: "Inventario", icono: "▢", grupo: "Operación" },
   { href: "/forecast", etiqueta: "Forecast comercial", icono: "◔", grupo: "Proyección" },
   { href: "/seguimiento", etiqueta: "Seguimiento de cobros", icono: "☏", grupo: "Proyección" },

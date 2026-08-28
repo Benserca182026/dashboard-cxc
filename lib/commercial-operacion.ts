@@ -27,6 +27,18 @@ export interface AcumuladoClienteVenta {
   hasta: string | null;
 }
 
+/** Composición histórica por producto. El export de líneas no trae descuento,
+ * por lo que esta medida es cantidad × precio unitario de lista: sirve para
+ * leer el mix y no debe presentarse como venta neta cerrada ni como margen. */
+export interface AcumuladoProductoComercial {
+  id: string;
+  etiqueta: string;
+  sku: string;
+  valor: number;
+  unidades: number;
+  pedidos: number;
+}
+
 export interface AnaliticaVentas {
   disponible: boolean;
   pedidos: number;
@@ -194,6 +206,39 @@ export function acumuladosVentasPorCliente(dataset: Dataset): AcumuladoClienteVe
 
   return [...acumulados.values()]
     .map((fila) => ({ ...fila, valor: DOS_DECIMALES(fila.valor) }))
+    .sort((a, b) => b.valor - a.valor || a.etiqueta.localeCompare(b.etiqueta));
+}
+
+export function acumuladosComposicionPorProducto(dataset: Dataset): AcumuladoProductoComercial[] {
+  const productos = new Map((dataset.productos ?? []).map((producto) => [producto.id_producto, producto]));
+  const ventas = new Map((dataset.ventas ?? []).filter(ventaNoCancelada).map((venta) => [venta.id_venta, venta]));
+  const acumulados = new Map<string, AcumuladoProductoComercial & { pedidosSet: Set<string> }>();
+
+  for (const linea of dataset.ventaLineas ?? []) {
+    const venta = ventas.get(linea.id_venta);
+    if (!venta) continue;
+    const producto = productos.get(linea.id_producto);
+    const actual = acumulados.get(linea.id_producto) ?? {
+      id: linea.id_producto,
+      etiqueta: producto?.nombre_producto ?? linea.id_producto,
+      sku: producto?.sku ?? linea.id_producto,
+      valor: 0,
+      unidades: 0,
+      pedidos: 0,
+      pedidosSet: new Set<string>(),
+    };
+    actual.valor += equivalenteEnMonedaRegistro(
+      linea.cantidad * linea.precio_unitario,
+      monedaDeVenta(venta, dataset),
+      dataset
+    );
+    actual.unidades += linea.cantidad;
+    actual.pedidosSet.add(venta.id_venta);
+    acumulados.set(linea.id_producto, actual);
+  }
+
+  return [...acumulados.values()]
+    .map(({ pedidosSet, ...fila }) => ({ ...fila, valor: DOS_DECIMALES(fila.valor), pedidos: pedidosSet.size }))
     .sort((a, b) => b.valor - a.valor || a.etiqueta.localeCompare(b.etiqueta));
 }
 
