@@ -353,22 +353,25 @@ body {
 /* Portada: los módulos son el territorio. Los agentes no se guardan dentro de
    tarjetas; circulan entre los cuatro territorios y sólo hablan al tocarlos. */
 .agent-command-surface {
-  border: 1px solid rgba(255, 255, 255, .92);
-  border-radius: 30px;
-  padding: 20px;
-  background: linear-gradient(145deg, rgba(255,255,255,.93), rgba(226,234,249,.82));
-  box-shadow: 0 24px 50px -34px rgba(31, 46, 82, .46);
+  padding: 0;
+  background: transparent;
 }
 .agent-eyebrow { color: #6273c8; font-size: 10px; font-weight: 800; letter-spacing: .14em; text-transform: uppercase; }
 .agent-heading { margin-top: 4px; color: #171c27; font-size: clamp(1.3rem, 2.2vw, 1.95rem); font-weight: 850; letter-spacing: -.035em; }
-.agent-stage { position: relative; min-height: 590px; padding: 28px; overflow: hidden; border: 1px solid rgba(255,255,255,.85); border-radius: 28px; background-color: rgba(245,248,254,.78); background-image: radial-gradient(rgba(74, 92, 137, .14) 1px, transparent 1px); background-size: 18px 18px; }
+.agent-stage { position: relative; min-height: 590px; padding: 28px; overflow: hidden; background-color: rgba(245,248,254,.48); background-image: radial-gradient(rgba(74, 92, 137, .14) 1px, transparent 1px); background-size: 18px 18px; }
 .agent-stage-grid { position: relative; z-index: 1; display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 80px 150px; }
 .module-card { position: relative; min-height: 190px; border: 1px solid rgba(137, 153, 185, .22); border-radius: 24px; padding: 18px; overflow: hidden; background: rgba(255,255,255,.8); box-shadow: 0 16px 32px -27px rgba(34, 48, 80, .55); transition: transform .25s ease, border-color .25s ease, box-shadow .25s ease; }
 .module-card:hover, .module-card:focus-visible, .module-card-active { transform: translateY(-3px); border-color: rgba(86,104,204,.55); box-shadow: 0 22px 38px -25px rgba(65, 79, 159, .45); outline: none; }
+.agent-stage-focus-ventas .module-card, .agent-stage-focus-clientes .module-card, .agent-stage-focus-productos .module-card, .agent-stage-focus-cartera .module-card { filter: blur(6px) saturate(.65); opacity: .28; pointer-events: none; transform: scale(.98); }
+.agent-stage-focus-ventas .module-ventas, .agent-stage-focus-clientes .module-clientes, .agent-stage-focus-productos .module-productos, .agent-stage-focus-cartera .module-cartera { position: relative; z-index: 4; filter: none; opacity: 1; pointer-events: auto; transform: none; border-color: rgba(86,104,204,.72); box-shadow: 0 26px 50px -26px rgba(53, 69, 148, .48); }
 .module-kicker { display: block; color: #8490a8; font-size: 9px; font-weight: 800; letter-spacing: .13em; text-transform: uppercase; }
 .module-title { display: block; margin-top: 3px; color: #242b3b; font-size: 13px; font-weight: 800; }
 .module-hover { position: absolute; right: 15px; bottom: 12px; color: #7180a0; font-size: 8.5px; opacity: 0; transform: translateY(4px); transition: .2s ease; }
 .module-card:hover .module-hover, .module-card:focus-visible .module-hover { opacity: 1; transform: none; }
+.agent-module-explanation { position: absolute; inset: 12px; display: grid; align-content: center; gap: 8px; border-radius: 16px; padding: 16px; background: rgba(255,255,255,.95); box-shadow: 0 12px 32px rgba(36,49,86,.12); color: #30394c; text-align: left; }
+.agent-module-explanation b { font-size: 11px; }
+.agent-module-explanation p { margin: 0; max-width: 36ch; font-size: 11px; font-weight: 600; line-height: 1.42; }
+.agent-module-explanation > span { color: #586bc8; font-size: 9px; font-weight: 900; text-transform: uppercase; letter-spacing: .08em; }
 .agent-orbit-layer { position: absolute; inset: 0; z-index: 3; pointer-events: none; }
 .agent-orb { position: absolute; display: grid; justify-items: center; width: 116px; gap: 3px; pointer-events: auto; color: #283147; text-align: center; transition: transform .25s ease, filter .25s ease; }
 .agent-orb:hover, .agent-orb:focus-visible, .agent-orb-selected { z-index: 5; transform: scale(1.1); outline: none; filter: drop-shadow(0 12px 13px rgba(30, 42, 80, .22)); }
@@ -392,5 +395,5 @@ body {
 @keyframes agent-drift-one { 0%,100% { translate: 0 0; } 50% { translate: 7px -7px; } }
 @keyframes agent-drift-two { 0%,100% { translate: 0 0; } 50% { translate: -8px 6px; } }
 @keyframes agent-breathe { 0%,100% { scale: 1; } 50% { scale: 1.07; } }
-@media (max-width: 900px) { .agent-stage { min-height: auto; padding: 14px; } .agent-stage-grid { gap: 14px; } .agent-orbit-layer { position: relative; display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 8px; margin-top: 16px; } .agent-orb { position: relative; top: auto !important; right: auto !important; bottom: auto !important; left: auto !important; width: auto; padding: 6px; animation: none; } .agent-insight { grid-template-columns: 1fr; } .agent-investigate { justify-self: start; } }
-@media (max-width: 560px) { .agent-command-surface { padding: 14px; } .agent-stage-grid { grid-template-columns: 1fr; } .agent-orbit-layer { grid-template-columns: repeat(2,minmax(0,1fr)); } }
+@media (max-width: 900px) { .agent-stage { min-height: auto; padding: 14px; } .agent-stage-grid { gap: 14px; } .agent-orbit-layer { position: relative; display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 8px; margin-top: 16px; } .agent-orb { position: relative; top: auto !important; right: auto !important; bottom: auto !important; left: auto !important; width: auto; padding: 6px; animation: none; } .agent-stage-focus-ventas .module-card, .agent-stage-focus-clientes .module-card, .agent-stage-focus-productos .module-card, .agent-stage-focus-cartera .module-card { display: none; } .agent-stage-focus-ventas .module-ventas, .agent-stage-focus-clientes .module-clientes, .agent-stage-focus-productos .module-productos, .agent-stage-focus-cartera .module-cartera { display: block; } }
+@media (max-width: 560px) { .agent-stage-grid { grid-template-columns: 1fr; } .agent-orbit-layer { grid-template-columns: repeat(2,minmax(0,1fr)); } }

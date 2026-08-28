@@ -84,7 +84,7 @@ export function ejecutarAgentesPortada(ventas: AnaliticaVentas, cartera: Context
       accion: "Separar acuerdos, disputas y cuentas que necesitan escalamiento.", href: "/aging", prioridad: cartera.moraCritica > 0 ? 84 : 20,
     },
     {
-      id: "coordinador", nombre: "Coordinador comercial", abreviatura: "CO", zona: "centro", estado: "observando", senal: `${ventas.pedidosConReferencia.toLocaleString("es-GT")} pedidos`,
+      id: "coordinador", nombre: "Coordinador comercial", abreviatura: "CO", zona: "ventas", estado: "observando", senal: `${ventas.pedidosConReferencia.toLocaleString("es-GT")} pedidos`,
       evidencia: "Conecta ventas, clientes, productos y cartera para priorizar la señal comercial más importante.",
       accion: "Seleccionar un agente para iluminar su módulo y abrir la investigación.", href: "/ventas", prioridad: 100,
     },
