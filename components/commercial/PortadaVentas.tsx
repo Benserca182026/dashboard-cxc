@@ -22,7 +22,7 @@ const ZONAS: Record<ZonaAgente, { etiqueta: string; clase: string }> = {
 function ExplicacionAgente({ agente }: { agente: AgenteComercial | null }) {
   if (!agente) return null;
   const tono = ESTILO_ESTADO[agente.estado];
-  return <div className="agent-module-explanation"><div className="flex items-center gap-2"><span className={`h-2 w-2 rounded-full ${tono.punto}`} /><b>{agente.nombre}</b><span className={tono.texto}>{agente.senal}</span></div><p>{agente.evidencia}</p><span>investigar ↗</span></div>;
+  return <div className="agent-module-explanation" title={agente.evidencia} aria-label={`${agente.nombre}: ${agente.evidencia}`}><i className="agent-visual-path" /><span className={`agent-visual-marker ${tono.punto}`}>{agente.abreviatura}</span><b className={tono.texto}>{agente.senal}</b></div>;
 }
 
 function GraficoLinea({ puntos, fmt, activo, agente, onActivar }: { puntos: PuntoTendencia[]; fmt: (n: number) => string; activo: boolean; agente: AgenteComercial | null; onActivar: () => void }) {

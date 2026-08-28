@@ -362,8 +362,12 @@ body {
 .agent-stage-grid { position: relative; z-index: 1; display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 80px 150px; }
 .module-card { position: relative; min-height: 190px; border: 1px solid rgba(137, 153, 185, .22); border-radius: 24px; padding: 18px; overflow: hidden; background: rgba(255,255,255,.8); box-shadow: 0 16px 32px -27px rgba(34, 48, 80, .55); transition: transform .25s ease, border-color .25s ease, box-shadow .25s ease; }
 .module-card:hover, .module-card:focus-visible, .module-card-active { transform: translateY(-3px); border-color: rgba(86,104,204,.55); box-shadow: 0 22px 38px -25px rgba(65, 79, 159, .45); outline: none; }
+.agent-stage-focus-ventas .module-card, .agent-stage-focus-clientes .module-card, .agent-stage-focus-productos .module-card, .agent-stage-focus-cartera .module-card { filter: blur(5px) saturate(.6); opacity: .27; pointer-events: none; transform: scale(.985); }
+.agent-stage-focus-ventas .module-ventas, .agent-stage-focus-clientes .module-clientes, .agent-stage-focus-productos .module-productos, .agent-stage-focus-cartera .module-cartera { filter: none; opacity: 1; pointer-events: auto; transform: none; }
+.agent-stage-focus-ventas .agent-orb, .agent-stage-focus-clientes .agent-orb, .agent-stage-focus-productos .agent-orb, .agent-stage-focus-cartera .agent-orb { filter: blur(3px); opacity: .28; }
+.agent-stage-focus-ventas .agent-orb-selected, .agent-stage-focus-clientes .agent-orb-selected, .agent-stage-focus-productos .agent-orb-selected, .agent-stage-focus-cartera .agent-orb-selected { filter: none; opacity: 1; }
 .module-card-target { position: relative; z-index: 4; border-color: var(--agent-color, #586bc8) !important; background: color-mix(in srgb, var(--agent-soft, #eef1ff) 42%, white) !important; box-shadow: 0 0 0 4px color-mix(in srgb, var(--agent-color, #586bc8) 16%, transparent), 0 26px 50px -26px color-mix(in srgb, var(--agent-color, #586bc8) 56%, transparent) !important; }
-.module-card-target::before { content: "MÓDULO VIGILADO"; position: absolute; top: 12px; right: 14px; border-radius: 999px; padding: 4px 7px; background: var(--agent-color, #586bc8); color: white; font-size: 7px; font-weight: 900; letter-spacing: .1em; }
+.module-card-target::before { content: ""; position: absolute; top: 13px; right: 15px; width: 8px; height: 8px; border-radius: 50%; background: var(--agent-color, #586bc8); box-shadow: 0 0 0 5px color-mix(in srgb, var(--agent-color, #586bc8) 15%, transparent); animation: agent-pulse 2.1s ease-in-out infinite; }
 .agent-stage-focus-ventas .module-ventas { --agent-color: #596bd0; --agent-soft: #edf0ff; }
 .agent-stage-focus-clientes .module-clientes { --agent-color: #e47743; --agent-soft: #fff0e9; }
 .agent-stage-focus-productos .module-productos { --agent-color: #2f9d78; --agent-soft: #e8f8f1; }
@@ -372,10 +376,10 @@ body {
 .module-title { display: block; margin-top: 3px; color: #242b3b; font-size: 13px; font-weight: 800; }
 .module-hover { position: absolute; right: 15px; bottom: 12px; color: #7180a0; font-size: 8.5px; opacity: 0; transform: translateY(4px); transition: .2s ease; }
 .module-card:hover .module-hover, .module-card:focus-visible .module-hover { opacity: 1; transform: none; }
-.agent-module-explanation { position: absolute; inset: 12px; display: grid; align-content: center; gap: 8px; border-radius: 16px; padding: 16px; background: rgba(255,255,255,.95); box-shadow: 0 12px 32px rgba(36,49,86,.12); color: #30394c; text-align: left; }
-.agent-module-explanation b { font-size: 11px; }
-.agent-module-explanation p { margin: 0; max-width: 36ch; font-size: 11px; font-weight: 600; line-height: 1.42; }
-.agent-module-explanation > span { color: #586bc8; font-size: 9px; font-weight: 900; text-transform: uppercase; letter-spacing: .08em; }
+.agent-module-explanation { position: absolute; z-index: 2; right: 16px; bottom: 16px; display: flex; align-items: center; gap: 6px; color: #30394c; }
+.agent-visual-path { width: 46px; height: 1px; background: var(--agent-color, #586bc8); opacity: .75; }
+.agent-visual-marker { display: grid; width: 22px; height: 22px; place-items: center; border: 2px solid white; border-radius: 50%; color: white; font-size: 7px; font-style: normal; font-weight: 900; box-shadow: 0 4px 10px rgba(34,47,82,.2); }
+.agent-module-explanation b { font-size: 10px; }
 .agent-orbit-layer { position: absolute; inset: 0; z-index: 3; pointer-events: none; }
 .agent-orb { position: absolute; display: grid; justify-items: center; width: 116px; gap: 3px; pointer-events: auto; color: #283147; text-align: center; transition: transform .25s ease, filter .25s ease; }
 .agent-orb:hover, .agent-orb:focus-visible, .agent-orb-selected { z-index: 5; transform: scale(1.1); outline: none; filter: drop-shadow(0 12px 13px rgba(30, 42, 80, .22)); }
