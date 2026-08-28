@@ -358,9 +358,10 @@ body {
 }
 .agent-eyebrow { color: #6273c8; font-size: 10px; font-weight: 800; letter-spacing: .14em; text-transform: uppercase; }
 .agent-heading { margin-top: 4px; color: #171c27; font-size: clamp(1.3rem, 2.2vw, 1.95rem); font-weight: 850; letter-spacing: -.035em; }
-.agent-stage { position: relative; min-height: 590px; padding: 28px; overflow: hidden; background-color: rgba(245,248,254,.48); background-image: radial-gradient(rgba(74, 92, 137, .14) 1px, transparent 1px); background-size: 18px 18px; }
-.agent-stage-grid { position: relative; z-index: 1; display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 80px 150px; }
+.agent-stage { position: relative; min-height: 710px; padding: 28px; overflow: hidden; background: linear-gradient(145deg, rgba(245,248,254,.54), rgba(226,234,249,.7)); }
+.agent-stage-grid { position: relative; z-index: 1; display: grid; grid-template-columns: minmax(0,1.18fr) minmax(0,.82fr); gap: 94px 180px; }
 .module-card { position: relative; min-height: 190px; border: 1px solid rgba(137, 153, 185, .22); border-radius: 24px; padding: 18px; overflow: hidden; background: rgba(255,255,255,.8); box-shadow: 0 16px 32px -27px rgba(34, 48, 80, .55); transition: transform .25s ease, border-color .25s ease, box-shadow .25s ease; }
+.module-ventas { min-height: 300px; }
 .module-card:hover, .module-card:focus-visible, .module-card-active { transform: translateY(-3px); border-color: rgba(86,104,204,.55); box-shadow: 0 22px 38px -25px rgba(65, 79, 159, .45); outline: none; }
 .agent-stage-focus-ventas .module-card, .agent-stage-focus-clientes .module-card, .agent-stage-focus-productos .module-card, .agent-stage-focus-cartera .module-card { filter: blur(5px) saturate(.6); opacity: .27; pointer-events: none; transform: scale(.985); }
 .agent-stage-focus-ventas .module-ventas, .agent-stage-focus-clientes .module-clientes, .agent-stage-focus-productos .module-productos, .agent-stage-focus-cartera .module-cartera { filter: none; opacity: 1; pointer-events: auto; transform: none; }
@@ -387,15 +388,15 @@ body {
 .agent-pulse { position: absolute; top: 3px; right: 3px; width: 8px; height: 8px; border: 2px solid white; border-radius: 50%; animation: agent-pulse 2.7s ease-in-out infinite; }
 .agent-name { max-width: 116px; font-size: 9px; font-weight: 800; line-height: 1.05; }
 .agent-signal { max-width: 116px; font-size: 8.5px; font-weight: 800; }
-.agent-pulso { top: 13%; left: 42%; animation: agent-drift-one 7s ease-in-out infinite; }
-.agent-ticket { top: 39%; left: 8%; animation: agent-drift-two 7.5s ease-in-out infinite; }
-.agent-clientes { top: 22%; right: 8%; animation: agent-drift-two 8s ease-in-out infinite; }
-.agent-cliente-principal { top: 42%; right: 41%; animation: agent-drift-one 8s ease-in-out infinite reverse; }
-.agent-producto { bottom: 14%; left: 42%; animation: agent-drift-two 7.5s ease-in-out infinite reverse; }
-.agent-mix { bottom: 39%; left: 7%; animation: agent-drift-one 8.5s ease-in-out infinite; }
-.agent-cartera { bottom: 14%; right: 8%; animation: agent-drift-one 9s ease-in-out infinite reverse; }
-.agent-mora { bottom: 39%; right: 41%; animation: agent-drift-two 8s ease-in-out infinite reverse; }
-.agent-coordinador { top: 43%; left: calc(50% - 58px); animation: agent-breathe 3s ease-in-out infinite; }
+.agent-pulso { top: 14%; left: 46%; animation: agent-drift-one 7s ease-in-out infinite; }
+.agent-ticket { top: 43%; left: 10%; animation: agent-drift-two 7.5s ease-in-out infinite; }
+.agent-clientes { top: 24%; right: 7%; animation: agent-drift-two 8s ease-in-out infinite; }
+.agent-cliente-principal { top: 43%; right: 26%; animation: agent-drift-one 8s ease-in-out infinite reverse; }
+.agent-producto { bottom: 13%; left: 45%; animation: agent-drift-two 7.5s ease-in-out infinite reverse; }
+.agent-mix { bottom: 37%; left: 10%; animation: agent-drift-one 8.5s ease-in-out infinite; }
+.agent-cartera { bottom: 13%; right: 8%; animation: agent-drift-one 9s ease-in-out infinite reverse; }
+.agent-mora { top: 55%; right: 26%; animation: agent-drift-two 8s ease-in-out infinite reverse; }
+.agent-coordinador { top: 42%; left: 47%; animation: agent-breathe 3s ease-in-out infinite; }
 .agent-zone-ventas { --agent-color: #596bd0; --agent-soft: #edf0ff; }
 .agent-zone-clientes { --agent-color: #e47743; --agent-soft: #fff0e9; }
 .agent-zone-productos { --agent-color: #2f9d78; --agent-soft: #e8f8f1; }
@@ -415,5 +416,5 @@ body {
 @keyframes agent-drift-one { 0%,100% { translate: 0 0; } 50% { translate: 7px -7px; } }
 @keyframes agent-drift-two { 0%,100% { translate: 0 0; } 50% { translate: -8px 6px; } }
 @keyframes agent-breathe { 0%,100% { scale: 1; } 50% { scale: 1.07; } }
-@media (max-width: 900px) { .agent-stage { min-height: auto; padding: 14px; } .agent-stage-grid { gap: 14px; } .agent-orbit-layer { position: relative; display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 8px; margin-top: 16px; } .agent-orb { position: relative; top: auto !important; right: auto !important; bottom: auto !important; left: auto !important; width: auto; padding: 6px; animation: none; } }
+@media (max-width: 900px) { .agent-stage { min-height: auto; padding: 14px; } .agent-stage-grid { grid-template-columns: repeat(2,minmax(0,1fr)); gap: 14px; } .module-ventas { min-height: 230px; } .agent-orbit-layer { position: relative; display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 8px; margin-top: 16px; } .agent-orb { position: relative; top: auto !important; right: auto !important; bottom: auto !important; left: auto !important; width: auto; padding: 6px; animation: none; } }
 @media (max-width: 560px) { .agent-stage-grid { grid-template-columns: 1fr; } .agent-orbit-layer { grid-template-columns: repeat(2,minmax(0,1fr)); } }
