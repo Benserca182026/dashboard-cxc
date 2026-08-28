@@ -26,7 +26,7 @@ const SECCIONES = [{ id: "sec-productos", etiqueta: "Agentes de producto" }];
 // los agentes sólo muestran y explican esta salida ya calculada.
 const LECTURAS: Record<AgenteProducto, LecturaProducto> = {
   familia: {
-    iniciales: "FA", nombre: "Familias", senal: "4 niveles disponibles",
+    iniciales: "FA", nombre: "Familias", senal: "41 productos sin familia",
     titulo: "¿Qué familia mueve el negocio?",
     explicacion: "La lectura separa la familia principal del producto; no mezcla modelo ni licencia.",
     hallazgo: "Cascos concentra 72.07% del valor clasificado.",
@@ -39,7 +39,7 @@ const LECTURAS: Record<AgenteProducto, LecturaProducto> = {
     ],
   },
   tipo: {
-    iniciales: "TC", nombre: "Tipo de casco", senal: "6 tipos observados",
+    iniciales: "TC", nombre: "Tipo de casco", senal: "6 tipos disponibles",
     titulo: "¿Qué tipo de casco sostiene la familia?",
     explicacion: "Este agente baja un nivel dentro de Cascos y conserva el producto no identificable como un límite visible.",
     hallazgo: "Integral y Modular reúnen la mayor parte de los cascos con tipo declarado.",
@@ -53,7 +53,7 @@ const LECTURAS: Record<AgenteProducto, LecturaProducto> = {
     ],
   },
   modelo: {
-    iniciales: "MO", nombre: "Modelos", senal: "BOSTON lidera el mix",
+    iniciales: "MO", nombre: "Modelos", senal: "Q4.45M sin modelo",
     titulo: "¿Qué modelo explica el mix?",
     explicacion: "El modelo se lee cuando está declarado en la ficha. “Sin modelo” no se rellena ni se interpreta como un modelo.",
     hallazgo: "Q4.45M permanece sin modelo declarado: es una brecha de catálogo, no un modelo comercial.",
@@ -77,7 +77,7 @@ const LECTURAS: Record<AgenteProducto, LecturaProducto> = {
     ],
   },
   cobertura: {
-    iniciales: "CO", nombre: "Cobertura", senal: "689 de 730 clasificados",
+    iniciales: "CO", nombre: "Cobertura", senal: "41 productos pendientes",
     titulo: "¿Qué falta para cerrar la clasificación?",
     explicacion: "La cobertura no es una categoría de producto: mide cuántas referencias quedan fuera de una familia confirmada.",
     hallazgo: "41 productos, equivalentes a 0.95% del valor, siguen sin familia declarada.",
