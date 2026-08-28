@@ -250,6 +250,25 @@ body.producto-lienzo-blanco::before {
   .producto-nodo-esquina, .producto-nucleo-activo { animation: none !important; }
 }
 
+/* B18 conserva el emblema circular entregado: los colores sólo viven en el
+   halo, nunca se recolorea ni se sustituye la silueta. */
+.mascota-b18 { --mascota-color: #ef5b63; position: absolute; z-index: 45; left: -66px; bottom: 20px; display: grid; grid-template-columns: 66px 180px; align-items: center; gap: 8px; transition: left .45s ease, bottom .45s ease; }
+.mascota-b18-en-detalle { position: fixed; z-index: 60; left: 18px; bottom: 18px; }
+.mascota-b18-figura { position: relative; display: grid; width: 66px; height: 66px; place-items: center; border: 2px solid var(--mascota-color); border-radius: 50%; background: white; box-shadow: 0 0 0 5px color-mix(in srgb, var(--mascota-color) 14%, transparent), 0 0 22px 3px color-mix(in srgb, var(--mascota-color) 55%, transparent), 0 12px 30px rgba(45,66,108,.22); transition: border-color .25s ease, box-shadow .25s ease, transform .25s ease; cursor: default; }
+.mascota-b18:hover .mascota-b18-figura { transform: translateY(-3px) scale(1.04); }
+.mascota-b18-figura img { width: 58px; height: 58px; border-radius: 50%; object-fit: cover; object-position: center; }
+.mascota-b18-marca { position: absolute; right: -7px; bottom: -5px; display: flex; align-items: baseline; padding: 2px 5px; border: 1px solid white; border-radius: 999px; background: #18233d; color: white; box-shadow: 0 4px 11px rgba(18,28,50,.22); font-style: normal; line-height: 1; }
+.mascota-b18-marca b { font-size: 13px; letter-spacing: -.06em; }.mascota-b18-marca i { font-size: 8px; font-style: normal; font-weight: 900; }
+.mascota-b18-globo { border: 1px solid #e6edf9; border-radius: 15px; padding: 9px 10px; background: rgba(255,255,255,.94); box-shadow: 0 13px 30px rgba(65,87,132,.13); color: #52627d; font-size: 9px; font-weight: 600; line-height: 1.35; opacity: .96; }
+.mascota-b18-globo strong { color: #32476e; font-size: 8px; letter-spacing: .035em; }.mascota-b18-globo p { margin: 4px 0 0; }
+.mascota-b18-punto { width: 6px; height: 6px; border-radius: 50%; background: var(--mascota-color); box-shadow: 0 0 8px var(--mascota-color); }
+.mascota-b18-opciones { position: absolute; top: -17px; left: 10px; display: flex; gap: 5px; padding: 5px; border: 1px solid #eef3fc; border-radius: 999px; background: rgba(255,255,255,.96); box-shadow: 0 8px 18px rgba(58,79,122,.13); opacity: 0; transform: translateY(6px); pointer-events: none; transition: .2s ease; }
+.mascota-b18:hover .mascota-b18-opciones, .mascota-b18:focus-within .mascota-b18-opciones { opacity: 1; transform: none; pointer-events: auto; }
+.mascota-b18-color { width: 12px; height: 12px; border: 2px solid white; border-radius: 50%; box-shadow: 0 1px 5px rgba(36,51,83,.25); transition: transform .18s ease; }.mascota-b18-color:hover, .mascota-b18-color[aria-pressed="true"] { transform: scale(1.28); }
+.mascota-b18-intro { position: fixed; inset: 0; z-index: 80; display: grid; place-content: center; justify-items: center; background: rgba(255,255,255,.94); animation: mascotaIntro .28s ease-out both; pointer-events: none; }.mascota-b18-intro-marca { display: flex; align-items: baseline; color: #3e7fe7; letter-spacing: -.1em; }.mascota-b18-intro-marca b { font-size: 74px; }.mascota-b18-intro-marca span { font-size: 32px; font-weight: 900; }.mascota-b18-intro p { margin: -4px 0 0; color: #657694; font-size: 12px; font-weight: 900; letter-spacing: .14em; text-transform: uppercase; }
+@keyframes mascotaIntro { 0% { opacity: 0; } 18%,75% { opacity: 1; } 100% { opacity: 0; } }
+@media (max-width: 900px) { .mascota-b18 { left: 10px; bottom: 12px; grid-template-columns: 54px; }.mascota-b18-en-detalle { left: 9px; bottom: 9px; }.mascota-b18-figura { width: 54px; height: 54px; }.mascota-b18-figura img { width: 48px; height: 48px; }.mascota-b18-globo { display: none; }.mascota-b18-opciones { left: 0; }.mascota-b18-intro-marca b { font-size: 58px; } }
+
 /* El negro sigue siendo uno solo por pantalla, pero ahora convive con vidrio. */
 .piel-referencia .pastilla-activa { box-shadow: 0 8px 22px -10px rgba(22, 24, 29, 0.5); }
 

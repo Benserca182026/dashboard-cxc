@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, type ReactNode } from "react";
+import { MascotaB18 } from "./MascotaB18";
 import type { AgenteLateral } from "./PanelAgentesLateral";
 
 const POSICIONES_CENTRALES = [
@@ -37,9 +38,9 @@ export function PanelAgentesReferencia<T extends string>({
 
   return (
     <section className="bg-white py-2 md:py-3">
-      <div className="relative mx-auto min-h-[550px] max-w-5xl overflow-visible rounded-[30px] border border-[#edf1fb] bg-white shadow-[0_28px_70px_rgba(71,105,175,.12)]">
-        <div className="absolute inset-x-0 bottom-0 h-36 rounded-b-[30px] bg-[radial-gradient(ellipse_at_50%_100%,rgba(204,220,255,.6),transparent_72%)]" />
-        <div className="relative grid min-h-[550px] grid-cols-[112px_minmax(0,1fr)] md:grid-cols-[158px_minmax(0,1fr)]">
+      <div className="relative mx-auto min-h-[500px] max-w-4xl overflow-visible rounded-[30px] border border-[#edf1fb] bg-white shadow-[0_24px_58px_rgba(71,105,175,.1)]">
+        <div className="absolute inset-x-0 bottom-0 h-32 rounded-b-[30px] bg-[radial-gradient(ellipse_at_50%_100%,rgba(204,220,255,.5),transparent_72%)]" />
+        <div className="relative grid min-h-[500px] grid-cols-[104px_minmax(0,1fr)] md:grid-cols-[146px_minmax(0,1fr)]">
           <aside className={`z-20 border-r border-[#eef2fa] bg-[linear-gradient(180deg,#fbfcff_0%,#f6f8ff_100%)] px-3 pt-28 transition duration-500 md:px-4 ${detalleAbierto ? "pointer-events-none opacity-25 blur-[3px]" : ""}`}>
             <p className="mb-4 hidden px-1 text-[9px] font-black uppercase tracking-[.15em] text-[#9babc8] md:block">Agentes</p>
             <div className="space-y-3">
@@ -53,7 +54,7 @@ export function PanelAgentesReferencia<T extends string>({
             </div>
           </aside>
 
-          <main className="relative min-h-[550px] overflow-hidden px-5 py-8 md:px-10">
+          <main className="relative min-h-[500px] overflow-hidden px-5 py-8 md:px-10">
             <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,rgba(231,240,255,.9),transparent_34%)]" />
             {detalleAbierto && <button type="button" onClick={() => setDetalleAbierto(false)} aria-label="Cerrar detalle del agente" className="fixed inset-0 z-40 cursor-default bg-white/35 backdrop-blur-[7px]" />}
             {detalleAbierto && <div className="fixed bottom-8 left-28 right-8 top-24 z-50 overflow-y-auto rounded-[30px] border border-[#eef2fb] bg-white/96 p-6 shadow-[0_28px_70px_rgba(50,80,140,.2)] animate-[entradaSuave_.32s_ease-out] md:bottom-12 md:left-40 md:right-12 md:top-28 md:p-9">{children}</div>}
@@ -75,6 +76,7 @@ export function PanelAgentesReferencia<T extends string>({
             <p className="mt-1 text-[9px] font-bold leading-tight text-[#5675b3]">{agente?.senal}</p>
           </div>
         </div>}
+        <MascotaB18 agente={agente?.nombre ?? "Clasificación"} alerta={agente?.senal ?? "sin alertas"} detalleAbierto={detalleAbierto} />
       </div>
     </section>
   );

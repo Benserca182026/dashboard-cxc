@@ -129,9 +129,9 @@ export default function PaginaCategoriasProducto() {
     id, iniciales: LECTURAS[id].iniciales, nombre: LECTURAS[id].nombre, senal: LECTURAS[id].senal, capacidad: capacidades[id], color: "#4b80ee", suave: "#eaf1ff",
   }));
 
-  return <div className="space-y-3">
+  return <div className="space-y-2">
     <header className="mx-auto flex w-full max-w-5xl items-start justify-between gap-5 pt-2">
-      <h1 className="min-w-0 whitespace-nowrap text-[clamp(1.7rem,3.35vw,3.4rem)] font-black leading-none tracking-[-.065em] text-[#111827]">Clasificación <span className="bg-[linear-gradient(90deg,#467deb,#8cc8ff)] bg-clip-text text-transparent">comercial de productos</span></h1>
+      <h1 className="min-w-0 whitespace-nowrap text-[clamp(1.35rem,2.35vw,2.45rem)] font-black leading-none tracking-[-.06em] text-[#111827]">Clasificación <span className="bg-[linear-gradient(90deg,#467deb,#8cc8ff)] bg-clip-text text-transparent">comercial de productos</span></h1>
       <BarraUsuario dataset={dataset} modulo="ventas" />
     </header>
     <div id="sec-productos"><PanelAgentesReferencia agentes={agentes} activo={activo} onSeleccionar={setActivo}><BarrasDeLectura lectura={lectura} fmt={fmt} /></PanelAgentesReferencia></div>
