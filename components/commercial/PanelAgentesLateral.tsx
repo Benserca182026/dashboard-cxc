@@ -8,6 +8,8 @@ export interface AgenteLateral<T extends string> {
   nombre: string;
   senal: string;
   capacidad?: string;
+  problema?: string;
+  accion?: string;
   color: string;
   suave: string;
 }

@@ -17,6 +17,8 @@ type LecturaProducto = {
   titulo: string;
   explicacion: string;
   hallazgo: string;
+  problema: string;
+  accion: string;
   filas: FilaLectura[];
 };
 
@@ -28,6 +30,8 @@ const LECTURAS: Record<AgenteProducto, LecturaProducto> = {
     titulo: "¿Qué familia mueve el negocio?",
     explicacion: "La lectura separa la familia principal del producto; no mezcla modelo ni licencia.",
     hallazgo: "Cascos concentra 72.07% del valor clasificado.",
+    problema: "41 referencias siguen sin familia: no se pueden comparar bien contra el mix comercial.",
+    accion: "priorizar la clasificación de esas referencias para decidir surtido, compras y exposición por familia.",
     filas: [
       { nombre: "Cascos", productos: 584, valor: 12461816, pct: 72.07 },
       { nombre: "Equipo", productos: 51, valor: 3257233, pct: 18.84 },
@@ -41,6 +45,8 @@ const LECTURAS: Record<AgenteProducto, LecturaProducto> = {
     titulo: "¿Qué tipo de casco sostiene la familia?",
     explicacion: "Este agente baja un nivel dentro de Cascos y conserva el producto no identificable como un límite visible.",
     hallazgo: "Integral y Modular reúnen la mayor parte de los cascos con tipo declarado.",
+    problema: "El mix de cascos pierde precisión cuando el tipo no está declarado de forma consistente.",
+    accion: "asignar inventario y campañas según la demanda real de Integral, Modular y los demás tipos.",
     filas: [
       { nombre: "Integral", productos: 341, valor: 0, pct: 55.52 },
       { nombre: "Modular", productos: 116, valor: 0, pct: 27.59 },
@@ -55,6 +61,8 @@ const LECTURAS: Record<AgenteProducto, LecturaProducto> = {
     titulo: "¿Qué modelo explica el mix?",
     explicacion: "El modelo se lee cuando está declarado en la ficha. “Sin modelo” no se rellena ni se interpreta como un modelo.",
     hallazgo: "Q4.45M permanece sin modelo declarado: es una brecha de catálogo, no un modelo comercial.",
+    problema: "Q4.45M de la venta no se puede atribuir a un modelo comercial.",
+    accion: "identificar qué modelos sostienen el margen, el inventario y la reposición.",
     filas: [
       { nombre: "Boston", productos: 24, valor: 1973341, pct: 11.41 },
       { nombre: "Shangai", productos: 30, valor: 911832, pct: 5.27 },
@@ -67,6 +75,8 @@ const LECTURAS: Record<AgenteProducto, LecturaProducto> = {
     titulo: "¿Qué licencias aparecen en la venta?",
     explicacion: "La licencia es una capa distinta de familia y modelo. Sólo se presenta como declarada cuando la clasificación la identifica.",
     hallazgo: "DC Comics es la licencia con mayor participación; la mayor parte del catálogo permanece sin licencia.",
+    problema: "La licencia está ausente en la mayoría del catálogo y limita la lectura de campañas por propiedad.",
+    accion: "separar licencias que sí mueven venta de producto genérico antes de definir promociones.",
     filas: [
       { nombre: "Sin licencia", valor: 14804422, pct: 85.61 },
       { nombre: "DC Comics", valor: 1278885, pct: 7.4 },
@@ -79,6 +89,8 @@ const LECTURAS: Record<AgenteProducto, LecturaProducto> = {
     titulo: "¿Qué falta para cerrar la clasificación?",
     explicacion: "La cobertura no es una categoría de producto: mide cuántas referencias quedan fuera de una familia confirmada.",
     hallazgo: "41 productos, equivalentes a 0.95% del valor, siguen sin familia declarada.",
+    problema: "41 productos permanecen pendientes y reducen la confianza de todas las lecturas comerciales.",
+    accion: "cerrar la clasificación pendiente antes de usar el mix para decisiones de compra o inventario.",
     filas: [
       { nombre: "Clasificados", productos: 689, valor: 17128263, pct: 99.05 },
       { nombre: "Sin clasificar", productos: 41, valor: 164069, pct: 0.95 },
@@ -126,7 +138,7 @@ export default function PaginaCategoriasProducto() {
     familia: "730 referencias", tipo: "584 cascos", modelo: "730 referencias", licencia: "730 referencias", cobertura: "730 referencias",
   };
   const agentes: AgenteLateral<AgenteProducto>[] = (Object.keys(LECTURAS) as AgenteProducto[]).map((id) => ({
-    id, iniciales: LECTURAS[id].iniciales, nombre: LECTURAS[id].nombre, senal: LECTURAS[id].senal, capacidad: capacidades[id], color: "#4b80ee", suave: "#eaf1ff",
+    id, iniciales: LECTURAS[id].iniciales, nombre: LECTURAS[id].nombre, senal: LECTURAS[id].senal, capacidad: capacidades[id], problema: LECTURAS[id].problema, accion: LECTURAS[id].accion, color: "#4b80ee", suave: "#eaf1ff",
   }));
 
   return <div className="space-y-2">

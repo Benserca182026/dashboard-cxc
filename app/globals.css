@@ -269,6 +269,16 @@ body.producto-lienzo-blanco::before {
 @keyframes mascotaIntro { 0% { opacity: 0; } 18%,75% { opacity: 1; } 100% { opacity: 0; } }
 @media (max-width: 900px) { .mascota-b18 { left: 10px; bottom: 12px; grid-template-columns: 54px; }.mascota-b18-en-detalle { left: 9px; bottom: 9px; }.mascota-b18-figura { width: 54px; height: 54px; }.mascota-b18-figura img { width: 48px; height: 48px; }.mascota-b18-globo { display: none; }.mascota-b18-opciones { left: 0; }.mascota-b18-intro-marca b { font-size: 58px; } }
 
+/* La guía no es una mascota animal: B18 es un módulo del sistema. El color
+   vive sólo en su halo para que cambie el enfoque sin dibujar un borde pesado. */
+.mascota-b18 { left: 14px; bottom: 18px; display: block; }
+.mascota-b18-en-detalle { left: 18px; bottom: 18px; }
+.mascota-b18-figura { width: 62px; height: 62px; border: 0; border-radius: 18px; background: linear-gradient(135deg,#3c75ee,#80c5ff); box-shadow: 0 0 19px 5px color-mix(in srgb, var(--mascota-color) 62%, transparent), 0 14px 30px rgba(45,66,108,.22); color: white; font-style: normal; line-height: 1; }
+.mascota-b18-figura b { font-size: 26px; letter-spacing: -.08em; }.mascota-b18-figura i { margin-left: 1px; font-size: 12px; font-style: normal; font-weight: 900; vertical-align: baseline; }
+.mascota-b18-figura img, .mascota-b18-marca, .mascota-b18-globo { display: none; }
+.mascota-b18-opciones { top: -15px; left: 7px; }
+@media (max-width: 900px) { .mascota-b18 { left: 10px; bottom: 12px; }.mascota-b18-en-detalle { left: 9px; bottom: 9px; }.mascota-b18-figura { width: 54px; height: 54px; }.mascota-b18-figura b { font-size: 23px; } }
+
 /* El negro sigue siendo uno solo por pantalla, pero ahora convive con vidrio. */
 .piel-referencia .pastilla-activa { box-shadow: 0 8px 22px -10px rgba(22, 24, 29, 0.5); }
 
