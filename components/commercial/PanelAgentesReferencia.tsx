@@ -31,6 +31,7 @@ export function PanelAgentesReferencia<T extends string>({
 }) {
   const [detalleAbierto, setDetalleAbierto] = useState(false);
   const [tono, setTono] = useState<TonoMascota>("riesgo");
+  const [mostrarExplicaciones, setMostrarExplicaciones] = useState(false);
   const agente = agentes.find((item) => item.id === activo) ?? agentes[0];
   const alrededor = agentes.filter((item) => item.id !== agente?.id);
   const indiceActivo = Math.max(agentes.findIndex((item) => item.id === activo), 0);
@@ -42,6 +43,7 @@ export function PanelAgentesReferencia<T extends string>({
     oportunidad: { etiqueta: "Oportunidad", kpi: agente?.capacidad ?? "", texto: agente?.accion ?? "Convierte la lectura en una decisión comercial accionable." },
     analisis: { etiqueta: "Análisis", kpi: agente?.capacidad ?? "", texto: "Da una base comparable para decidir con la misma clasificación." },
   }[tono];
+  const verExplicaciones = detalleAbierto || mostrarExplicaciones;
 
   return (
     <section className="bg-white py-2 md:py-3">
@@ -74,11 +76,12 @@ export function PanelAgentesReferencia<T extends string>({
 
             {alrededor.map((item, indice) => {
               const posicion = detalleAbierto ? POSICIONES_ESQUINAS[indice] : POSICIONES_CENTRALES[indice];
-              return <button key={item.id} type="button" onClick={() => seleccionarAgente(item.id)} className={`producto-nodo-esquina producto-nodo-${indice + 1} ${detalleAbierto ? "z-50" : "absolute z-20"} grid h-14 w-14 place-items-center rounded-2xl border border-[#edf2fe] bg-white text-[10px] font-black text-[#76a0f4] shadow-[0_12px_28px_rgba(90,126,195,.15)] transition-all duration-500 hover:scale-110 focus:outline-none focus:ring-4 focus:ring-[#e1ebff] ${posicion}`}>{item.iniciales}<span className="absolute -bottom-9 w-32 text-center text-[8px] font-bold leading-tight text-[#8d9bb5]"><span className="block truncate">{item.nombre}</span><span className="block truncate text-[#6c91dc]">{item.senal}</span></span>{detalleAbierto ? <span className="absolute left-16 top-0 w-44 rounded-xl bg-white p-3 text-left shadow-[0_12px_28px_rgba(50,80,140,.16)]"><b className="block text-[8px] uppercase tracking-[.12em] text-[#6e98f3]">Problema</b><span className="mt-1 block text-[9px] font-bold leading-snug text-[#4e5f7e]">{item.problema}</span></span> : null}</button>;
+              const posicionTexto = indice === 1 || indice === 3 ? "right-16" : "left-16";
+              return <button key={item.id} type="button" onClick={() => seleccionarAgente(item.id)} className={`producto-nodo-esquina producto-nodo-${indice + 1} ${detalleAbierto ? "z-50" : "absolute z-20"} grid h-14 w-14 place-items-center rounded-2xl border border-[#edf2fe] bg-white text-[10px] font-black text-[#76a0f4] shadow-[0_12px_28px_rgba(90,126,195,.15)] transition-all duration-500 hover:scale-110 focus:outline-none focus:ring-4 focus:ring-[#e1ebff] ${posicion}`}>{item.iniciales}<span className="absolute -bottom-9 w-32 text-center text-[8px] font-bold leading-tight text-[#8d9bb5]"><span className="block truncate">{item.nombre}</span><span className="block truncate text-[#6c91dc]">{item.senal}</span></span>{verExplicaciones ? <span className={`absolute ${posicionTexto} top-0 w-44 rounded-xl bg-white p-3 text-left shadow-[0_12px_28px_rgba(50,80,140,.16)]`}><b className="block text-[8px] uppercase tracking-[.12em] text-[#6e98f3]">Problema</b><span className="mt-1 block text-[9px] font-bold leading-snug text-[#4e5f7e]">{item.problema}</span></span> : null}</button>;
             })}
 
             {!detalleAbierto && <><button key={agente?.id} type="button" onClick={() => setDetalleAbierto(true)} aria-expanded={detalleAbierto} className="producto-nucleo-activo absolute left-1/2 top-1/2 z-30 grid h-[88px] w-[88px] -translate-x-1/2 -translate-y-1/2 place-items-center rounded-[25px] bg-[linear-gradient(135deg,#3d74ec,#7dc3ff)] text-lg font-black text-white shadow-[0_22px_45px_rgba(64,119,239,.35)] ring-8 ring-[#edf4ff] transition hover:scale-105 focus:outline-none focus:ring-4 focus:ring-[#cbdcff]">{agente?.iniciales}</button>
-            <div className="absolute left-1/2 top-[calc(50%+56px)] z-30 w-60 -translate-x-1/2 text-center"><p className="text-[11px] font-black text-[#6079ad]">{agente?.senal}</p><div className="mt-2 flex justify-center gap-2 text-[8px] font-black"><span className="rounded-full bg-white px-2 py-1 text-[#567cbe] shadow-[0_8px_18px_rgba(71,103,171,.12)]">{agente?.capacidad}</span><span className="rounded-full px-2 py-1 text-white" style={{ backgroundColor: TONOS_MASCOTA[tono].color }}>{enfoque.etiqueta}</span></div></div></>}
+            <div className="absolute left-1/2 top-[calc(50%+56px)] z-30 w-60 -translate-x-1/2 text-center"><p className="text-[11px] font-black text-[#6079ad]">{agente?.senal}</p><div className="mt-2 flex justify-center gap-2 text-[8px] font-black"><span className="rounded-full bg-white px-2 py-1 text-[#567cbe] shadow-[0_8px_18px_rgba(71,103,171,.12)]">{agente?.capacidad}</span><span className="rounded-full px-2 py-1 text-white" style={{ backgroundColor: TONOS_MASCOTA[tono].color }}>{enfoque.etiqueta}</span></div>{mostrarExplicaciones ? <div className="mt-3 rounded-xl bg-white p-3 text-left shadow-[0_12px_28px_rgba(50,80,140,.16)]"><b className="text-[8px] uppercase tracking-[.12em] text-[#6e98f3]">Problema · {agente?.nombre}</b><p className="mt-1 text-[9px] font-bold leading-snug text-[#4e5f7e]">{agente?.problema}</p></div> : null}</div></>}
           </main>
         </div>
 
@@ -89,7 +92,7 @@ export function PanelAgentesReferencia<T extends string>({
             <p className="mt-1 text-[9px] font-bold leading-tight text-[#5675b3]">{agente?.senal}</p>
           </div>
         </div>}
-        <MascotaB18 detalleAbierto={detalleAbierto} onTonoCambiar={setTono} />
+        <MascotaB18 detalleAbierto={detalleAbierto} explicacionActiva={mostrarExplicaciones} onTonoCambiar={setTono} onExplicacionActiva={() => setMostrarExplicaciones(true)} />
       </div>
     </section>
   );

@@ -11,10 +11,11 @@ export const TONOS_MASCOTA: Record<TonoMascota, { etiqueta: string; color: strin
   analisis: { etiqueta: "Análisis", color: "#8b67df" },
 };
 
-export function MascotaB18({ detalleAbierto, onTonoCambiar }: { detalleAbierto: boolean; onTonoCambiar: (tono: TonoMascota) => void }) {
+export function MascotaB18({ detalleAbierto, explicacionActiva, onTonoCambiar, onExplicacionActiva }: { detalleAbierto: boolean; explicacionActiva: boolean; onTonoCambiar: (tono: TonoMascota) => void; onExplicacionActiva: () => void }) {
   const [tono, setTono] = useState<TonoMascota>("riesgo");
   const [presentacion, setPresentacion] = useState(true);
-  const elegirTono = (siguiente: TonoMascota) => { setTono(siguiente); onTonoCambiar(siguiente); };
+  const [selectorAbierto, setSelectorAbierto] = useState(false);
+  const elegirTono = (siguiente: TonoMascota) => { setTono(siguiente); onTonoCambiar(siguiente); onExplicacionActiva(); setSelectorAbierto(false); };
 
   useEffect(() => {
     const temporizador = window.setTimeout(() => setPresentacion(false), 1100);
@@ -27,7 +28,7 @@ export function MascotaB18({ detalleAbierto, onTonoCambiar }: { detalleAbierto: 
       <p>Benserca 18</p>
     </div> : null}
     <aside className={`mascota-b18 ${detalleAbierto ? "mascota-b18-en-detalle" : ""}`} style={{ "--mascota-color": TONOS_MASCOTA[tono].color } as CSSProperties} aria-label="Guía B18">
-      <div className="mascota-b18-opciones" aria-label="Elegir enfoque de B18">
+      <div className={`mascota-b18-opciones ${selectorAbierto ? "mascota-b18-opciones-abiertas" : ""}`} aria-label="Elegir enfoque de B18">
         {(Object.keys(TONOS_MASCOTA) as TonoMascota[]).map((opcion) => <button
           key={opcion}
           type="button"
@@ -38,7 +39,8 @@ export function MascotaB18({ detalleAbierto, onTonoCambiar }: { detalleAbierto: 
           style={{ backgroundColor: TONOS_MASCOTA[opcion].color }}
         />)}
       </div>
-      <div className="mascota-b18-figura" aria-label="B18, guía de análisis"><b>B</b><i>18</i></div>
+      <button type="button" onClick={() => setSelectorAbierto((abierto) => !abierto)} aria-expanded={selectorAbierto} className="mascota-b18-figura" aria-label="Abrir los enfoques de B18"><b>B</b><i>18</i></button>
+      {explicacionActiva ? <div className="mascota-b18-explicacion"><b>B18 · {TONOS_MASCOTA[tono].etiqueta}</b><span>Los agentes muestran qué problema comercial atienden.</span></div> : null}
     </aside>
   </>;
 }

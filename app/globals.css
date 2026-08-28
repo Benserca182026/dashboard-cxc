@@ -273,10 +273,12 @@ body.producto-lienzo-blanco::before {
    vive sólo en su halo para que cambie el enfoque sin dibujar un borde pesado. */
 .mascota-b18 { left: 14px; bottom: 18px; display: block; }
 .mascota-b18-en-detalle { left: 18px; bottom: 18px; }
-.mascota-b18-figura { width: 62px; height: 62px; border: 0; border-radius: 18px; background: linear-gradient(135deg,#3c75ee,#80c5ff); box-shadow: 0 0 19px 5px color-mix(in srgb, var(--mascota-color) 62%, transparent), 0 14px 30px rgba(45,66,108,.22); color: white; font-style: normal; line-height: 1; }
+.mascota-b18-figura { display: flex; width: 62px; height: 62px; align-items: baseline; justify-content: center; gap: 1px; border: 0; border-radius: 50%; background: linear-gradient(135deg,#3c75ee,#80c5ff); box-shadow: 0 0 19px 5px color-mix(in srgb, var(--mascota-color) 62%, transparent), 0 14px 30px rgba(45,66,108,.22); color: white; font-style: normal; line-height: 1; cursor: pointer; }
 .mascota-b18-figura b { font-size: 26px; letter-spacing: -.08em; }.mascota-b18-figura i { margin-left: 1px; font-size: 12px; font-style: normal; font-weight: 900; vertical-align: baseline; }
 .mascota-b18-figura img, .mascota-b18-marca, .mascota-b18-globo { display: none; }
 .mascota-b18-opciones { top: -15px; left: 7px; }
+.mascota-b18-opciones-abiertas { opacity: 1; transform: none; pointer-events: auto; }
+.mascota-b18-explicacion { position: absolute; bottom: 0; left: 72px; width: 180px; border-radius: 12px; padding: 8px 9px; background: white; box-shadow: 0 10px 22px rgba(50,80,140,.15); color: #556783; font-size: 9px; font-weight: 700; line-height: 1.32; }.mascota-b18-explicacion b { display: block; color: #3d74ec; font-size: 8px; letter-spacing: .06em; }.mascota-b18-explicacion span { display: block; margin-top: 3px; }
 @media (max-width: 900px) { .mascota-b18 { left: 10px; bottom: 12px; }.mascota-b18-en-detalle { left: 9px; bottom: 9px; }.mascota-b18-figura { width: 54px; height: 54px; }.mascota-b18-figura b { font-size: 23px; } }
 
 /* El negro sigue siendo uno solo por pantalla, pero ahora convive con vidrio. */
