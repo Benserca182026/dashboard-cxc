@@ -7,7 +7,7 @@ export function AvisoPreliminar() {
   const ruta = usePathname();
   const { bundle, origen, cargandoRemoto } = useDecisionV2();
   const { complete, partial, blocked, total } = bundle.coverage;
-  if (ruta === "/login") return null;
+  if (ruta === "/login" || ruta === "/ventas/productos") return null;
 
   return (
     <aside

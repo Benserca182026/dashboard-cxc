@@ -241,7 +241,7 @@ body.producto-lienzo-blanco::before {
 
 @keyframes productoFlotarA { 0%, 100% { transform: translate3d(0, 0, 0); } 50% { transform: translate3d(7px, -8px, 0); } }
 @keyframes productoFlotarB { 0%, 100% { transform: translate3d(0, 0, 0); } 50% { transform: translate3d(-8px, 6px, 0); } }
-@keyframes productoNucleo { 0%, 100% { transform: translateX(-50%) scale(1); } 50% { transform: translateX(-50%) scale(1.045); } }
+@keyframes productoNucleo { 0%, 100% { transform: translate(-50%, -50%) scale(1); } 50% { transform: translate(-50%, -50%) scale(1.045); } }
 .producto-nodo-esquina { animation: productoFlotarA 5.5s ease-in-out infinite; }
 .producto-nodo-2, .producto-nodo-3 { animation-name: productoFlotarB; animation-duration: 6.6s; }
 .producto-nodo-4 { animation-duration: 7.4s; animation-delay: -1.5s; }

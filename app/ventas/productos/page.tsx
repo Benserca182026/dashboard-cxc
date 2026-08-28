@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Encabezado } from "@/components/Encabezado";
+import { BarraUsuario } from "@/components/BarraUsuario";
 import { SkeletonPagina } from "@/components/Basicos";
 import { PanelAgentesReferencia } from "@/components/commercial/PanelAgentesReferencia";
 import type { AgenteLateral } from "@/components/commercial/PanelAgentesLateral";
@@ -19,8 +19,6 @@ type LecturaProducto = {
   hallazgo: string;
   filas: FilaLectura[];
 };
-
-const SECCIONES = [{ id: "sec-productos", etiqueta: "Agentes de producto" }];
 
 // Clasificación disponible en el corte analítico actual. No deriva de la UI:
 // los agentes sólo muestran y explican esta salida ya calculada.
@@ -128,5 +126,10 @@ export default function PaginaCategoriasProducto() {
     id, iniciales: LECTURAS[id].iniciales, nombre: LECTURAS[id].nombre, senal: LECTURAS[id].senal, color: "#4b80ee", suave: "#eaf1ff",
   }));
 
-  return <div className="space-y-5"><Encabezado titulo="Categorías de producto" secciones={SECCIONES} dataset={dataset} modulo="ventas" /><div id="sec-productos" className="scroll-mt-24"><PanelAgentesReferencia agentes={agentes} activo={activo} onSeleccionar={setActivo}><BarrasDeLectura lectura={lectura} fmt={fmt} /></PanelAgentesReferencia></div></div>;
+  return <div className="space-y-3">
+    <header className="flex h-10 items-center justify-end">
+      <BarraUsuario dataset={dataset} modulo="ventas" />
+    </header>
+    <div id="sec-productos"><PanelAgentesReferencia agentes={agentes} activo={activo} onSeleccionar={setActivo}><BarrasDeLectura lectura={lectura} fmt={fmt} /></PanelAgentesReferencia></div>
+  </div>;
 }
