@@ -9,8 +9,9 @@ import { BUCKETS } from "@/lib/types";
 import { useApp } from "@/lib/store";
 
 const SECCIONES = [
-  { id: "sec-pulso", etiqueta: "Pulso" },
-  { id: "sec-impacto", etiqueta: "Top impacto" },
+  { id: "sec-ventas", etiqueta: "Ventas" },
+  { id: "sec-problemas", etiqueta: "Top 5 problemas" },
+  { id: "sec-impacto", etiqueta: "Cartera" },
   { id: "sec-acciones", etiqueta: "Acciones" },
   { id: "sec-antiguedad", etiqueta: "Antigüedad" },
 ];

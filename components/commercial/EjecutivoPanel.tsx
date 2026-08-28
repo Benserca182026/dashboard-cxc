@@ -10,7 +10,8 @@ import {
   type FilaImpactoEjecutivo,
 } from "@/lib/commercial-ejecutivo";
 import { analiticaForecast, analiticaVentas } from "@/lib/commercial-operacion";
-import { KpiExplorable, MapaImpactoCobranza, ResumenVentasEjecutivo } from "@/components/commercial/VisualesInteractivas";
+import { KpiExplorable, MapaImpactoCobranza } from "@/components/commercial/VisualesInteractivas";
+import { PortadaVentas } from "@/components/commercial/PortadaVentas";
 
 const ESTADO_LIMITE = {
   complete: { etiqueta: "calculado", clase: "bg-emerald-500/10 text-emerald-800" },
@@ -251,10 +252,10 @@ export function EjecutivoPanel() {
       <div className="relative z-10">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
-            <p className="text-[10px] font-semibold uppercase tracking-[0.1em] text-[#778198]">Centro ejecutivo · dinero, cambio y acción</p>
-            <h2 className="mt-1 text-[22px] font-extrabold tracking-[-0.02em] text-tinta">Qué mueve el resultado ahora</h2>
+            <p className="text-[10px] font-semibold uppercase tracking-[0.1em] text-[#778198]">Centro comercial · ventas, problemas y acción</p>
+            <h2 className="mt-1 text-[22px] font-extrabold tracking-[-0.02em] text-tinta">Ventas primero: qué cambió y qué exige atención</h2>
             <p className="mt-1 max-w-3xl text-[12px] leading-relaxed text-[#6b6f78]">
-              Cada cifra declara su fuente y corte. Cartera, Top 5 y aging comparten el cálculo operativo; los demás KPI conservan sus límites históricos.
+              La portada abre con el pulso comercial. Cartera y aging permanecen como una segunda capa, con su cálculo y corte separados.
             </p>
           </div>
           <div className="shrink-0 text-right">
@@ -271,6 +272,16 @@ export function EjecutivoPanel() {
           </p>
         ) : null}
 
+        <div className="mt-5"><PortadaVentas ventas={ventas} fmt={fmt} fuente={dataset.fuente} /></div>
+
+        <div className="mt-6 flex flex-wrap items-end justify-between gap-3 border-t border-white/60 pt-5">
+          <div>
+            <p className="text-[10px] font-semibold uppercase tracking-[0.1em] text-[#778198]">Segunda capa · cartera</p>
+            <h3 className="mt-1 text-[17px] font-extrabold tracking-[-0.02em] text-tinta">Riesgo financiero después del pulso comercial</h3>
+          </div>
+          <Link href="/aging" className="rounded-full bg-white/70 px-3 py-1.5 text-[10px] font-semibold text-[#536b91] hover:bg-white">abrir aging ↗</Link>
+        </div>
+
         <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
           <KpiExplorable etiqueta="Cartera vencida" valor={fmt(lectura.totalVencido)} nota={`${porcentajeVencido.toFixed(1)}% de cartera clasificable`} porcentaje={porcentajeVencido} tono="rojo" detalle={<><b>Hecho:</b> saldo pendiente con vencimiento anterior al corte {fechaCorte}.<br /><b>Fórmula:</b> saldo pendiente clasificado, bucket actual excluido.<br /><b>Fuente:</b> {dataset.fuente}.</>} />
           <KpiExplorable etiqueta="Mora crítica · 90+" valor={fmt(lectura.totalMoraCritica)} nota={`${moraCriticaPct.toFixed(1)}% de lo vencido`} porcentaje={moraCriticaPct} tono="ambar" detalle={<><b>Hecho:</b> saldo vencido clasificado en 90+ días.<br /><b>Acción:</b> revisar escalamiento, disputa o negociación; no significa pérdida automática.</>} />
@@ -283,8 +294,6 @@ export function EjecutivoPanel() {
         <p className="mt-2 text-[10px] text-[#8b8f98]">
           Cambio por cuenta: sin histórico comparable disponible · {lectura.sinFechaVencimiento} factura(s) con saldo sin fecha de vencimiento quedan fuera del ranking.
         </p>
-
-        <div className="mt-5"><ResumenVentasEjecutivo ventas={ventas} fmt={fmt} /></div>
 
         <div className="mt-5 grid gap-4 lg:grid-cols-[1.05fr_.95fr]">
           <div id="sec-acciones" className="scroll-mt-24 rounded-[20px] border border-white/70 bg-white/45 p-4 shadow-[inset_0_1px_0_rgba(255,255,255,.75)]">
