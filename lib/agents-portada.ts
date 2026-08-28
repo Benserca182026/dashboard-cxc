@@ -1,115 +1,94 @@
 import type { AnaliticaVentas } from "./commercial-operacion";
 
-export type SeveridadProblema = "critico" | "alto" | "medio";
+export type SeveridadAgente = "critico" | "atencion" | "observando" | "estable";
+export type ZonaAgente = "ventas" | "clientes" | "productos" | "cartera" | "centro";
 
-export interface ProblemaPortada {
+export interface AgenteComercial {
   id: string;
-  agente: string;
-  titulo: string;
-  metrica: string;
+  nombre: string;
+  abreviatura: string;
+  zona: ZonaAgente;
+  estado: SeveridadAgente;
+  senal: string;
   evidencia: string;
   accion: string;
   href: string;
-  severidad: SeveridadProblema;
   prioridad: number;
 }
 
-export interface ResultadoAgentesPortada {
-  ventaAuditoria: number;
-  diferenciaAuditoria: number;
-  ticketPromedio: number;
-  problemas: ProblemaPortada[];
+export interface ContextoCarteraPortada {
+  vencida: number;
+  moraCritica: number;
+  porcentajeVencido: number;
 }
 
-// Referencia registrada en el expediente de Auditoría para los mismos
-// 3,189 pedidos. Se conserva separada del cálculo vivo del Dashboard.
-export const VENTA_AUDITORIA_REFERENCIA = 19_292_422.91;
-
-function absPct(valor: number | null): number {
-  return Math.abs(valor ?? 0);
+function numero(n: number) {
+  return new Intl.NumberFormat("es-GT", { maximumFractionDigits: 1 }).format(n);
 }
 
-/**
- * Agentes deterministas de la portada. Cada hallazgo se deriva de una regla
- * visible; no hay texto generado ni decisiones automáticas.
- */
-export function ejecutarAgentesPortada(ventas: AnaliticaVentas): ResultadoAgentesPortada {
-  const diferenciaAuditoria = Number((ventas.vendidoOdoo - VENTA_AUDITORIA_REFERENCIA).toFixed(2));
-  const ticketPromedio = ventas.pedidosConReferencia > 0
-    ? Number((ventas.vendidoOdoo / ventas.pedidosConReferencia).toFixed(2))
-    : 0;
-  const variacion = ventas.variacionUltimoPeriodo ?? 0;
-  const principalCliente = ventas.topClientes[0];
-  const principalProducto = ventas.topProductos[0];
+/** Agentes visibles: leen comportamiento comercial, nunca calidad interna de datos. */
+export function ejecutarAgentesPortada(ventas: AnaliticaVentas, cartera: ContextoCarteraPortada): AgenteComercial[] {
+  const variacion = ventas.variacionUltimoPeriodo;
+  const cliente = ventas.topClientes[0];
+  const producto = ventas.topProductos[0];
+  const ticket = ventas.pedidosConReferencia > 0 ? ventas.vendidoOdoo / ventas.pedidosConReferencia : 0;
+  const concentracion = ventas.concentracionTop5 ?? 0;
+  const brechaLista = Math.abs(ventas.brechaPct ?? 0);
 
-  const problemas: ProblemaPortada[] = [
+  const agentes: AgenteComercial[] = [
     {
-      id: "reconciliacion",
-      agente: "Agente de reconciliación",
-      titulo: "Dos totales para la misma venta",
-      metrica: `Δ Q${Math.abs(diferenciaAuditoria).toLocaleString("es-GT", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
-      evidencia: `Dashboard y Auditoría conservan una diferencia de Q${Math.abs(diferenciaAuditoria).toLocaleString("es-GT", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}.`,
-      accion: "Abrir la comparación de fuentes antes de declarar un total definitivo.",
-      href: "/datos",
-      severidad: Math.abs(diferenciaAuditoria) > 1 ? "critico" : "medio",
-      prioridad: Math.abs(diferenciaAuditoria) > 1 ? 100 : 20,
+      id: "pulso", nombre: "Pulso de ventas", abreviatura: "PV", zona: "ventas",
+      estado: variacion !== null && variacion < -12 ? "critico" : variacion !== null && variacion < 0 ? "atencion" : "estable",
+      senal: variacion === null ? "sin comparación" : `${variacion >= 0 ? "+" : ""}${variacion.toFixed(1)}%`,
+      evidencia: variacion === null ? "Todavía no hay un período comparable completo." : `El período actual se mueve ${variacion >= 0 ? "por encima" : "por debajo"} del anterior al mismo día de corte.`,
+      accion: "Abrir la evolución mensual y localizar el punto de quiebre.", href: "/ventas", prioridad: variacion !== null && variacion < 0 ? 98 : 35,
     },
     {
-      id: "variacion",
-      agente: "Agente de cambio",
-      titulo: variacion < 0 ? "Caída en período comparable" : "Cambio comercial por explicar",
-      metrica: `${variacion >= 0 ? "+" : "−"}${absPct(variacion).toFixed(1)}%`,
-      evidencia: `${ventas.periodoComparacionActual ?? "Período actual"} frente a ${ventas.periodoComparacionAnterior ?? "período anterior"}, ambos hasta el día ${ventas.diaCorteComparacion ?? "—"}.`,
-      accion: "Abrir clientes y productos que más aportan al cambio.",
-      href: "/ventas",
-      severidad: variacion <= -20 ? "critico" : variacion < 0 ? "alto" : "medio",
-      prioridad: variacion < 0 ? 90 + Math.min(9, absPct(variacion) / 10) : 45,
+      id: "ticket", nombre: "Ticket comercial", abreviatura: "TC", zona: "ventas", estado: ticket > 0 ? "observando" : "estable",
+      senal: ticket > 0 ? `Q ${numero(ticket)}` : "sin señal",
+      evidencia: ticket > 0 ? `El valor medio por pedido confirmado es Q ${numero(ticket)}.` : "No hay pedidos con total confirmado para estimar ticket.",
+      accion: "Contrastar cambios de ticket con clientes y productos.", href: "/ventas", prioridad: 44,
     },
     {
-      id: "concentracion",
-      agente: "Agente de concentración",
-      titulo: "Venta dependiente de pocos clientes",
-      metrica: `${(ventas.concentracionTop5 ?? 0).toFixed(1)}% Top 5`,
-      evidencia: principalCliente
-        ? `${principalCliente.etiqueta} encabeza la concentración con ${principalCliente.pct.toFixed(1)}% del total.`
-        : "No hay clientes suficientes para calcular concentración.",
-      accion: "Revisar los cinco clientes que sostienen la mayor parte de la venta.",
-      href: "/ventas",
-      severidad: (ventas.concentracionTop5 ?? 0) >= 35 ? "alto" : "medio",
-      prioridad: 78,
+      id: "clientes", nombre: "Concentración de clientes", abreviatura: "CL", zona: "clientes",
+      estado: concentracion >= 45 ? "critico" : concentracion >= 30 ? "atencion" : "observando", senal: `${concentracion.toFixed(1)}% Top 5`,
+      evidencia: cliente ? `${cliente.etiqueta} lidera la venta; los cinco primeros clientes concentran ${concentracion.toFixed(1)}%.` : "No hay clientes suficientes para un ranking.",
+      accion: "Revisar dependencia y oportunidades en el resto de la cartera comercial.", href: "/ventas", prioridad: concentracion >= 30 ? 88 : 42,
     },
     {
-      id: "producto",
-      agente: "Agente de producto",
-      titulo: "Lista y venta neta no son lo mismo",
-      metrica: `${absPct(ventas.brechaPct).toFixed(1)}% de brecha`,
-      evidencia: principalProducto
-        ? `${principalProducto.etiqueta} lidera valor de lista; esa capa no prueba venta neta ni margen.`
-        : "No hay líneas de producto suficientes.",
-      accion: "Separar descuento, IVA y costo antes de usar la brecha como margen.",
-      href: "/ventas",
-      severidad: absPct(ventas.brechaPct) >= 20 ? "alto" : "medio",
-      prioridad: 72,
+      id: "cliente-principal", nombre: "Cliente principal", abreviatura: "CP", zona: "clientes",
+      estado: cliente && cliente.pct >= 20 ? "atencion" : "observando", senal: cliente ? `${cliente.pct.toFixed(1)}%` : "sin señal",
+      evidencia: cliente ? `${cliente.etiqueta} aporta ${cliente.pct.toFixed(1)}% de la venta registrada.` : "No hay señal principal disponible.",
+      accion: "Abrir ficha del cliente y revisar frecuencia, mix y tendencia.", href: "/ventas", prioridad: cliente?.pct && cliente.pct >= 20 ? 72 : 30,
     },
     {
-      id: "vendedor",
-      agente: "Agente de cobertura",
-      titulo: "Vendedor no preservado",
-      metrica: ventas.vendedorDisponible ? "Disponible" : "Bloqueado",
-      evidencia: ventas.vendedorDisponible
-        ? "La dimensión vendedor está disponible para este corte."
-        : "La fuente contiene vendedor, pero la copia analítica no lo conserva todavía.",
-      accion: "No publicar rankings, metas ni comisiones por vendedor hasta importar esa relación.",
-      href: "/datos",
-      severidad: ventas.vendedorDisponible ? "medio" : "alto",
-      prioridad: ventas.vendedorDisponible ? 25 : 68,
+      id: "producto", nombre: "Producto líder", abreviatura: "PR", zona: "productos",
+      estado: producto && producto.pct >= 18 ? "atencion" : "observando", senal: producto ? `${producto.pct.toFixed(1)}%` : "sin señal",
+      evidencia: producto ? `${producto.etiqueta} concentra ${producto.pct.toFixed(1)}% del valor de lista observado.` : "No hay productos suficientes para el ranking.",
+      accion: "Ver mezcla de productos y dependencia de la categoría dominante.", href: "/ventas", prioridad: producto?.pct && producto.pct >= 18 ? 70 : 36,
+    },
+    {
+      id: "mix", nombre: "Mezcla comercial", abreviatura: "MX", zona: "productos", estado: brechaLista >= 20 ? "atencion" : "observando", senal: `${brechaLista.toFixed(1)}%`,
+      evidencia: `La diferencia entre valor de lista y total registrado es ${brechaLista.toFixed(1)}%; se usa como señal de mezcla, no como margen.`,
+      accion: "Examinar categorías que mueven el valor por pedido.", href: "/ventas", prioridad: brechaLista >= 20 ? 64 : 32,
+    },
+    {
+      id: "cartera", nombre: "Cartera en riesgo", abreviatura: "CR", zona: "cartera",
+      estado: cartera.porcentajeVencido >= 35 ? "critico" : cartera.porcentajeVencido >= 15 ? "atencion" : "observando", senal: `${cartera.porcentajeVencido.toFixed(1)}%`,
+      evidencia: `Q ${numero(cartera.vencida)} permanece vencido dentro de la cartera clasificable.`,
+      accion: "Abrir aging y priorizar los clientes con mayor saldo vencido.", href: "/aging", prioridad: cartera.porcentajeVencido >= 15 ? 90 : 38,
+    },
+    {
+      id: "mora", nombre: "Mora crítica", abreviatura: "90+", zona: "cartera", estado: cartera.moraCritica > 0 ? "atencion" : "estable", senal: cartera.moraCritica > 0 ? `Q ${numero(cartera.moraCritica)}` : "sin saldo",
+      evidencia: cartera.moraCritica > 0 ? `Q ${numero(cartera.moraCritica)} está en 90+ días y requiere gestión priorizada.` : "No hay saldo crítico en 90+ días para este corte.",
+      accion: "Separar acuerdos, disputas y cuentas que necesitan escalamiento.", href: "/aging", prioridad: cartera.moraCritica > 0 ? 84 : 20,
+    },
+    {
+      id: "coordinador", nombre: "Coordinador comercial", abreviatura: "CO", zona: "centro", estado: "observando", senal: `${ventas.pedidosConReferencia.toLocaleString("es-GT")} pedidos`,
+      evidencia: "Conecta ventas, clientes, productos y cartera para priorizar la señal comercial más importante.",
+      accion: "Seleccionar un agente para iluminar su módulo y abrir la investigación.", href: "/ventas", prioridad: 100,
     },
   ];
 
-  return {
-    ventaAuditoria: VENTA_AUDITORIA_REFERENCIA,
-    diferenciaAuditoria,
-    ticketPromedio,
-    problemas: problemas.sort((a, b) => b.prioridad - a.prioridad).slice(0, 5),
-  };
+  return agentes.sort((a, b) => b.prioridad - a.prioridad);
 }
