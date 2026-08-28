@@ -7,6 +7,7 @@ export interface AgenteLateral<T extends string> {
   iniciales: string;
   nombre: string;
   senal: string;
+  capacidad?: string;
   color: string;
   suave: string;
 }

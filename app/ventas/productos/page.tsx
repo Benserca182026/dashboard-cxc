@@ -122,12 +122,16 @@ export default function PaginaCategoriasProducto() {
   if (cargando) return <SkeletonPagina />;
 
   const lectura = LECTURAS[activo];
+  const capacidades: Record<AgenteProducto, string> = {
+    familia: "730 referencias", tipo: "584 cascos", modelo: "730 referencias", licencia: "730 referencias", cobertura: "730 referencias",
+  };
   const agentes: AgenteLateral<AgenteProducto>[] = (Object.keys(LECTURAS) as AgenteProducto[]).map((id) => ({
-    id, iniciales: LECTURAS[id].iniciales, nombre: LECTURAS[id].nombre, senal: LECTURAS[id].senal, color: "#4b80ee", suave: "#eaf1ff",
+    id, iniciales: LECTURAS[id].iniciales, nombre: LECTURAS[id].nombre, senal: LECTURAS[id].senal, capacidad: capacidades[id], color: "#4b80ee", suave: "#eaf1ff",
   }));
 
   return <div className="space-y-3">
-    <header className="flex h-10 items-center justify-end">
+    <header className="mx-auto flex w-full max-w-5xl items-start justify-between gap-5 pt-2">
+      <h1 className="max-w-xl text-[clamp(2rem,4vw,3.7rem)] font-black leading-[.92] tracking-[-.065em] text-[#111827]">Clasifica productos.<span className="block bg-[linear-gradient(90deg,#467deb,#8cc8ff)] bg-clip-text text-transparent">Encuentra lo que falta.</span></h1>
       <BarraUsuario dataset={dataset} modulo="ventas" />
     </header>
     <div id="sec-productos"><PanelAgentesReferencia agentes={agentes} activo={activo} onSeleccionar={setActivo}><BarrasDeLectura lectura={lectura} fmt={fmt} /></PanelAgentesReferencia></div>
