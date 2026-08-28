@@ -32,7 +32,7 @@ function GraficoLinea({ puntos, fmt, activo, agente, onActivar }: { puntos: Punt
   const rango = Math.max(1, maximo - minimo);
   const coords = serie.map((p, indice) => ({ x: 18 + (indice / Math.max(1, serie.length - 1)) * 244, y: 22 + ((maximo - p.valor) / rango) * 96, ...p }));
   const path = coords.map((p, indice) => `${indice ? "L" : "M"}${p.x},${p.y}`).join(" ");
-  return <button type="button" onMouseEnter={onActivar} onFocus={onActivar} onClick={onActivar} className={`module-card module-ventas group w-full text-left ${activo ? "module-card-active" : ""}`}>
+  return <button type="button" onMouseEnter={onActivar} onFocus={onActivar} onClick={onActivar} className={`module-card module-ventas group w-full text-left ${activo ? "module-card-active" : ""} ${agente ? "module-card-target" : ""}`}>
     <span className="module-kicker">Ventas</span><span className="module-title">Ritmo mensual</span>
     <svg viewBox="0 0 280 142" className="mt-2 h-28 w-full" role="img" aria-label="Ritmo mensual de ventas">
       {[45, 82, 119].map((y) => <line key={y} x1="18" x2="262" y1={y} y2={y} stroke="#d9dfeb" strokeDasharray="3 5" />)}
@@ -47,7 +47,7 @@ function GraficoLinea({ puntos, fmt, activo, agente, onActivar }: { puntos: Punt
 function GraficoBarras({ titulo, zona, filas, fmt, activo, agente, onActivar }: { titulo: string; zona: string; filas: FilaComercial[]; fmt: (n: number) => string; activo: boolean; agente: AgenteComercial | null; onActivar: () => void }) {
   const top = filas.slice(0, 4); const maximo = Math.max(1, ...top.map((x) => x.valor));
   const clase = zona === "Clientes" ? "module-clientes" : "module-productos";
-  return <button type="button" onMouseEnter={onActivar} onFocus={onActivar} onClick={onActivar} className={`module-card ${clase} group w-full text-left ${activo ? "module-card-active" : ""}`}>
+  return <button type="button" onMouseEnter={onActivar} onFocus={onActivar} onClick={onActivar} className={`module-card ${clase} group w-full text-left ${activo ? "module-card-active" : ""} ${agente ? "module-card-target" : ""}`}>
     <span className="module-kicker">{zona}</span><span className="module-title">{titulo}</span>
     <div className="mt-3 space-y-2.5">{top.map((fila, indice) => <div key={fila.id}><div className="flex justify-between gap-2"><span className="truncate text-[9px] font-semibold text-[#566175]">{fila.etiqueta}</span><span className="text-[9px] font-bold text-[#31394b]">{fila.pct.toFixed(1)}%</span></div><span className="mt-1 block h-2 rounded-full bg-[#e8ecf3]"><i className={`block h-full rounded-full ${indice === 0 ? "bg-[#e47743]" : "bg-[#7487c4]"}`} style={{ width: `${Math.max(5, fila.valor / maximo * 100)}%` }} /></span></div>)}</div>
     {!agente && <span className="module-hover">pasar por encima para llamar a los agentes</span>}<ExplicacionAgente agente={agente}/>
@@ -56,7 +56,7 @@ function GraficoBarras({ titulo, zona, filas, fmt, activo, agente, onActivar }: 
 
 function ModuloCartera({ contexto, fmt, activo, agente, onActivar }: { contexto: ContextoCarteraPortada; fmt: (n: number) => string; activo: boolean; agente: AgenteComercial | null; onActivar: () => void }) {
   const maximo = Math.max(1, contexto.vencida, contexto.moraCritica);
-  return <button type="button" onMouseEnter={onActivar} onFocus={onActivar} onClick={onActivar} className={`module-card module-cartera group w-full text-left ${activo ? "module-card-active" : ""}`}>
+  return <button type="button" onMouseEnter={onActivar} onFocus={onActivar} onClick={onActivar} className={`module-card module-cartera group w-full text-left ${activo ? "module-card-active" : ""} ${agente ? "module-card-target" : ""}`}>
     <span className="module-kicker">Cartera</span><span className="module-title">Pulso de cobro</span>
     <div className="mt-4 flex items-end gap-3"><div className="flex-1"><div className="flex items-center justify-between text-[9px] text-[#566175]"><span>Vencida</span><b>{contexto.porcentajeVencido.toFixed(1)}%</b></div><i className="mt-1.5 block h-4 rounded-full bg-[#ff8b78]" style={{ width: `${contexto.vencida / maximo * 100}%` }} /></div><div className="flex-1"><div className="flex items-center justify-between text-[9px] text-[#566175]"><span>90+</span><b>crítica</b></div><i className="mt-1.5 block h-4 rounded-full bg-[#1f2430]" style={{ width: `${contexto.moraCritica / maximo * 100}%` }} /></div></div>
     <span className="mt-4 block text-[10px] font-bold text-[#31394b]">{fmt(contexto.vencida)} vencida</span>{!agente && <span className="module-hover">abrir investigación de cartera</span>}<ExplicacionAgente agente={agente}/>
