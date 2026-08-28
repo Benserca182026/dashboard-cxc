@@ -232,6 +232,13 @@ body {
     linear-gradient(158deg, #f3f6fc 0%, #e6ecf8 48%, #d9e2f2 100%);
 }
 
+/* Categorías de producto usa un lienzo blanco propio: el azul queda sólo en
+   las señales del agente y sus sombras, no como fondo de toda la aplicación. */
+body.producto-lienzo-blanco,
+body.producto-lienzo-blanco::before {
+  background: #ffffff !important;
+}
+
 /* El negro sigue siendo uno solo por pantalla, pero ahora convive con vidrio. */
 .piel-referencia .pastilla-activa { box-shadow: 0 8px 22px -10px rgba(22, 24, 29, 0.5); }
 

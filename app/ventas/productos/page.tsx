@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Encabezado } from "@/components/Encabezado";
 import { SkeletonPagina } from "@/components/Basicos";
 import { PanelAgentesReferencia } from "@/components/commercial/PanelAgentesReferencia";
@@ -36,6 +36,10 @@ export default function PaginaCategoriasProducto() {
   const { dataset, cargando, fechaCorte, fmt } = useApp();
   const [dimension, setDimension] = useState<Dimension>("familia");
   const [activo, setActivo] = useState<AgenteProducto>("atributo");
+  useEffect(() => {
+    document.body.classList.add("producto-lienzo-blanco");
+    return () => document.body.classList.remove("producto-lienzo-blanco");
+  }, []);
   const productos = useMemo(() => acumuladosComposicionPorProducto(dataset), [dataset]);
   const activa = DIMENSIONES.find((x) => x.id === dimension) ?? DIMENSIONES[0];
   const total = productos.reduce((s, x) => s + x.valor, 0);
