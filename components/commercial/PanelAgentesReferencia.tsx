@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
+import type { ReactNode } from "react";
 import type { AgenteLateral } from "./PanelAgentesLateral";
 
 export function PanelAgentesReferencia<T extends string>({
@@ -16,7 +16,6 @@ export function PanelAgentesReferencia<T extends string>({
   children: ReactNode;
   handoff: ReactNode;
 }) {
-  const [mostrarResultado, setMostrarResultado] = useState(false);
   const agente = agentes.find((item) => item.id === activo) ?? agentes[0];
 
   return (
@@ -28,7 +27,7 @@ export function PanelAgentesReferencia<T extends string>({
             <div className="space-y-4">
               {agentes.map((item) => {
                 const seleccionado = item.id === activo;
-                return <button key={item.id} type="button" onClick={() => onSeleccionar(item.id)} aria-pressed={seleccionado} className="flex w-full items-center gap-2 text-left opacity-75 transition hover:opacity-100">
+                return <button key={item.id} type="button" onClick={() => onSeleccionar(item.id)} aria-pressed={seleccionado} className={`flex w-full items-center gap-2 rounded-xl p-1.5 text-left transition ${seleccionado ? "bg-[#eaf1ff] shadow-[0_7px_16px_rgba(77,120,204,.12)]" : "opacity-65 hover:bg-white hover:opacity-100"}`}>
                   <span className={`grid h-7 w-7 shrink-0 place-items-center rounded-lg text-[8px] font-black ${seleccionado ? "bg-[#dce8ff] text-[#4c80ee]" : "bg-[#f0f4ff] text-[#a1b7ed]"}`}>{item.iniciales}</span>
                   <span className={`hidden truncate text-[9px] font-bold md:block ${seleccionado ? "text-[#5275bc]" : "text-[#b6c2da]"}`}>{item.nombre}</span>
                 </button>;
@@ -38,12 +37,12 @@ export function PanelAgentesReferencia<T extends string>({
 
           <main className="relative grid min-h-[490px] place-items-center overflow-hidden">
             <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_48%,rgba(231,239,255,.82),transparent_27%)]" />
-            <div className="relative grid w-full max-w-md place-items-center text-center">
-              <span className="absolute left-[12%] top-[15%] grid h-12 w-12 place-items-center rounded-xl border border-[#edf2fe] bg-white text-lg text-[#86acf8] shadow-[0_10px_24px_rgba(90,126,195,.12)]">▣</span>
-              <span className="absolute right-[12%] top-[15%] grid h-12 w-12 place-items-center rounded-xl border border-[#edf2fe] bg-white text-lg text-[#86acf8] shadow-[0_10px_24px_rgba(90,126,195,.12)]">⌁</span>
-              <span className="absolute bottom-[2%] left-[24%] grid h-12 w-12 place-items-center rounded-xl border border-[#edf2fe] bg-white text-lg text-[#86acf8] shadow-[0_10px_24px_rgba(90,126,195,.12)]">↗</span>
-              <span className="absolute bottom-[2%] right-[24%] grid h-12 w-12 place-items-center rounded-xl border border-[#edf2fe] bg-white text-lg text-[#86acf8] shadow-[0_10px_24px_rgba(90,126,195,.12)]">◌</span>
-              <div className="grid h-[90px] w-[90px] place-items-center rounded-[25px] bg-[linear-gradient(135deg,#3d74ec,#7dc3ff)] text-lg font-black text-white shadow-[0_22px_45px_rgba(64,119,239,.35)] ring-8 ring-[#edf4ff]">{agente?.iniciales}</div>
+            <div key={agente?.id} className="relative grid w-full max-w-md place-items-center text-center">
+              <span className="producto-nodo-flotante producto-nodo-a absolute left-[12%] top-[15%] grid h-12 w-12 place-items-center rounded-xl border border-[#edf2fe] bg-white text-lg text-[#86acf8] shadow-[0_10px_24px_rgba(90,126,195,.12)]">▣</span>
+              <span className="producto-nodo-flotante producto-nodo-b absolute right-[12%] top-[15%] grid h-12 w-12 place-items-center rounded-xl border border-[#edf2fe] bg-white text-lg text-[#86acf8] shadow-[0_10px_24px_rgba(90,126,195,.12)]">⌁</span>
+              <span className="producto-nodo-flotante producto-nodo-c absolute bottom-[2%] left-[24%] grid h-12 w-12 place-items-center rounded-xl border border-[#edf2fe] bg-white text-lg text-[#86acf8] shadow-[0_10px_24px_rgba(90,126,195,.12)]">↗</span>
+              <span className="producto-nodo-flotante producto-nodo-d absolute bottom-[2%] right-[24%] grid h-12 w-12 place-items-center rounded-xl border border-[#edf2fe] bg-white text-lg text-[#86acf8] shadow-[0_10px_24px_rgba(90,126,195,.12)]">◌</span>
+              <div className="producto-nucleo-activo grid h-[90px] w-[90px] place-items-center rounded-[25px] bg-[linear-gradient(135deg,#3d74ec,#7dc3ff)] text-lg font-black text-white shadow-[0_22px_45px_rgba(64,119,239,.35)] ring-8 ring-[#edf4ff]">{agente?.iniciales}</div>
               <p className="mt-5 max-w-[220px] text-[11px] font-bold leading-relaxed text-[#7283a3]">{agente?.senal}</p>
             </div>
           </main>
@@ -56,10 +55,10 @@ export function PanelAgentesReferencia<T extends string>({
 
         <div className="absolute -bottom-8 right-4 z-20 w-[min(290px,calc(100%-2rem))] rounded-2xl border border-white bg-white/95 p-4 shadow-[0_18px_42px_rgba(71,103,171,.18)] md:right-9">
           <div className="flex items-start gap-3"><span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-[#e6efff] text-[#6d9bf1]">⌁</span><div><p className="text-[9px] font-black uppercase tracking-[.12em] text-[#8192b1]">Handoff</p><p className="mt-1 text-[12px] font-black text-[#263857]">{agente?.nombre}</p><div className="mt-2 text-[10px] leading-relaxed text-[#71809b]">{handoff}</div></div></div>
-          <button type="button" onClick={() => setMostrarResultado((value) => !value)} className="mt-3 text-[10px] font-black text-[#5f8ef1]">{mostrarResultado ? "Ocultar lectura" : "Abrir lectura"} →</button>
+          <p className="mt-3 text-[10px] font-black text-[#5f8ef1]">Gráfica actualizada ↓</p>
         </div>
       </div>
-      {mostrarResultado && <div className="mx-auto mt-16 max-w-5xl rounded-[26px] border border-[#edf1fb] bg-white p-5 shadow-[0_18px_42px_rgba(71,105,175,.08)] md:p-7">{children}</div>}
+      <div className="mx-auto mt-16 max-w-5xl rounded-[26px] border border-[#edf1fb] bg-white p-5 shadow-[0_18px_42px_rgba(71,105,175,.08)] md:p-7">{children}</div>
     </section>
   );
 }
