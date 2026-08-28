@@ -10,6 +10,8 @@ export interface AgenteLateral<T extends string> {
   capacidad?: string;
   problema?: string;
   accion?: string;
+  kpiPct?: number;
+  kpiEtiqueta?: string;
   color: string;
   suave: string;
 }
