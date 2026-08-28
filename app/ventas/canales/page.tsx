@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Encabezado } from "@/components/Encabezado";
 import { SkeletonPagina } from "@/components/Basicos";
+import { ModuloGuiado } from "@/components/commercial/ModuloGuiado";
 import { acumuladosVentasPorCliente } from "@/lib/commercial-operacion";
 import { useApp } from "@/lib/store";
 
@@ -193,9 +194,22 @@ export default function PaginaCanalesVentas() {
         </div>
       </section>
 
-      <section id="sec-clasificar" className="scroll-mt-24 rounded-[28px] border border-white/90 bg-white/75 p-5 shadow-[0_12px_30px_rgba(44,63,108,.08)]">
-        <div className="flex flex-wrap items-end justify-between gap-3"><div><p className="text-[10px] font-black uppercase tracking-[.14em] text-[#e47743]">Siguiente paso</p><h2 className="mt-1 text-xl font-black text-[#253047]">Completar la clasificación de clientes</h2></div><span className="rounded-full bg-[#fff0e9] px-3 py-1.5 text-[10px] font-black text-[#c86a37]">local · no escribe Odoo</span></div>
-        <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">{porCanal.map((canal) => <div key={canal.id} className="rounded-2xl border p-4" style={{ borderColor: `${canal.color}33`, background: canal.suave }}><p className="text-[10px] font-black uppercase tracking-[.12em]" style={{ color: canal.color }}>{canal.abreviatura} · {canal.nombre}</p><p className="mt-1 text-xl font-black text-[#29334a]">{canal.filas.length} clientes</p><p className="mt-1 text-[10px] font-semibold text-[#68758d]">{canal.descripcion} · {canal.pedidos} pedidos</p></div>)}</div>
+      <section id="sec-clasificar" className="scroll-mt-24 rounded-[34px] border border-white/90 bg-[linear-gradient(135deg,#f1f5ff_0%,#e8effb_100%)] p-5 shadow-[0_16px_38px_rgba(44,63,108,.10)] md:p-7">
+        <div className="mb-5 flex flex-wrap items-end justify-between gap-3"><div><p className="text-[10px] font-black uppercase tracking-[.14em] text-[#596bd0]">Ruta de trabajo</p><h2 className="mt-1 text-2xl font-black tracking-[-.03em] text-[#253047]">Módulos guiados por agentes</h2><p className="mt-1 text-sm text-[#6b7690]">La página no cambia de modo: cada agente vive dentro de su módulo y conduce la siguiente lectura.</p></div><span className="rounded-full bg-white/80 px-3 py-1.5 text-[10px] font-black text-[#657291]">01 → 04</span></div>
+        <div className="space-y-4">
+          <ModuloGuiado orden="01" agente="Cobertura visible" iniciales="CV" senal={`${cobertura.toFixed(1)}% de venta ya clasificada`} color="#2f9d78" suave="#e8f8f1" activo={agenteActivo === "cobertura"} atenuado={Boolean(agenteActivo && agenteActivo !== "cobertura")} onActivar={() => setAgenteActivo(agenteActivo === "cobertura" ? null : "cobertura")}>
+            <div className="grid gap-4 md:grid-cols-[1fr_220px]"><div><p className="text-xl font-black text-[#263149]">{cobertura.toFixed(1)}% leído por canal</p><div className="mt-3 h-4 overflow-hidden rounded-full bg-[#e2e8f2]"><div className="h-full rounded-full bg-[#2f9d78]" style={{ width: `${cobertura}%` }} /></div></div><p className="text-right text-[11px] font-bold text-[#69758c]">{sinClasificar.length.toLocaleString("es-GT")} clientes aún sin canal<br />{fmt(valorSinClasificar)} por clasificar</p></div>
+          </ModuloGuiado>
+          <ModuloGuiado orden="02" agente="Mezcla de canales" iniciales="MX" senal={principal?.valor ? `${principal.nombre} lidera la base clasificada` : "todavía no hay base clasificada"} color="#a45ccf" suave="#f7edff" activo={agenteActivo === "mezcla"} atenuado={Boolean(agenteActivo && agenteActivo !== "mezcla")} onActivar={() => setAgenteActivo(agenteActivo === "mezcla" ? null : "mezcla")}>
+            <div className="grid gap-3 md:grid-cols-2">{porCanal.map((canal) => <div key={canal.id} className="rounded-2xl bg-[#f7f9fd] p-3"><div className="flex justify-between gap-3 text-[11px] font-black text-[#536078]"><span>{canal.nombre}</span><span>{porcentaje(canal.valor, total).toFixed(1)}%</span></div><div className="mt-2 h-2.5 overflow-hidden rounded-full bg-[#e4e9f2]"><div className="h-full rounded-full" style={{ width: `${porcentaje(canal.valor, total)}%`, background: canal.color }} /></div><p className="mt-2 text-[10px] font-semibold text-[#718099]">{canal.filas.length} clientes · {canal.pedidos} pedidos</p></div>)}</div>
+          </ModuloGuiado>
+          <ModuloGuiado orden="03" agente="Histórico de canal" iniciales="HC" senal={`${historial.length} períodos comparables`} color="#596bd0" suave="#edf0ff" activo={agenteActivo === "historia"} atenuado={Boolean(agenteActivo && agenteActivo !== "historia")} onActivar={() => setAgenteActivo(agenteActivo === "historia" ? null : "historia")}>
+            <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_220px]"><GraficoHistorico puntos={historial} color="#596bd0" /><p className="self-center text-[11px] leading-relaxed text-[#68758f]">El histórico se activa al clasificar clientes. No distribuye la venta hacia atrás sin una decisión de canal verificable.</p></div>
+          </ModuloGuiado>
+          <ModuloGuiado orden="04" agente="Codificador comercial" iniciales="CC" senal={`${sinClasificar.length} clientes en cola`} color="#e47743" suave="#fff0e9" activo={agenteActivo === "clasificacion"} atenuado={Boolean(agenteActivo && agenteActivo !== "clasificacion")} onActivar={() => setAgenteActivo(agenteActivo === "clasificacion" ? null : "clasificacion")}>
+            <div className="grid gap-2 md:grid-cols-2">{sinClasificar.slice(0, 6).map((cliente) => <div key={cliente.id} className="grid grid-cols-[minmax(0,1fr)_132px] items-center gap-3 rounded-2xl bg-[#fff8f4] px-3 py-2.5"><div className="min-w-0"><p className="truncate text-[11px] font-extrabold text-[#36415a]">{cliente.etiqueta}</p><p className="text-[10px] font-semibold text-[#748099]">{fmt(cliente.valor)} · {cliente.pedidos} pedidos</p></div><select aria-label={`Asignar canal a ${cliente.etiqueta}`} value="" onChange={(e) => cambiarCanal(cliente.id, e.target.value)} className="rounded-xl border border-[#f0d8cb] bg-white px-2 py-1.5 text-[10px] font-bold text-[#8f674f] outline-none focus:border-[#e47743]"><option value="">Asignar canal</option>{CANALES.map((canal) => <option key={canal.id} value={canal.id}>{canal.nombre}</option>)}</select></div>)}{sinClasificar.length === 0 && <p className="rounded-2xl bg-[#e8f8f1] p-4 text-[11px] font-bold text-[#2f9d78]">Toda la venta disponible ya tiene canal asignado.</p>}</div>
+          </ModuloGuiado>
+        </div>
       </section>
 
       <section id="sec-control-canal" className="scroll-mt-24 rounded-[28px] border border-[#dfe6f4] bg-[#f6f8fc] p-5 text-[11px] leading-relaxed text-[#5e6b83]">
