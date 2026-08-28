@@ -131,7 +131,7 @@ export default function PaginaCategoriasProducto() {
 
   return <div className="space-y-3">
     <header className="mx-auto flex w-full max-w-5xl items-start justify-between gap-5 pt-2">
-      <h1 className="max-w-xl text-[clamp(2rem,4vw,3.7rem)] font-black leading-[.92] tracking-[-.065em] text-[#111827]">Clasifica productos.<span className="block bg-[linear-gradient(90deg,#467deb,#8cc8ff)] bg-clip-text text-transparent">Encuentra lo que falta.</span></h1>
+      <h1 className="min-w-0 whitespace-nowrap text-[clamp(1.7rem,3.35vw,3.4rem)] font-black leading-none tracking-[-.065em] text-[#111827]">Clasificación <span className="bg-[linear-gradient(90deg,#467deb,#8cc8ff)] bg-clip-text text-transparent">comercial de productos</span></h1>
       <BarraUsuario dataset={dataset} modulo="ventas" />
     </header>
     <div id="sec-productos"><PanelAgentesReferencia agentes={agentes} activo={activo} onSeleccionar={setActivo}><BarrasDeLectura lectura={lectura} fmt={fmt} /></PanelAgentesReferencia></div>

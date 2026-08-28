@@ -11,10 +11,10 @@ const POSICIONES_CENTRALES = [
 ];
 
 const POSICIONES_ESQUINAS = [
-  "left-6 top-7 md:left-9 md:top-9",
-  "right-6 top-7 md:right-9 md:top-9",
-  "bottom-7 left-6 md:bottom-9 md:left-9",
-  "bottom-7 right-6 md:bottom-9 md:right-9",
+  "fixed left-7 top-24 md:left-12 md:top-24",
+  "fixed right-7 top-24 md:right-12 md:top-24",
+  "fixed bottom-8 left-7 md:bottom-10 md:left-12",
+  "fixed bottom-8 right-7 md:bottom-10 md:right-12",
 ];
 
 export function PanelAgentesReferencia<T extends string>({
@@ -55,12 +55,12 @@ export function PanelAgentesReferencia<T extends string>({
 
           <main className="relative min-h-[550px] overflow-hidden px-5 py-8 md:px-10">
             <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,rgba(231,240,255,.9),transparent_34%)]" />
-            {detalleAbierto && <div className="absolute inset-0 z-10 bg-white/30 backdrop-blur-[5px]" />}
-            {detalleAbierto && <div className="absolute inset-x-16 bottom-12 top-12 z-30 overflow-y-auto rounded-[26px] border border-[#eef2fb] bg-white/95 p-5 shadow-[0_18px_44px_rgba(72,106,174,.12)] animate-[entradaSuave_.32s_ease-out] md:inset-x-24 md:bottom-16 md:top-16 md:p-7">{children}</div>}
+            {detalleAbierto && <button type="button" onClick={() => setDetalleAbierto(false)} aria-label="Cerrar detalle del agente" className="fixed inset-0 z-40 cursor-default bg-white/35 backdrop-blur-[7px]" />}
+            {detalleAbierto && <div className="fixed bottom-8 left-28 right-8 top-24 z-50 overflow-y-auto rounded-[30px] border border-[#eef2fb] bg-white/96 p-6 shadow-[0_28px_70px_rgba(50,80,140,.2)] animate-[entradaSuave_.32s_ease-out] md:bottom-12 md:left-40 md:right-12 md:top-28 md:p-9">{children}</div>}
 
             {alrededor.map((item, indice) => {
               const posicion = detalleAbierto ? POSICIONES_ESQUINAS[indice] : POSICIONES_CENTRALES[indice];
-              return <button key={item.id} type="button" onClick={() => seleccionarAgente(item.id)} className={`producto-nodo-esquina producto-nodo-${indice + 1} absolute z-20 grid h-14 w-14 place-items-center rounded-2xl border border-[#edf2fe] bg-white text-[10px] font-black text-[#76a0f4] shadow-[0_12px_28px_rgba(90,126,195,.15)] transition-all duration-500 hover:scale-110 focus:outline-none focus:ring-4 focus:ring-[#e1ebff] ${posicion}`}>{item.iniciales}<span className="absolute -bottom-9 w-32 text-center text-[8px] font-bold leading-tight text-[#8d9bb5]"><span className="block truncate">{item.nombre}</span><span className="block truncate text-[#6c91dc]">{item.senal}</span></span></button>;
+              return <button key={item.id} type="button" onClick={() => seleccionarAgente(item.id)} className={`producto-nodo-esquina producto-nodo-${indice + 1} ${detalleAbierto ? "z-50" : "absolute z-20"} grid h-14 w-14 place-items-center rounded-2xl border border-[#edf2fe] bg-white text-[10px] font-black text-[#76a0f4] shadow-[0_12px_28px_rgba(90,126,195,.15)] transition-all duration-500 hover:scale-110 focus:outline-none focus:ring-4 focus:ring-[#e1ebff] ${posicion}`}>{item.iniciales}<span className="absolute -bottom-9 w-32 text-center text-[8px] font-bold leading-tight text-[#8d9bb5]"><span className="block truncate">{item.nombre}</span><span className="block truncate text-[#6c91dc]">{item.senal}</span></span></button>;
             })}
 
             {!detalleAbierto && <><button key={agente?.id} type="button" onClick={() => setDetalleAbierto(true)} aria-expanded={detalleAbierto} className="producto-nucleo-activo absolute left-1/2 top-1/2 z-30 grid h-[88px] w-[88px] -translate-x-1/2 -translate-y-1/2 place-items-center rounded-[25px] bg-[linear-gradient(135deg,#3d74ec,#7dc3ff)] text-lg font-black text-white shadow-[0_22px_45px_rgba(64,119,239,.35)] ring-8 ring-[#edf4ff] transition hover:scale-105 focus:outline-none focus:ring-4 focus:ring-[#cbdcff]">{agente?.iniciales}</button>
