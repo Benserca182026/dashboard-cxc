@@ -96,7 +96,23 @@ export function PanelAgentesReferencia<T extends string>({
   const [tono, setTono] = useState<TonoMascota>("riesgo");
   const [detalleAbierto, setDetalleAbierto] = useState(false);
   const agente = agentes.find((item) => item.id === activo) ?? agentes[0];
-  const alrededor = agentes.filter((item) => item.id !== agente?.id);
+  // El lienzo tiene una plaza central y cuatro esquinas fijas. Así el primer
+  // estado siempre se lee como una conversación entre el foco y sus cuatro
+  // dimensiones complementarias, sin crear una quinta tarjeta flotante.
+  const esquinaBase: Record<string, number> = {
+    tipo: 0,
+    familia: 1,
+    licencia: 2,
+    modelo: 3,
+  };
+  const esquinaActiva = esquinaBase[String(agente?.id)] ?? 0;
+  const alrededor = agentes
+    .filter((item) => item.id !== agente?.id)
+    .sort((a, b) => {
+      const posicionA = String(a.id) === "cobertura" ? esquinaActiva : esquinaBase[String(a.id)] ?? 99;
+      const posicionB = String(b.id) === "cobertura" ? esquinaActiva : esquinaBase[String(b.id)] ?? 99;
+      return posicionA - posicionB;
+    });
   const lecturaActiva = agente?.lecturas?.[tono] ?? "";
 
   useEffect(() => {
@@ -126,7 +142,7 @@ export function PanelAgentesReferencia<T extends string>({
       </div>
 
       <div className="product-agent-stage">
-        {agentes.map((item, indice) => (
+        {alrededor.map((item, indice) => (
           <TarjetaComercial
             key={item.id}
             agente={item}
@@ -137,18 +153,19 @@ export function PanelAgentesReferencia<T extends string>({
           />
         ))}
 
+        {alrededor.map((item, indice) => (
+          <button
+            key={item.id}
+            type="button"
+            className={`product-orbit-node product-orbit-node-${indice}`}
+            onClick={() => onSeleccionar(item.id)}
+            aria-label={`Seleccionar ${item.nombre}`}
+          >
+            <b>{item.iniciales}</b><span>{item.nombre}</span>
+          </button>
+        ))}
+
         <div className="product-agent-center" aria-live="polite">
-          {alrededor.map((item, indice) => (
-            <button
-              key={item.id}
-              type="button"
-              className={`product-orbit-node product-orbit-node-${indice}`}
-              onClick={() => onSeleccionar(item.id)}
-              aria-label={`Seleccionar ${item.nombre}`}
-            >
-              <b>{item.iniciales}</b><span>{item.nombre}</span>
-            </button>
-          ))}
           <button
             type="button"
             className="product-central-node"

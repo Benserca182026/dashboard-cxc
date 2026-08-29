@@ -215,7 +215,9 @@ function DetalleLectura({ lectura }: { lectura: LecturaProducto }) {
 
 export default function PaginaCategoriasProducto() {
   const { cargando, dataset } = useApp();
-  const [activo, setActivo] = useState<AgenteProducto>("familia");
+  // Cobertura abre en el centro: las cuatro dimensiones restantes ocupan las
+  // esquinas del lienzo y cada una conserva su propia tarjeta explicativa.
+  const [activo, setActivo] = useState<AgenteProducto>("cobertura");
 
   useEffect(() => {
     document.body.classList.add("producto-lienzo-blanco");
