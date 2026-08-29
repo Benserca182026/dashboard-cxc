@@ -12,8 +12,11 @@ export interface AgenteLateral<T extends string> {
   accion?: string;
   kpiPct?: number;
   kpiEtiqueta?: string;
+  kpis?: string[];
+  miniDatos?: { etiqueta: string; valor: number }[];
   pregunta?: string;
   kpiVisual?: "dona" | "barras" | "pareto" | "cobertura";
+  lecturas?: Record<"riesgo" | "atencion" | "oportunidad" | "analisis", string>;
   color: string;
   suave: string;
 }
