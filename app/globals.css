@@ -279,6 +279,7 @@ body.producto-lienzo-blanco::before {
 .mascota-b18-opciones { top: -15px; left: 7px; }
 .mascota-b18-opciones-abiertas { opacity: 1; transform: none; pointer-events: auto; }
 .mascota-b18-explicacion { position: absolute; bottom: 0; left: 72px; width: 180px; border-radius: 12px; padding: 8px 9px; background: white; box-shadow: 0 10px 22px rgba(50,80,140,.15); color: #556783; font-size: 9px; font-weight: 700; line-height: 1.32; }.mascota-b18-explicacion b { display: block; color: #3d74ec; font-size: 8px; letter-spacing: .06em; }.mascota-b18-explicacion span { display: block; margin-top: 3px; }
+.mascota-b18-en-panel { right: 12px; bottom: 14px; left: 12px; width: auto; }.mascota-b18-en-panel .mascota-b18-explicacion { bottom: 70px; left: 0; width: 100%; box-sizing: border-box; }.mascota-b18-en-panel .mascota-b18-opciones { left: 4px; }
 
 /* Micrográfico: acompaña el problema sin convertir cada tarjeta en un dashboard. */
 .micro-kpi { display: block; margin-top: 7px; }.micro-kpi-linea { display: flex; justify-content: space-between; gap: 6px; color: #7083a6; font-size: 7px; line-height: 1; }.micro-kpi-linea b { overflow: hidden; font-weight: 800; text-overflow: ellipsis; text-transform: none; white-space: nowrap; }.micro-kpi-linea strong { color: #4c82ee; font-size: 7px; }.micro-kpi-riel { display: block; height: 4px; margin-top: 4px; overflow: hidden; border-radius: 999px; background: #edf3ff; }.micro-kpi-riel span { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg,#4b80ee,#8cc8ff); }

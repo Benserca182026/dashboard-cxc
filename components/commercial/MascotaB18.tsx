@@ -11,7 +11,7 @@ export const TONOS_MASCOTA: Record<TonoMascota, { etiqueta: string; color: strin
   analisis: { etiqueta: "Análisis", color: "#8b67df" },
 };
 
-export function MascotaB18({ detalleAbierto, explicacionActiva, onTonoCambiar, onExplicacionActiva }: { detalleAbierto: boolean; explicacionActiva: boolean; onTonoCambiar: (tono: TonoMascota) => void; onExplicacionActiva: () => void }) {
+export function MascotaB18({ detalleAbierto, explicacionActiva, enPanelLateral = false, onTonoCambiar, onExplicacionActiva }: { detalleAbierto: boolean; explicacionActiva: boolean; enPanelLateral?: boolean; onTonoCambiar: (tono: TonoMascota) => void; onExplicacionActiva: () => void }) {
   const [tono, setTono] = useState<TonoMascota>("riesgo");
   const [presentacion, setPresentacion] = useState(true);
   const [selectorAbierto, setSelectorAbierto] = useState(false);
@@ -43,7 +43,7 @@ export function MascotaB18({ detalleAbierto, explicacionActiva, onTonoCambiar, o
       <div className="mascota-b18-intro-marca"><b>B</b><span>18</span></div>
       <p>Benserca 18</p>
     </div> : null}
-    <aside className={`mascota-b18 ${detalleAbierto ? "mascota-b18-en-detalle" : ""}`} style={{ "--mascota-color": TONOS_MASCOTA[tono].color, left: posicion.x, bottom: posicion.y } as CSSProperties} aria-label="Guía B18">
+    <aside className={`mascota-b18 ${enPanelLateral ? "mascota-b18-en-panel" : ""} ${detalleAbierto && !enPanelLateral ? "mascota-b18-en-detalle" : ""}`} style={enPanelLateral ? { "--mascota-color": TONOS_MASCOTA[tono].color } as CSSProperties : { "--mascota-color": TONOS_MASCOTA[tono].color, left: posicion.x, bottom: posicion.y } as CSSProperties} aria-label="Guía B18">
       <div className={`mascota-b18-opciones ${selectorAbierto ? "mascota-b18-opciones-abiertas" : ""}`} aria-label="Elegir enfoque de B18">
         {(Object.keys(TONOS_MASCOTA) as TonoMascota[]).map((opcion) => <button
           key={opcion}
