@@ -5,11 +5,13 @@ import { MascotaB18, TONOS_MASCOTA, type TonoMascota } from "./MascotaB18";
 import type { AgenteLateral } from "./PanelAgentesLateral";
 
 const POSICIONES_CENTRALES = [
-  "left-[calc(50%-128px)] top-28",
-  "right-[calc(50%-128px)] top-28",
-  "bottom-28 left-[calc(50%-128px)]",
-  "bottom-28 right-[calc(50%-128px)]",
+  "left-[calc(50%-128px)] top-36",
+  "right-[calc(50%-128px)] top-36",
+  "bottom-36 left-[calc(50%-128px)]",
+  "bottom-36 right-[calc(50%-128px)]",
 ];
+
+const POSICIONES_TARJETAS = ["tarjeta-comercial-0", "tarjeta-comercial-1", "tarjeta-comercial-2", "tarjeta-comercial-3", "tarjeta-comercial-4"];
 
 const POSICIONES_ESQUINAS = [
   "fixed left-7 top-24 md:left-12 md:top-24",
@@ -24,6 +26,23 @@ function MicroKpi<T extends string>({ agente }: { agente: AgenteLateral<T> }) {
     <span className="micro-kpi-linea"><b>{agente.kpiEtiqueta ?? "KPI"}</b><strong>{pct.toFixed(2)}%</strong></span>
     <span className="micro-kpi-riel"><span style={{ width: `${Math.max(pct, 3)}%` }} /></span>
   </span>;
+}
+
+function MicroVisual<T extends string>({ agente }: { agente: AgenteLateral<T> }) {
+  const pct = agente.kpiPct ?? 0;
+  if (agente.kpiVisual === "pareto") return <span className="micro-visual micro-pareto" aria-label="Pareto de modelos"><i style={{ height: "86%" }} /><i style={{ height: "52%" }} /><i style={{ height: "34%" }} /></span>;
+  if (agente.kpiVisual === "barras") return <span className="micro-visual micro-barras" aria-label="Mix de tipos"><i style={{ width: "86%" }} /><i style={{ width: "52%" }} /><i style={{ width: "28%" }} /></span>;
+  const visible = agente.kpiVisual === "cobertura" ? 100 - pct : pct;
+  return <span className="micro-visual micro-dona" style={{ background: `conic-gradient(#4b80ee ${visible}%, #eaf0ff 0)` }} aria-label={`${visible.toFixed(2)} por ciento`}><i>{visible.toFixed(0)}%</i></span>;
+}
+
+function TarjetaComercial<T extends string>({ agente, indice }: { agente: AgenteLateral<T>; indice: number }) {
+  return <article className={`tarjeta-comercial ${POSICIONES_TARJETAS[indice]}`}>
+    <div className="flex items-center gap-2"><span className="grid h-5 w-5 place-items-center rounded-md bg-[#e8f0ff] text-[7px] font-black text-[#4b80ee]">{agente.iniciales}</span><p>{agente.nombre}</p></div>
+    <h3>{agente.pregunta}</h3>
+    <div className="tarjeta-comercial-kpi"><MicroVisual agente={agente} /><MicroKpi agente={agente} /></div>
+    <span className="tarjeta-comercial-lectura">{agente.accion}</span>
+  </article>;
 }
 
 export function PanelAgentesReferencia<T extends string>({
@@ -51,7 +70,6 @@ export function PanelAgentesReferencia<T extends string>({
     oportunidad: { etiqueta: "Oportunidad", kpi: agente?.capacidad ?? "", texto: agente?.accion ?? "Convierte la lectura en una decisión comercial accionable." },
     analisis: { etiqueta: "Análisis", kpi: agente?.capacidad ?? "", texto: "Da una base comparable para decidir con la misma clasificación." },
   }[tono];
-  const verExplicaciones = detalleAbierto || mostrarExplicaciones;
 
   return (
     <section className="bg-white py-2 md:py-3">
@@ -81,15 +99,15 @@ export function PanelAgentesReferencia<T extends string>({
               </div>
               {children}
             </div>}
+            {mostrarExplicaciones && !detalleAbierto ? <div className="absolute inset-0 z-20 pointer-events-none">{agentes.map((item, indice) => <TarjetaComercial key={item.id} agente={item} indice={indice} />)}</div> : null}
 
             {alrededor.map((item, indice) => {
               const posicion = detalleAbierto ? POSICIONES_ESQUINAS[indice] : POSICIONES_CENTRALES[indice];
-              const posicionTexto = indice === 1 || indice === 3 ? "right-16" : "left-16";
-              return <button key={item.id} type="button" onClick={() => seleccionarAgente(item.id)} className={`producto-nodo-esquina producto-nodo-${indice + 1} ${detalleAbierto ? "z-50" : "absolute z-20"} grid h-14 w-14 place-items-center rounded-2xl border border-[#edf2fe] bg-white text-[10px] font-black text-[#76a0f4] shadow-[0_12px_28px_rgba(90,126,195,.15)] transition-all duration-500 hover:scale-110 focus:outline-none focus:ring-4 focus:ring-[#e1ebff] ${posicion}`}>{item.iniciales}<span className="absolute -bottom-9 w-32 text-center text-[8px] font-bold leading-tight text-[#8d9bb5]"><span className="block truncate">{item.nombre}</span><span className="block truncate text-[#6c91dc]">{item.senal}</span></span>{verExplicaciones ? <span className={`absolute ${posicionTexto} top-0 w-36 rounded-xl bg-white p-2.5 text-left shadow-[0_12px_28px_rgba(50,80,140,.16)]`}><b className="block text-[8px] uppercase tracking-[.12em] text-[#6e98f3]">Problema</b><span className="mt-1 block text-[8px] font-bold leading-snug text-[#4e5f7e]">{item.problema}</span><MicroKpi agente={item} /></span> : null}</button>;
+              return <button key={item.id} type="button" onClick={() => seleccionarAgente(item.id)} className={`producto-nodo-esquina producto-nodo-${indice + 1} ${detalleAbierto ? "z-50" : "absolute z-20"} grid h-14 w-14 place-items-center rounded-2xl border border-[#edf2fe] bg-white text-[10px] font-black text-[#76a0f4] shadow-[0_12px_28px_rgba(90,126,195,.15)] transition-all duration-500 hover:scale-110 focus:outline-none focus:ring-4 focus:ring-[#e1ebff] ${posicion}`}>{item.iniciales}<span className="absolute -bottom-9 w-32 text-center text-[8px] font-bold leading-tight text-[#8d9bb5]"><span className="block truncate">{item.nombre}</span><span className="block truncate text-[#6c91dc]">{item.senal}</span></span></button>;
             })}
 
             {!detalleAbierto && <><button key={agente?.id} type="button" onClick={() => setDetalleAbierto(true)} aria-expanded={detalleAbierto} className="producto-nucleo-activo absolute left-1/2 top-1/2 z-30 grid h-[88px] w-[88px] -translate-x-1/2 -translate-y-1/2 place-items-center rounded-[25px] bg-[linear-gradient(135deg,#3d74ec,#7dc3ff)] text-lg font-black text-white shadow-[0_22px_45px_rgba(64,119,239,.35)] ring-8 ring-[#edf4ff] transition hover:scale-105 focus:outline-none focus:ring-4 focus:ring-[#cbdcff]">{agente?.iniciales}</button>
-            <div className="absolute left-1/2 top-[calc(50%+56px)] z-30 w-60 -translate-x-1/2 text-center"><p className="text-[11px] font-black text-[#6079ad]">{agente?.senal}</p><div className="mt-2 flex justify-center gap-2 text-[8px] font-black"><span className="rounded-full bg-white px-2 py-1 text-[#567cbe] shadow-[0_8px_18px_rgba(71,103,171,.12)]">{agente?.capacidad}</span><span className="rounded-full px-2 py-1 text-white" style={{ backgroundColor: TONOS_MASCOTA[tono].color }}>{enfoque.etiqueta}</span></div>{mostrarExplicaciones ? <div className="mt-3 rounded-xl bg-white p-3 text-left shadow-[0_12px_28px_rgba(50,80,140,.16)]"><b className="text-[8px] uppercase tracking-[.12em] text-[#6e98f3]">Problema · {agente?.nombre}</b><p className="mt-1 text-[9px] font-bold leading-snug text-[#4e5f7e]">{agente?.problema}</p><MicroKpi agente={agente} /></div> : null}</div></>}
+            <div className="absolute left-1/2 top-[calc(50%+56px)] z-30 w-60 -translate-x-1/2 text-center"><p className="text-[11px] font-black text-[#6079ad]">{agente?.senal}</p><div className="mt-2 flex justify-center gap-2 text-[8px] font-black"><span className="rounded-full bg-white px-2 py-1 text-[#567cbe] shadow-[0_8px_18px_rgba(71,103,171,.12)]">{agente?.capacidad}</span><span className="rounded-full px-2 py-1 text-white" style={{ backgroundColor: TONOS_MASCOTA[tono].color }}>{enfoque.etiqueta}</span></div></div></>}
           </main>
         </div>
 
