@@ -3,19 +3,22 @@
 import { useEffect, useState } from "react";
 import { BarraUsuario } from "@/components/BarraUsuario";
 import { SkeletonPagina } from "@/components/Basicos";
-import { PanelAgentesReferencia } from "@/components/commercial/PanelAgentesReferencia";
+import { PanelReporteAgentes } from "@/components/commercial/PanelReporteAgentes";
 import type { AgenteLateral } from "@/components/commercial/PanelAgentesLateral";
 import { construirLecturasProductoVentas, type AgenteProductoVentas, type LecturaAgenteProducto } from "@/lib/agentes-producto-ventas";
 import { useApp } from "@/lib/store";
+import type { TonoMascota } from "@/components/commercial/MascotaB18";
 
 type AgenteProducto = AgenteProductoVentas;
 
 type FilaLectura = { nombre: string; productos?: number; valor: number; pct: number };
-function BarrasDeLectura({ lectura, fmt }: { lectura: LecturaAgenteProducto; fmt: (valor: number) => string }) {
+function BarrasDeLectura({ lectura, lecturas, fmt }: { lectura: LecturaAgenteProducto; lecturas: Record<AgenteProducto, LecturaAgenteProducto>; fmt: (valor: number) => string }) {
   const tieneValor = lectura.filas.some((fila) => fila.valor > 0);
   return <section aria-live="polite">
-    <p className="text-[10px] font-black uppercase tracking-[.16em] text-[#6e98f3]">Agente de producto</p>
-    <h2 className="mt-2 text-[clamp(1.7rem,3vw,2.55rem)] font-black tracking-[-.06em] text-[#121c32]">{lectura.titulo}</h2>
+    <p className="text-[10px] font-black uppercase tracking-[.16em] text-[#6e98f3]">Reporte general del portafolio</p>
+    <h2 className="mt-2 text-[clamp(1.55rem,2.5vw,2.25rem)] font-black tracking-[-.06em] text-[#121c32]">Cascos sostienen la composición comercial.</h2>
+    <div className="mt-4 grid grid-cols-2 gap-2"><div className="rounded-xl bg-[#f5f8ff] p-3"><p className="text-[8px] font-black uppercase tracking-[.12em] text-[#8193b4]">Familia líder</p><b className="mt-1 block text-xs text-[#29415f]">{lecturas.familia.filas[0]?.nombre}</b><span className="text-[10px] font-black text-[#4b80ee]">{lecturas.familia.filas[0]?.pct.toFixed(2)}%</span></div><div className="rounded-xl bg-[#f5f8ff] p-3"><p className="text-[8px] font-black uppercase tracking-[.12em] text-[#8193b4]">Tipo líder</p><b className="mt-1 block text-xs text-[#29415f]">{lecturas.tipo.filas[0]?.nombre}</b><span className="text-[10px] font-black text-[#4b80ee]">{lecturas.tipo.filas[0]?.pct.toFixed(2)}%</span></div></div>
+    <div className="mt-6 border-t border-[#e8eefb] pt-5"><p className="text-[9px] font-black uppercase tracking-[.14em] text-[#6e98f3]">Profundización · {lectura.nombre}</p><h3 className="mt-2 text-[clamp(1.15rem,2vw,1.55rem)] font-black tracking-[-.04em] text-[#121c32]">{lectura.titulo}</h3></div>
     <p className="mt-3 max-w-2xl text-sm leading-relaxed text-[#6a7893]">{lectura.explicacion}</p>
     <div className="mt-7 grid gap-6 lg:grid-cols-[minmax(0,1fr)_250px]">
       <div className="space-y-4">
@@ -40,6 +43,7 @@ function BarrasDeLectura({ lectura, fmt }: { lectura: LecturaAgenteProducto; fmt
 export default function PaginaCategoriasProducto() {
   const { cargando, fmt, dataset } = useApp();
   const [activo, setActivo] = useState<AgenteProducto>("familia");
+  const [tono, setTono] = useState<TonoMascota>("analisis");
   useEffect(() => {
     document.body.classList.add("producto-lienzo-blanco");
     return () => document.body.classList.remove("producto-lienzo-blanco");
@@ -64,6 +68,6 @@ export default function PaginaCategoriasProducto() {
       <h1 className="min-w-0 whitespace-nowrap text-center text-[clamp(1.75rem,3.35vw,3.15rem)] font-black leading-none tracking-[-.065em] text-[#111827]">Clasificación <span className="bg-[linear-gradient(90deg,#467deb,#8cc8ff)] bg-clip-text text-transparent">comercial de productos</span></h1>
       <div className="justify-self-end"><BarraUsuario dataset={dataset} modulo="ventas" /></div>
     </header>
-    <div id="sec-productos"><PanelAgentesReferencia agentes={agentes} activo={activo} onSeleccionar={setActivo}><BarrasDeLectura lectura={lectura} fmt={fmt} /></PanelAgentesReferencia></div>
+    <div id="sec-productos"><PanelReporteAgentes agentes={agentes} activo={activo} tono={tono} onSeleccionar={setActivo} onTonoCambiar={setTono} titulo="Clasificación comercial de productos" corte="última venta disponible"><BarrasDeLectura lectura={lectura} lecturas={lecturas} fmt={fmt} /></PanelReporteAgentes></div>
   </div>;
 }

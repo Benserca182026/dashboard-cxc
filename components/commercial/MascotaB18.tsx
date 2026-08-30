@@ -12,7 +12,7 @@ export const TONOS_MASCOTA: Record<TonoMascota, { etiqueta: string; color: strin
 };
 
 export function MascotaB18({ detalleAbierto, explicacionActiva, enPanelLateral = false, onTonoCambiar, onExplicacionActiva }: { detalleAbierto: boolean; explicacionActiva: boolean; enPanelLateral?: boolean; onTonoCambiar: (tono: TonoMascota) => void; onExplicacionActiva: () => void }) {
-  const [tono, setTono] = useState<TonoMascota>("riesgo");
+  const [tono, setTono] = useState<TonoMascota>("analisis");
   const [presentacion, setPresentacion] = useState(true);
   const [selectorAbierto, setSelectorAbierto] = useState(false);
   const [posicion, setPosicion] = useState({ x: 14, y: 18 });

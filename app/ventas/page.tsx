@@ -1,153 +1,37 @@
 "use client";
 
+import Link from "next/link";
+import { useState } from "react";
+import { BarraUsuario } from "@/components/BarraUsuario";
 import { SkeletonPagina } from "@/components/Basicos";
-import { Encabezado } from "@/components/Encabezado";
-import { FilaAgentes } from "@/components/Agentes";
-import { LienzoConAgentes } from "@/components/Argumento";
-import { DecisionPanelV2 } from "@/components/DecisionPanelV2";
-import { AGENTES_COMERCIALES_VENTAS } from "@/components/commercial/OperacionAgentes";
-import { PanelAgentesVisuales } from "@/components/commercial/PanelAgentesVisuales";
-import {
-  OperacionControl,
-  OperacionKpi,
-  OperacionPuente,
-  OperacionRanking,
-  OperacionTendencia,
-} from "@/components/commercial/OperacionVisuales";
-import { analiticaVentas } from "@/lib/commercial-operacion";
+import { PanelReporteAgentes } from "@/components/commercial/PanelReporteAgentes";
+import type { AgenteLateral } from "@/components/commercial/PanelAgentesLateral";
+import { leerVentasReales } from "@/lib/lecturas-ventas-reales";
 import { useApp } from "@/lib/store";
-import costoHistoricoOdoo from "@/fixtures/costo-historico-odoo-resumen.json";
+import type { TonoMascota } from "@/components/commercial/MascotaB18";
 
-const SECCIONES = [
-  { id: "sec-decisiones-v2", etiqueta: "Decisiones" },
-  { id: "sec-pulso", etiqueta: "Pulso comercial" },
-  { id: "sec-ranking", etiqueta: "Top clientes y productos" },
-  { id: "sec-tendencia", etiqueta: "Tendencia" },
-  { id: "sec-puente", etiqueta: "Precio a resultado" },
-  { id: "sec-control", etiqueta: "Control" },
-];
+type AgenteVenta = "evolucion" | "clientes" | "ticket" | "portafolio";
 
-function formatearMontoSinMoneda(valor: number): string {
-  return valor.toLocaleString("es-GT", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+function Filas({ filas, fmt }: { filas: { etiqueta: string; valor: number; detalle?: string }[]; fmt: (valor: number) => string }) {
+  const maximo = Math.max(1, ...filas.map((fila) => fila.valor));
+  return <div className="mt-6 space-y-3">{filas.map((fila) => <div key={fila.etiqueta}><div className="flex justify-between gap-3 text-[11px] font-bold text-[#536783]"><span className="truncate">{fila.etiqueta}</span><span className="shrink-0 text-[#477ce7]">{fmt(fila.valor)}</span></div><div className="mt-1.5 h-2 overflow-hidden rounded-full bg-[#edf3ff]"><i className="block h-full rounded-full bg-[linear-gradient(90deg,#4b80ee,#8cc8ff)]" style={{ width: `${(fila.valor / maximo) * 100}%` }} /></div>{fila.detalle ? <p className="mt-1 text-[9px] font-semibold text-[#8795af]">{fila.detalle}</p> : null}</div>)}</div>;
 }
 
 export default function PaginaVentas() {
-  const { dataset, cargando, fechaCorte, fmt, tipoCambio } = useApp();
-  const analitica = analiticaVentas(dataset);
-  const costoHistorico = costoHistoricoOdoo.poblacionConciliada;
-  const fmtVenta = analitica.monedaPedidoDisponible ? fmt : formatearMontoSinMoneda;
-  const notaMoneda = analitica.monedaPedidoDisponible
-    ? `${analitica.pedidosPorMoneda.GTQ.toLocaleString("es-GT")} GTQ + ${analitica.pedidosPorMoneda.USD.toLocaleString("es-GT")} USD · normalizados sólo para la vista${tipoCambio ? ` con Q${tipoCambio.quetzalesPorDolar.toFixed(5)} por US$1` : ""}`
-    : "moneda por pedido no preservada";
-  const etiquetaComparacion = analitica.diaCorteComparacion
-    ? `MTD comparable al día ${analitica.diaCorteComparacion}`
-    : "MTD comparable";
-  const anioTendencia = analitica.tendencia.at(-1)?.periodo.slice(0, 4) ?? null;
-  const totalAnualTendencia = anioTendencia
-    ? analitica.tendencia.filter((punto) => punto.periodo.startsWith(anioTendencia)).reduce((suma, punto) => suma + punto.valor, 0)
-    : 0;
-
+  const { dataset, cargando, fmt } = useApp();
+  const [activo, setActivo] = useState<AgenteVenta>("evolucion");
+  const [tono, setTono] = useState<TonoMascota>("analisis");
   if (cargando) return <SkeletonPagina />;
-
-  const agentes = (
-    <FilaAgentes dataset={dataset} fechaCorte={fechaCorte} agentes={AGENTES_COMERCIALES_VENTAS} />
-  );
-
-  return (
-    <div className="space-y-6">
-      <Encabezado titulo="Ventas" secciones={SECCIONES} dataset={dataset} modulo="ventas" />
-      <DecisionPanelV2 modulo="ventas" />
-      <PanelAgentesVisuales dataset={dataset} fechaCorte={fechaCorte} agentes={AGENTES_COMERCIALES_VENTAS} fmt={fmt} />
-
-      <section id="sec-pulso" className="scroll-mt-24">
-        <LienzoConAgentes titulo="Pulso comercial del período" agentes={agentes}>
-          <div className="flex flex-wrap items-end justify-between gap-3">
-            <div>
-              <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-[#6876d8]">Lectura ejecutiva</p>
-              <h2 className="mt-1 text-xl font-bold text-tinta">Qué se vendió, dónde se concentra y cómo cambió</h2>
-            </div>
-            <p className="text-[11px] text-tintaSuave">
-              {analitica.desde && analitica.hasta
-                ? `Ventana ${analitica.desde} → ${analitica.hasta} · corte general ${fechaCorte}`
-                : "Período sin fechas comparables"}
-            </p>
-          </div>
-
-          {!analitica.disponible ? (
-            <div className="mt-5 rounded-2xl border border-dashed border-borde bg-white/60 p-6 text-sm text-tintaSuave">
-              Este dataset no trae pedidos y líneas suficientes. No se muestran ceros que parezcan ventas.
-            </div>
-          ) : (
-            <div className="mt-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
-              <OperacionKpi etiqueta="Venta registrada" valor={fmtVenta(analitica.vendidoOdoo)} nota={`${analitica.pedidosConReferencia} pedidos · total Odoo con descuento aplicado · ${notaMoneda}`} tono="positivo" />
-              <OperacionKpi etiqueta="Concentración Top 5" valor={analitica.concentracionTop5 === null ? "Sin dato" : `${analitica.concentracionTop5.toFixed(1)}%`} nota="Participación de los cinco clientes principales sobre la venta registrada" tono={(analitica.concentracionTop5 ?? 0) >= 60 ? "alerta" : "normal"} />
-              <OperacionKpi etiqueta="Variación MTD comparable" valor={analitica.variacionUltimoPeriodo === null ? "Sin comparación" : `${analitica.variacionUltimoPeriodo >= 0 ? "+" : ""}${analitica.variacionUltimoPeriodo.toFixed(1)}%`} nota={`${analitica.periodoComparacionActual ?? "mes actual"} vs ${analitica.periodoComparacionAnterior ?? "mes anterior"}, ambos hasta el día ${analitica.diaCorteComparacion ?? "disponible"}`} tono={analitica.variacionUltimoPeriodo !== null && analitica.variacionUltimoPeriodo >= 0 ? "positivo" : "alerta"} />
-              <OperacionKpi etiqueta="Brecha lista vs total" valor={analitica.brechaPct === null ? "Sin dato" : `${Math.abs(analitica.brechaPct).toFixed(2)}%`} nota="Mezcla descuento e IVA; no se interpreta como descuento real" tono="alerta" />
-              <OperacionKpi etiqueta="Pedidos sin total Odoo" valor={analitica.pedidosSinReferencia.toLocaleString("es-GT")} nota={`${analitica.pedidos} pedidos confirmados evaluados`} tono={analitica.pedidosSinReferencia > 0 ? "alerta" : "normal"} />
-            </div>
-          )}
-        </LienzoConAgentes>
-      </section>
-
-      <section id="sec-ranking" className="scroll-mt-24">
-        <LienzoConAgentes titulo="Dónde está el dinero" agentes={agentes}>
-          <div className="grid gap-4 lg:grid-cols-2">
-            <OperacionRanking titulo="Clientes por venta registrada" subtitulo={`Total Odoo por pedido · moneda reconciliada en ${analitica.pedidosConReferencia.toLocaleString("es-GT")} de ${analitica.pedidos.toLocaleString("es-GT")} pedidos`} filas={analitica.topClientes} formatear={fmtVenta} vacio="No hay pedidos con total Odoo para ordenar clientes." />
-            <OperacionRanking titulo="Productos por valor a precio de lista" subtitulo="Cantidad × precio unitario en la moneda recuperada del pedido · señal separada; no equivale a venta neta ni margen" filas={analitica.topProductos} formatear={fmtVenta} vacio="No hay líneas relacionadas con productos para construir el ranking." />
-          </div>
-          <p className="mt-3 text-[10.5px] leading-relaxed text-tintaSuave">
-            No se muestra Top vendedores: el XLSX trae “Comercial”, pero el importador actual no lo preserva en el modelo. El espacio se mantiene bloqueado, no se fabrica un ranking.
-          </p>
-        </LienzoConAgentes>
-      </section>
-
-      <section id="sec-tendencia" className="scroll-mt-24">
-        <LienzoConAgentes titulo="Qué cambió" agentes={agentes}>
-          <OperacionTendencia
-            puntos={analitica.tendencia}
-            formatear={fmtVenta}
-            variacion={analitica.variacionUltimoPeriodo}
-            etiquetaComparacion={etiquetaComparacion}
-            notaCorte={`última venta ${analitica.hasta ?? "sin fecha"}`}
-            totalAnual={totalAnualTendencia}
-            anio={anioTendencia}
-          />
-        </LienzoConAgentes>
-      </section>
-
-      <section id="sec-puente" className="scroll-mt-24">
-        <LienzoConAgentes titulo="Del precio de lista al resultado comercial" agentes={agentes}>
-          <OperacionPuente
-            titulo="Margen histórico conciliado en Odoo"
-            subtitulo={`Snapshot ${costoHistoricoOdoo.snapshot.finUtc.slice(0, 16).replace("T", " ")} UTC · ${costoHistoricoOdoo.cobertura.lineasConciliadas.toLocaleString("es-GT")} líneas con cantidad facturada neta = cantidad entregada neta.`}
-            pasos={[
-              { etiqueta: "Ingreso neto sin IVA", valor: fmt(costoHistorico.ingresoNetoSinIvaGTQ), nota: "−Σ balance de facturas publicadas y notas de crédito vinculadas" },
-              { etiqueta: "Costo registrado por Odoo", valor: fmt(costoHistorico.costoHistoricoEstandarGTQ), nota: "valor estándar guardado en cada salida; referencia histórica, no costo real FIFO/AVCO", tono: "alerta" },
-              { etiqueta: "Margen bruto", valor: fmt(costoHistorico.margenBrutoGTQ), nota: "ingreso conciliado − valoración histórica estándar", tono: "positivo" },
-              { etiqueta: "Margen sobre población", valor: `${costoHistorico.margenPct.toFixed(2)}%`, nota: `cobertura ${costoHistorico.coberturaIngresoPct.toFixed(2)}% del ingreso vinculado`, tono: "positivo" },
-            ]}
-          />
-          <div className="mt-4 grid gap-4 sm:grid-cols-2">
-            <OperacionKpi etiqueta="Cobertura conciliada" valor={`${costoHistoricoOdoo.cobertura.lineasConciliadas.toLocaleString("es-GT")} / ${costoHistoricoOdoo.cobertura.lineasActivas.toLocaleString("es-GT")}`} nota={`${costoHistoricoOdoo.cobertura.estadosLinea["entregada-no-facturada"]} líneas entregadas no facturadas y ${costoHistoricoOdoo.cobertura.estadosLinea["facturada-no-entregada"]} facturadas no entregadas quedan fuera`} />
-            <OperacionKpi etiqueta="Calidad contable del costo" valor="Parcial conciliado" nota="Odoo usa costo estándar y valoración manual; no es FIFO/AVCO ni existe asiento COGS automático por capa" tono="alerta" />
-          </div>
-        </LienzoConAgentes>
-      </section>
-
-      <section id="sec-control" className="scroll-mt-24">
-        <LienzoConAgentes titulo="Controles secundarios" agentes={agentes}>
-          <OperacionControl
-            titulo="Lo que falta antes de afirmar margen y desempeño por vendedor"
-            items={[
-              `El ingreso neto ya sale de ${costoHistoricoOdoo.cobertura.facturasPublicadas.toLocaleString("es-GT")} facturas y ${costoHistoricoOdoo.cobertura.notasCreditoPublicadas.toLocaleString("es-GT")} notas de crédito publicadas, usando account.move.line.balance en GTQ.`,
-              `La cadena por ID está demostrada: ${costoHistoricoOdoo.cobertura.movimientosTerminados.toLocaleString("es-GT")} movimientos terminados y la misma cantidad de capas; diferencia de cantidad y valor = 0.`,
-              "El costo sigue siendo estándar histórico: es el valor que Odoo guardó al salir el inventario, no el precio real de compra de cada lote. Las cuatro categorías están configuradas como standard + manual_periodic; no debe llamarse costo real FIFO/AVCO ni margen contable definitivo.",
-              `${costoHistoricoOdoo.universoValoracion.capasSinMovimiento} ajustes manuales de valor, por ${fmt(costoHistoricoOdoo.universoValoracion.ajustesManualesSinMovimientoValorGTQ)}, no tienen stock_move_id y no se reparten entre pedidos.`,
-              "El XLSX original trae la columna Comercial, pero el importador actual no la guarda; por eso el Top vendedores sigue bloqueado.",
-            ]}
-          />
-        </LienzoConAgentes>
-      </section>
-    </div>
-  );
+  const lectura = leerVentasReales(dataset);
+  const ticketComparable = lectura.comparable && lectura.actual && lectura.comparable.pedidos > 0 && lectura.actual.pedidos > 0
+    ? ((lectura.actual.valor / lectura.actual.pedidos) / (lectura.comparable.valor / lectura.comparable.pedidos) - 1) * 100 : 0;
+  const agentes: AgenteLateral<AgenteVenta>[] = [
+    { id: "evolucion", iniciales: "VE", nombre: "Evolución", senal: lectura.variacionValor === null ? "Sin comparable" : `${lectura.variacionValor >= 0 ? "+" : ""}${lectura.variacionValor.toFixed(2)}% comparable`, pregunta: "¿La venta crece al mismo ritmo que los pedidos?", kpiPct: Math.max(0, lectura.variacionValor ?? 0), kpiEtiqueta: "crecimiento", kpiVisual: "barras", accion: "Comparar períodos equivalentes, no meses incompletos.", color: "#4b80ee", suave: "#eaf1ff" },
+    { id: "clientes", iniciales: "CL", nombre: "Clientes", senal: `Top 5 · ${lectura.participacionTop5.toFixed(2)}%`, pregunta: "¿Qué cuentas concentran la venta?", kpiPct: lectura.participacionTop5, kpiEtiqueta: "Top 5", kpiVisual: "pareto", accion: "Diferenciar atención a cuentas estratégicas.", color: "#4b80ee", suave: "#eaf1ff" },
+    { id: "ticket", iniciales: "TI", nombre: "Ticket", senal: `${fmt(lectura.ticket)} por pedido`, pregunta: "¿El valor por pedido también está creciendo?", kpiPct: Math.max(0, ticketComparable), kpiEtiqueta: "ticket comparable", kpiVisual: "barras", accion: "Distinguir más pedidos de pedidos de mayor valor.", color: "#4b80ee", suave: "#eaf1ff" },
+    { id: "portafolio", iniciales: "PO", nombre: "Portafolio", senal: lectura.familiaLider ? `${lectura.familiaLider.nombre} · ${lectura.familiaLider.pct.toFixed(2)}%` : "Sin líneas", pregunta: "¿Qué familia compone la demanda?", kpiPct: lectura.familiaLider?.pct ?? 0, kpiEtiqueta: lectura.familiaLider?.nombre ?? "familia", kpiVisual: "dona", accion: "Abrir la lectura de productos antes de decidir surtido.", color: "#4b80ee", suave: "#eaf1ff" },
+  ];
+  const encabezado = tono === "riesgo" ? "Riesgo comercial" : tono === "atencion" ? "Prioridad comercial" : tono === "oportunidad" ? "Oportunidad comercial" : "Lectura completa";
+  const centro = activo === "evolucion" ? <><p className="text-[10px] font-black uppercase tracking-[.16em] text-[#7197ec]">{encabezado} · Evolución</p><h3 className="mt-2 text-[clamp(1.55rem,2.7vw,2.3rem)] font-black tracking-[-.06em] text-[#14203a]">La venta comparable crece {lectura.variacionValor === null ? "sin base equivalente" : `${lectura.variacionValor.toFixed(2)}%`}.</h3><p className="mt-3 text-sm leading-relaxed text-[#667793]">Entre el 1 de enero y el {lectura.hasta}, la venta confirmada por Odoo suma {lectura.actual ? fmt(lectura.actual.valor) : "sin dato"}. La comparación usa los mismos días de 2025 para no interpretar agosto parcial como un mes cerrado.</p><Filas fmt={fmt} filas={lectura.meses.slice(-6).map((mes) => ({ etiqueta: mes.periodo, valor: mes.valor, detalle: `${mes.pedidos} pedidos confirmados` }))} /></> : activo === "clientes" ? <><p className="text-[10px] font-black uppercase tracking-[.16em] text-[#7197ec]">{encabezado} · Clientes</p><h3 className="mt-2 text-[clamp(1.55rem,2.7vw,2.3rem)] font-black tracking-[-.06em] text-[#14203a]">Cinco cuentas reúnen {lectura.participacionTop5.toFixed(2)}% de la venta.</h3><p className="mt-3 text-sm leading-relaxed text-[#667793]">La concentración no es un problema por sí sola: define dónde conviene profundizar relación comercial, seguimiento y propuesta de catálogo.</p><Filas fmt={fmt} filas={lectura.clientes.slice(0, 5).map((cliente) => ({ etiqueta: cliente.etiqueta, valor: cliente.valor, detalle: `${cliente.pedidos} pedidos · ticket ${fmt(cliente.ticket)}` }))} /><Link href="/ventas/clientes" className="mt-6 inline-flex rounded-full bg-[#eaf1ff] px-4 py-2 text-[10px] font-black text-[#4176df]">Abrir ficha comercial de clientes →</Link></> : activo === "ticket" ? <><p className="text-[10px] font-black uppercase tracking-[.16em] text-[#7197ec]">{encabezado} · Ticket</p><h3 className="mt-2 text-[clamp(1.55rem,2.7vw,2.3rem)] font-black tracking-[-.06em] text-[#14203a]">Cada pedido confirmado promedia {fmt(lectura.ticket)}.</h3><div className="mt-7 grid gap-3 sm:grid-cols-2"><div className="rounded-2xl bg-[#f5f8ff] p-5"><p className="text-[9px] font-black uppercase tracking-[.14em] text-[#7d91b8]">Pedidos confirmados</p><b className="mt-2 block text-2xl font-black text-[#243553]">{lectura.pedidos.toLocaleString("es-GT")}</b></div><div className="rounded-2xl bg-[#f5f8ff] p-5"><p className="text-[9px] font-black uppercase tracking-[.14em] text-[#7d91b8]">Cambio de ticket comparable</p><b className="mt-2 block text-2xl font-black text-[#243553]">{ticketComparable >= 0 ? "+" : ""}{ticketComparable.toFixed(2)}%</b></div></div><p className="mt-5 text-sm leading-relaxed text-[#667793]">El ticket se calcula sólo con total confirmado Odoo dividido entre pedidos confirmados; no mezcla la composición de líneas a precio de lista.</p></> : <><p className="text-[10px] font-black uppercase tracking-[.16em] text-[#7197ec]">{encabezado} · Portafolio</p><h3 className="mt-2 text-[clamp(1.55rem,2.7vw,2.3rem)] font-black tracking-[-.06em] text-[#14203a]">{lectura.familiaLider?.nombre ?? "La familia principal"} concentra {lectura.familiaLider?.pct.toFixed(2) ?? "0.00"}% de la composición.</h3><p className="mt-3 text-sm leading-relaxed text-[#667793]">Esta lectura usa las líneas y SKU de los pedidos confirmados. Es una composición comercial, distinta de la venta neta cerrada por Odoo.</p><div className="mt-7 rounded-2xl bg-[#f5f8ff] p-5"><p className="text-[9px] font-black uppercase tracking-[.14em] text-[#7d91b8]">Composición de la familia principal</p><b className="mt-2 block text-2xl font-black text-[#243553]">{lectura.familiaLider ? fmt(lectura.familiaLider.valor) : "—"}</b></div><Link href="/ventas/productos" className="mt-6 inline-flex rounded-full bg-[#eaf1ff] px-4 py-2 text-[10px] font-black text-[#4176df]">Abrir clasificación comercial de productos →</Link></>;
+  return <div className="space-y-3"><header className="mx-auto grid w-full max-w-5xl grid-cols-[1fr_auto_1fr] items-start gap-4 pt-3"><span /><h1 className="whitespace-nowrap text-center text-[clamp(1.75rem,3.35vw,3.15rem)] font-black leading-none tracking-[-.065em] text-[#111827]">Ventas <span className="bg-[linear-gradient(90deg,#467deb,#8cc8ff)] bg-clip-text text-transparent">comerciales</span></h1><div className="justify-self-end"><BarraUsuario dataset={dataset} modulo="ventas" /></div></header><PanelReporteAgentes agentes={agentes} activo={activo} tono={tono} onSeleccionar={setActivo} onTonoCambiar={setTono} titulo="Radar comercial de ventas" corte={lectura.hasta ?? "sin fecha"}>{centro}</PanelReporteAgentes></div>;
 }
