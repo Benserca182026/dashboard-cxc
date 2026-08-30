@@ -5,114 +5,13 @@ import { BarraUsuario } from "@/components/BarraUsuario";
 import { SkeletonPagina } from "@/components/Basicos";
 import { PanelAgentesReferencia } from "@/components/commercial/PanelAgentesReferencia";
 import type { AgenteLateral } from "@/components/commercial/PanelAgentesLateral";
+import { construirLecturasProductoVentas, type AgenteProductoVentas, type LecturaAgenteProducto } from "@/lib/agentes-producto-ventas";
 import { useApp } from "@/lib/store";
 
-type AgenteProducto = "familia" | "tipo" | "modelo" | "licencia" | "cobertura";
+type AgenteProducto = AgenteProductoVentas;
 
 type FilaLectura = { nombre: string; productos?: number; valor: number; pct: number };
-type LecturaProducto = {
-  iniciales: string;
-  nombre: string;
-  senal: string;
-  titulo: string;
-  explicacion: string;
-  hallazgo: string;
-  problema: string;
-  accion: string;
-  kpiPct: number;
-  kpiEtiqueta: string;
-  pregunta: string;
-  kpiVisual: "dona" | "barras" | "pareto" | "cobertura";
-  filas: FilaLectura[];
-};
-
-// Clasificación disponible en el corte analítico actual. No deriva de la UI:
-// los agentes sólo muestran y explican esta salida ya calculada.
-const LECTURAS: Record<AgenteProducto, LecturaProducto> = {
-  familia: {
-    iniciales: "FA", nombre: "Familias", senal: "41 productos sin familia",
-    titulo: "¿Qué familia mueve el negocio?",
-    explicacion: "La lectura separa la familia principal del producto; no mezcla modelo ni licencia.",
-    hallazgo: "Cascos concentra 72.07% del valor clasificado.",
-    problema: "41 referencias siguen sin familia: no se pueden comparar bien contra el mix comercial.",
-    accion: "priorizar la clasificación de esas referencias para decidir surtido, compras y exposición por familia.",
-    kpiPct: 0.95, kpiEtiqueta: "sin familia",
-    pregunta: "¿Qué familia sostiene la venta?", kpiVisual: "dona",
-    filas: [
-      { nombre: "Cascos", productos: 584, valor: 12461816, pct: 72.07 },
-      { nombre: "Equipo", productos: 51, valor: 3257233, pct: 18.84 },
-      { nombre: "Llantas", productos: 30, valor: 1173250, pct: 6.78 },
-      { nombre: "Accesorios", productos: 24, valor: 235964, pct: 1.36 },
-      { nombre: "Sin clasificar", productos: 41, valor: 164069, pct: 0.95 },
-    ],
-  },
-  tipo: {
-    iniciales: "TC", nombre: "Tipo de casco", senal: "6 tipos disponibles",
-    titulo: "¿Qué tipo de casco sostiene la familia?",
-    explicacion: "Este agente baja un nivel dentro de Cascos y conserva el producto no identificable como un límite visible.",
-    hallazgo: "Integral y Modular reúnen la mayor parte de los cascos con tipo declarado.",
-    problema: "El mix de cascos pierde precisión cuando el tipo no está declarado de forma consistente.",
-    accion: "asignar inventario y campañas según la demanda real de Integral, Modular y los demás tipos.",
-    kpiPct: 55.52, kpiEtiqueta: "Integral",
-    pregunta: "¿Qué tipo de casco domina el mix?", kpiVisual: "barras",
-    filas: [
-      { nombre: "Integral", productos: 341, valor: 0, pct: 55.52 },
-      { nombre: "Modular", productos: 116, valor: 0, pct: 27.59 },
-      { nombre: "Abatible", productos: 64, valor: 0, pct: 11.15 },
-      { nombre: "Cross modular", productos: 18, valor: 0, pct: 3.78 },
-      { nombre: "Semi integral", productos: 26, valor: 0, pct: 1.03 },
-      { nombre: "Doble propósito", productos: 7, valor: 0, pct: 0.88 },
-    ],
-  },
-  modelo: {
-    iniciales: "MO", nombre: "Modelos", senal: "Q4.45M sin modelo",
-    titulo: "¿Qué modelo explica el mix?",
-    explicacion: "El modelo se lee cuando está declarado en la ficha. “Sin modelo” no se rellena ni se interpreta como un modelo.",
-    hallazgo: "Q4.45M permanece sin modelo declarado: es una brecha de catálogo, no un modelo comercial.",
-    problema: "Q4.45M de la venta no se puede atribuir a un modelo comercial.",
-    accion: "identificar qué modelos sostienen el margen, el inventario y la reposición.",
-    kpiPct: 25.73, kpiEtiqueta: "sin modelo",
-    pregunta: "¿Qué modelos explican la facturación?", kpiVisual: "pareto",
-    filas: [
-      { nombre: "Boston", productos: 24, valor: 1973341, pct: 11.41 },
-      { nombre: "Shangai", productos: 30, valor: 911832, pct: 5.27 },
-      { nombre: "Frankie", productos: 52, valor: 681469, pct: 3.94 },
-      { nombre: "Sin modelo", valor: 4449970, pct: 25.73 },
-    ],
-  },
-  licencia: {
-    iniciales: "LI", nombre: "Licencias", senal: "85.61% sin licencia",
-    titulo: "¿Qué licencias aparecen en la venta?",
-    explicacion: "La licencia es una capa distinta de familia y modelo. Sólo se presenta como declarada cuando la clasificación la identifica.",
-    hallazgo: "DC Comics es la licencia con mayor participación; la mayor parte del catálogo permanece sin licencia.",
-    problema: "La licencia está ausente en la mayoría del catálogo y limita la lectura de campañas por propiedad.",
-    accion: "separar licencias que sí mueven venta de producto genérico antes de definir promociones.",
-    kpiPct: 85.61, kpiEtiqueta: "sin licencia",
-    pregunta: "¿Qué peso comercial tienen las licencias?", kpiVisual: "dona",
-    filas: [
-      { nombre: "Sin licencia", valor: 14804422, pct: 85.61 },
-      { nombre: "DC Comics", valor: 1278885, pct: 7.4 },
-      { nombre: "Looney Tunes", valor: 527200, pct: 3.05 },
-      { nombre: "Marvel", valor: 436656, pct: 2.53 },
-    ],
-  },
-  cobertura: {
-    iniciales: "CO", nombre: "Cobertura", senal: "41 productos pendientes",
-    titulo: "¿Qué falta para cerrar la clasificación?",
-    explicacion: "La cobertura no es una categoría de producto: mide cuántas referencias quedan fuera de una familia confirmada.",
-    hallazgo: "41 productos, equivalentes a 0.95% del valor, siguen sin familia declarada.",
-    problema: "41 productos permanecen pendientes y reducen la confianza de todas las lecturas comerciales.",
-    accion: "cerrar la clasificación pendiente antes de usar el mix para decisiones de compra o inventario.",
-    kpiPct: 0.95, kpiEtiqueta: "pendiente",
-    pregunta: "¿Qué tan visible es el portafolio para decidir?", kpiVisual: "cobertura",
-    filas: [
-      { nombre: "Clasificados", productos: 689, valor: 17128263, pct: 99.05 },
-      { nombre: "Sin clasificar", productos: 41, valor: 164069, pct: 0.95 },
-    ],
-  },
-};
-
-function BarrasDeLectura({ lectura, fmt }: { lectura: LecturaProducto; fmt: (valor: number) => string }) {
+function BarrasDeLectura({ lectura, fmt }: { lectura: LecturaAgenteProducto; fmt: (valor: number) => string }) {
   const tieneValor = lectura.filas.some((fila) => fila.valor > 0);
   return <section aria-live="polite">
     <p className="text-[10px] font-black uppercase tracking-[.16em] text-[#6e98f3]">Agente de producto</p>
@@ -147,12 +46,16 @@ export default function PaginaCategoriasProducto() {
   }, []);
   if (cargando) return <SkeletonPagina />;
 
-  const lectura = LECTURAS[activo];
+  const lecturas = construirLecturasProductoVentas(dataset);
+  const lectura = lecturas[activo];
   const capacidades: Record<AgenteProducto, string> = {
-    familia: "730 referencias", tipo: "584 cascos", modelo: "730 referencias", licencia: "730 referencias", cobertura: "730 referencias",
+    familia: `${lecturas.familia.cobertura.toFixed(1)}% identificado`,
+    tipo: `${lecturas.tipo.cobertura.toFixed(1)}% identificado`,
+    modelo: `${lecturas.modelo.cobertura.toFixed(1)}% identificado`,
+    licencia: `${lecturas.licencia.cobertura.toFixed(1)}% con señal`,
   };
-  const agentes: AgenteLateral<AgenteProducto>[] = (Object.keys(LECTURAS) as AgenteProducto[]).map((id) => ({
-    id, iniciales: LECTURAS[id].iniciales, nombre: LECTURAS[id].nombre, senal: LECTURAS[id].senal, capacidad: capacidades[id], problema: LECTURAS[id].problema, accion: LECTURAS[id].accion, kpiPct: LECTURAS[id].kpiPct, kpiEtiqueta: LECTURAS[id].kpiEtiqueta, pregunta: LECTURAS[id].pregunta, kpiVisual: LECTURAS[id].kpiVisual, color: "#4b80ee", suave: "#eaf1ff",
+  const agentes: AgenteLateral<AgenteProducto>[] = (Object.keys(lecturas) as AgenteProducto[]).map((id) => ({
+    id, iniciales: lecturas[id].iniciales, nombre: lecturas[id].nombre, senal: lecturas[id].senal, capacidad: capacidades[id], problema: lecturas[id].problema, accion: lecturas[id].accion, kpiPct: lecturas[id].kpiPct, kpiEtiqueta: lecturas[id].kpiEtiqueta, pregunta: lecturas[id].pregunta, kpiVisual: lecturas[id].kpiVisual, color: "#4b80ee", suave: "#eaf1ff",
   }));
 
   return <div className="space-y-3">

@@ -65,10 +65,10 @@ export function PanelAgentesReferencia<T extends string>({
   useEffect(() => setDetalleAbierto(false), [activo]);
   const seleccionarAgente = (id: T) => { setDetalleAbierto(false); onSeleccionar(id); };
   const enfoque = {
-    riesgo: { etiqueta: "Riesgo comercial", kpi: agente?.senal ?? "", texto: "Evita que una brecha de datos distorsione compras, inventario o ventas." },
-    atencion: { etiqueta: "Atención operativa", kpi: "Prioridad de corrección", texto: "Ordena el trabajo que debe resolverse primero en el catálogo." },
+    riesgo: { etiqueta: "Riesgo comercial", kpi: agente?.senal ?? "", texto: "Hace visible dónde la venta depende más de un grupo comercial." },
+    atencion: { etiqueta: "Atención", kpi: "Prioridad comercial", texto: "Ordena los SKU o extensiones que cambian la lectura del mix." },
     oportunidad: { etiqueta: "Oportunidad", kpi: agente?.capacidad ?? "", texto: agente?.accion ?? "Convierte la lectura en una decisión comercial accionable." },
-    analisis: { etiqueta: "Análisis", kpi: agente?.capacidad ?? "", texto: "Da una base comparable para decidir con la misma clasificación." },
+    analisis: { etiqueta: "Análisis", kpi: agente?.capacidad ?? "", texto: "Separa venta confirmada de composición y declara qué parte es inferida." },
   }[tono];
 
   return (
