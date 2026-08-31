@@ -9,9 +9,10 @@ type RolLectura = {
   id: Rol;
   nombre: string;
   color: string;
-  problema: string;
-  senal: string;
-  paso: string;
+  kpi: number;
+  etiqueta: string;
+  resumen: string;
+  accion: string;
   grafica: "dona" | "barras" | "pareto" | "cobertura";
 };
 
@@ -42,27 +43,27 @@ function construirRoles(lectura: LecturaAgenteProducto): RolLectura[] {
   return [
     {
       id: "detecta", nombre: "Detecta", color: colores.detecta, grafica: "dona",
-      problema: lectura.problema,
-      senal: `${uno} concentra ${pct(principal?.pct ?? 0)} de la composición de esta categoría.`,
-      paso: "Confirmar que esta señal representa la decisión comercial que se quiere tomar.",
+      kpi: principal?.pct ?? 0, etiqueta: uno,
+      resumen: `${(principal?.pedidos ?? 0).toLocaleString("es-GT")} pedidos incluyen esta señal.`,
+      accion: "Confirmar la señal antes de usarla como decisión comercial.",
     },
     {
       id: "explica", nombre: "Explica", color: colores.explica, grafica: "barras",
-      problema: "¿Cómo se reparte la composición y qué todavía no demuestra?",
-      senal: `${uno} y ${dos} reúnen ${pct(topDos)}; la clasificación se infiere desde SKU y nombre.`,
-      paso: "Contrastar el patrón con el maestro comercial antes de atribuir una causa.",
+      kpi: topDos, etiqueta: "Top 2 del mix",
+      resumen: "Tres bandas muestran la distribución observada.",
+      accion: "Contrastar el patrón con el maestro comercial.",
     },
     {
       id: "prioriza", nombre: "Prioriza", color: colores.prioriza, grafica: "pareto",
-      problema: "¿Qué concentración o incertidumbre merece foco primero?",
-      senal: coberturaBaja ? `La cobertura es ${pct(lectura.cobertura)}: hay valor que aún no se puede priorizar con confianza.` : `${uno} es la principal concentración observada; revisar dependencia relativa.`,
-      paso: "Ordenar la revisión por valor, pedidos y porcentaje de cobertura.",
+      kpi: principal?.pedidos ?? 0, etiqueta: "pedidos",
+      resumen: coberturaBaja ? `Cobertura ${pct(lectura.cobertura)}: lectura incompleta.` : `${uno} lidera el Pareto de la categoría.`,
+      accion: "Ordenar la revisión por pedidos, peso y cobertura.",
     },
     {
       id: "recomienda", nombre: "Recomienda", color: colores.recomienda, grafica: "cobertura",
-      problema: "¿Qué experimento comercial se puede evaluar de forma responsable?",
-      senal: `Cobertura de clasificación: ${pct(lectura.cobertura)}. No hay margen ni inventario en esta lectura.`,
-      paso: "Evaluar una acción solo después de validar margen, inventario y maestro comercial.",
+      kpi: lectura.cobertura, etiqueta: "cobertura",
+      resumen: "Sin margen ni inventario: validar antes de actuar.",
+      accion: "Evaluar una acción solo con maestro, margen e inventario.",
     },
   ];
 }
@@ -74,7 +75,10 @@ function MiniGrafica({ tipo, color, lectura }: { tipo: RolLectura["grafica"]; co
     return <div className="b18-mini-dona" style={{ "--b18-color": color, "--b18-pct": `${Math.min(valor, 100) * 3.6}deg` } as CSSProperties} aria-label={`${tipo}: ${pct(valor)}`}><span>{valor.toFixed(0)}%</span></div>;
   }
   const filas = [uno, dos, tres].filter(Boolean);
-  return <div className="b18-mini-barras" aria-label={`${tipo} de la categoría activa`}>
+  if (tipo === "pareto") return <div className="b18-mini-pareto" aria-label="Pareto de la categoría activa">
+    {filas.map((fila, indice) => <i key={fila!.nombre} style={{ height: `${Math.max(fila!.pct, 12)}%`, backgroundColor: color, opacity: 1 - indice * 0.2 }} />)}
+  </div>;
+  return <div className="b18-mini-barras" aria-label="Barras de la categoría activa">
     {filas.map((fila, indice) => <i key={fila!.nombre} style={{ width: `${Math.max(fila!.pct, 8)}%`, backgroundColor: color, opacity: 1 - indice * 0.2 }} />)}
   </div>;
 }
@@ -83,7 +87,8 @@ function TarjetaRol({ item, lectura, insignia, activa, onSeleccionar }: { item: 
   return <button type="button" className={`b18-rol-card b18-rol-${item.id} ${activa ? "is-active" : ""}`} onClick={onSeleccionar} aria-pressed={activa} style={{ "--b18-role": item.color } as CSSProperties}>
     <span className="b18-connector" aria-hidden="true" />
     <div className="b18-rol-heading"><span>{insignia}</span><strong>{item.nombre}</strong></div>
-    <div className="b18-rol-content"><div><p><b>Problema</b>{item.problema}</p><p><b>Señal</b>{item.senal}</p><p><b>Próximo paso</b>{item.paso}</p></div><MiniGrafica tipo={item.grafica} color={item.color} lectura={lectura} /></div>
+    <div className="b18-rol-content"><div className="b18-rol-kpi"><strong>{item.kpi.toLocaleString("es-GT", { maximumFractionDigits: item.id === "prioriza" ? 0 : 2 })}{item.id === "prioriza" ? "" : "%"}</strong><span>{item.etiqueta}</span></div><MiniGrafica tipo={item.grafica} color={item.color} lectura={lectura} /></div>
+    <p className="b18-rol-resumen">{item.resumen}</p>
   </button>;
 }
 
@@ -112,7 +117,7 @@ export function MapaB18Producto({ lecturas, corte, fuente, moneda }: { lecturas:
           <h3>{lectura.pregunta}</h3>
           <div className="b18-centro-viz"><div className="b18-dona-principal" style={{ "--b18-color": activo.color, "--b18-pct": `${Math.min(principal?.pct ?? 0, 100) * 3.6}deg` } as CSSProperties}><span>{(principal?.pct ?? 0).toFixed(2)}<small>%</small></span><em>{principal?.nombre ?? "Sin señal"}</em></div><div><p>Hecho demostrado</p><strong>{lectura.hallazgo}</strong><span>{lectura.explicacion}</span></div></div>
           <div className="b18-resumen"><p><b>Problema completo</b>{lectura.problema}</p><p><b>Lo que aún no sabemos</b>La clasificación es inferida desde SKU y nombre; no sustituye el maestro Odoo.</p><p><b>Riesgo principal</b>{lectura.cobertura < 90 ? `La cobertura de ${pct(lectura.cobertura)} limita cualquier decisión por esta categoría.` : "La concentración observada no demuestra margen, inventario ni causalidad."}</p><p><b>Tensión entre lecturas</b>{activo.nombre} prioriza una perspectiva; B18 requiere contrastarla con las otras tres antes de decidir.</p></div>
-          <div className="b18-decision"><p>Decisión humana requerida</p><strong>{activo.paso}</strong></div>
+          <div className="b18-decision"><p>Decisión humana requerida</p><strong>{activo.accion}</strong></div>
           <dl className="b18-metadatos"><div><dt>Fuente</dt><dd>{fuente}</dd></div><div><dt>Capa</dt><dd>Composición de líneas, no venta total</dd></div><div><dt>Corte</dt><dd>{corte}</dd></div><div><dt>Moneda</dt><dd>{moneda}</dd></div><div><dt>Cobertura</dt><dd>{pct(lectura.cobertura)}</dd></div><div><dt>Límite</dt><dd>SKU/nombre inferido</dd></div></dl>
         </article>
       </div>
