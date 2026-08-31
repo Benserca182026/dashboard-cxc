@@ -89,14 +89,14 @@ function MiniGrafica({ tipo, color, lectura }: { tipo: RolLectura["grafica"]; co
 }
 
 function TarjetaRol({ item, lectura, insignia, activa, onSeleccionar }: { item: RolLectura; lectura: LecturaAgenteProducto; insignia: string; activa: boolean; onSeleccionar: () => void }) {
-  return <button type="button" className={`b18-rol-card b18-rol-${item.id} ${activa ? "is-active" : ""}`} onClick={onSeleccionar} aria-pressed={activa} aria-label={`${item.nombre}. ${item.problema}`} style={{ "--b18-role": item.color } as CSSProperties}>
+  return <button type="button" className={`b18-rol-card b18-rol-${item.id} ${activa ? "is-active" : ""}`} onMouseEnter={onSeleccionar} onClick={onSeleccionar} aria-pressed={activa} aria-label={`${item.nombre}. Abrir lectura ampliada: ${item.problema}`} style={{ "--b18-role": item.color } as CSSProperties}>
     <span className="b18-connector" aria-hidden="true" />
     <div className="b18-rol-visual">
       <div className="b18-rol-heading"><span>{insignia}</span><strong>{item.nombre}</strong></div>
       <div className="b18-rol-content"><div className="b18-rol-kpi"><strong>{item.kpi.toLocaleString("es-GT", { maximumFractionDigits: item.id === "prioriza" ? 0 : 2 })}{item.id === "prioriza" ? "" : "%"}</strong><span>{item.etiqueta}</span></div><MiniGrafica tipo={item.grafica} color={item.color} lectura={lectura} /></div>
       <p className="b18-rol-resumen">{item.resumen}</p>
     </div>
-    <div className="b18-rol-detalle" aria-hidden="true"><span>Diagnóstico comercial</span><strong>{item.problema}</strong><p><b>Impacto</b>{item.resumen}</p><p><b>Siguiente paso</b>{item.accion}</p></div>
+    <div className="b18-rol-detalle" aria-hidden="true"><span>Diagnóstico comercial</span><strong>{item.problema}</strong><p><b>Impacto</b>{item.resumen}</p><p><b>Abrir</b>Lectura ampliada del agente</p></div>
   </button>;
 }
 
