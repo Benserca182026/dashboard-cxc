@@ -92,9 +92,31 @@ function TarjetaRol({ item, lectura, insignia, activa, onSeleccionar }: { item: 
   </button>;
 }
 
+function DiagnosticoB18({ lecturas, corte, onCerrar }: { lecturas: Record<AgenteProductoVentas, LecturaAgenteProducto>; corte: string; onCerrar: () => void }) {
+  const categorias = Object.keys(lecturas) as AgenteProductoVentas[];
+  return <div className="b18-diagnostico-velo" role="presentation" onPointerDown={(evento) => evento.target === evento.currentTarget && onCerrar()}>
+    <section className="b18-diagnostico" role="dialog" aria-modal="true" aria-labelledby="diagnostico-b18-titulo">
+      <header><div><p>Diagnóstico integral</p><h2 id="diagnostico-b18-titulo">B<span>18</span> · problemas encontrados</h2><small>Lectura de composición de líneas confirmadas · corte {corte}</small></div><button type="button" onClick={onCerrar} aria-label="Cerrar diagnóstico B18">×</button></header>
+      <div className="b18-diagnostico-grid">{categorias.map((id) => {
+        const lectura = lecturas[id];
+        const principal = lectura.filas[0];
+        return <article key={id}>
+          <div className="b18-diagnostico-card-title"><span>{siglas[id]}</span><b>{nombres[id]}</b><em>{pct(lectura.cobertura)} cobertura</em></div>
+          <div className="b18-diagnostico-kpi"><div className="b18-diagnostico-dona" style={{ "--b18-color": "#1681ed", "--b18-pct": `${Math.min(principal?.pct ?? 0, 100) * 3.6}deg` } as CSSProperties}><strong>{(principal?.pct ?? 0).toFixed(0)}%</strong></div><div><strong>{principal?.nombre ?? "Sin señal"}</strong><span>{(principal?.pedidos ?? 0).toLocaleString("es-GT")} pedidos con señal</span></div></div>
+          <p><b>Hallazgo</b>{lectura.hallazgo}</p>
+          <p><b>Problema</b>{lectura.problema}</p>
+          <p><b>Validación</b>{lectura.accion}</p>
+        </article>;
+      })}</div>
+      <footer>Fuente: ventas + venta_lineas + productos · Clasificación inferida desde SKU/nombre · Moneda no agregable: segmentar por moneda.</footer>
+    </section>
+  </div>;
+}
+
 export function MapaB18Producto({ lecturas, corte, fuente, moneda }: { lecturas: Record<AgenteProductoVentas, LecturaAgenteProducto>; corte: string; fuente: string; moneda: string }) {
   const [categoria, setCategoria] = useState<AgenteProductoVentas>("familia");
   const [rolActivo, setRolActivo] = useState<Rol>("detecta");
+  const [diagnosticoAbierto, setDiagnosticoAbierto] = useState(false);
   const lectura = lecturas[categoria];
   const roles = useMemo(() => construirRoles(lectura), [lectura]);
   const principal = lectura.filas[0];
@@ -105,7 +127,7 @@ export function MapaB18Producto({ lecturas, corte, fuente, moneda }: { lecturas:
       <div className="b18-map-marca">{siglas[categoria]}</div><p>Categorías</p>
       <div className="b18-map-lista">{(Object.keys(lecturas) as AgenteProductoVentas[]).map((id) => <button key={id} type="button" onClick={() => { setCategoria(id); setRolActivo("detecta"); }} aria-pressed={categoria === id}><span>{siglas[id]}</span>{nombres[id]}</button>)}</div>
       <div className="b18-map-status"><span>Agent status</span><b>● Lectura activa</b><p>{lectura.senal}</p></div>
-      <div className="b18-map-b18" aria-label="B18, coordinador de lectura">B<span>18</span></div>
+      <button type="button" className="b18-map-b18" onClick={() => setDiagnosticoAbierto(true)} aria-label="Abrir diagnóstico integral B18">B<span>18</span></button>
     </aside>
     <div className="b18-map-canvas">
       <header className="b18-map-header"><div><p>Reporte general</p><h2>Clasificación comercial de productos</h2></div><span>Corte: {corte}</span></header>
@@ -121,5 +143,6 @@ export function MapaB18Producto({ lecturas, corte, fuente, moneda }: { lecturas:
         </article>
       </div>
     </div>
+    {diagnosticoAbierto ? <DiagnosticoB18 lecturas={lecturas} corte={corte} onCerrar={() => setDiagnosticoAbierto(false)} /> : null}
   </section>;
 }
