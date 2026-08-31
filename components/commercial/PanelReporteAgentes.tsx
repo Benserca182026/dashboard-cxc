@@ -4,12 +4,22 @@ import type { ReactNode } from "react";
 import { MascotaB18, TONOS_MASCOTA, type TonoMascota } from "./MascotaB18";
 import type { AgenteLateral } from "./PanelAgentesLateral";
 
+export type TarjetaAnalisis = {
+  id: string;
+  etiqueta: string;
+  pregunta: string;
+  kpiEtiqueta: string;
+  kpiPct: number;
+  conclusion: string;
+};
+
 export function PanelReporteAgentes<T extends string>({
   agentes,
   activo,
   tono,
   onSeleccionar,
   onTonoCambiar,
+  analisis,
   titulo,
   corte,
   children,
@@ -19,6 +29,7 @@ export function PanelReporteAgentes<T extends string>({
   tono: TonoMascota;
   onSeleccionar: (id: T) => void;
   onTonoCambiar: (tono: TonoMascota) => void;
+  analisis: TarjetaAnalisis[];
   titulo: string;
   corte: string;
   children: ReactNode;
@@ -44,9 +55,9 @@ export function PanelReporteAgentes<T extends string>({
       <main className="reporte-agentes-canvas">
         <div className="reporte-agentes-cabecera"><div><p>Reporte general</p><h2>{titulo}</h2></div><span>Corte: {corte}</span></div>
         <div className="reporte-agentes-grid">
-          {agentes.map((item, indice) => <button key={item.id} type="button" onClick={() => onSeleccionar(item.id)} className={`reporte-agente-tarjeta reporte-agente-${indice} ${item.id === activo ? "reporte-agente-activo" : ""}`}>
-            <span className="reporte-agente-sigla">{item.iniciales}</span><span className="reporte-agente-nombre">{item.nombre}</span><strong>{item.pregunta}</strong><span className="reporte-agente-kpi"><b>{item.kpiEtiqueta}</b><em>{(item.kpiPct ?? 0).toFixed(2)}%</em></span><span className="reporte-agente-riel"><i style={{ width: `${Math.max(item.kpiPct ?? 0, 3)}%` }} /></span>
-          </button>)}
+          {analisis.map((item, indice) => <article key={item.id} className={`reporte-agente-tarjeta reporte-agente-${indice}`}>
+            <span className="reporte-agente-sigla">{agente?.iniciales}</span><span className="reporte-agente-nombre">{agente?.nombre} · {item.etiqueta}</span><strong>{item.pregunta}</strong><span className="reporte-agente-kpi"><b>{item.kpiEtiqueta}</b><em>{item.kpiPct.toFixed(2)}%</em></span><span className="reporte-agente-riel"><i style={{ width: `${Math.max(item.kpiPct, 3)}%` }} /></span><span className="reporte-agente-conclusion">{item.conclusion}</span>
+          </article>)}
           <article className="reporte-agentes-centro" aria-live="polite">{children}</article>
         </div>
       </main>

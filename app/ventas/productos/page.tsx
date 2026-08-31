@@ -3,13 +3,37 @@
 import { useEffect, useState } from "react";
 import { BarraUsuario } from "@/components/BarraUsuario";
 import { SkeletonPagina } from "@/components/Basicos";
-import { PanelReporteAgentes } from "@/components/commercial/PanelReporteAgentes";
+import { PanelReporteAgentes, type TarjetaAnalisis } from "@/components/commercial/PanelReporteAgentes";
 import type { AgenteLateral } from "@/components/commercial/PanelAgentesLateral";
 import { construirLecturasProductoVentas, type AgenteProductoVentas, type LecturaAgenteProducto } from "@/lib/agentes-producto-ventas";
 import { useApp } from "@/lib/store";
 import type { TonoMascota } from "@/components/commercial/MascotaB18";
 
 type AgenteProducto = AgenteProductoVentas;
+
+function construirAnalisisPerimetro(lectura: LecturaAgenteProducto): TarjetaAnalisis[] {
+  const [principal, alternativa] = lectura.filas;
+  const principalSeguro = principal ?? { nombre: "Sin señal", pct: 0, pedidos: 0, productos: 0 };
+  const alternativaSegura = alternativa ?? principalSeguro;
+  return [
+    {
+      id: "composicion", etiqueta: "Composición", pregunta: `¿Cuál lidera el mix de ${lectura.nombre.toLowerCase()}?`, kpiEtiqueta: principalSeguro.nombre, kpiPct: principalSeguro.pct,
+      conclusion: `${principalSeguro.nombre} concentra la mayor participación de ${lectura.nombre.toLowerCase()}.`,
+    },
+    {
+      id: "demanda", etiqueta: "Demanda", pregunta: `¿Dónde se concentra la demanda de ${lectura.nombre.toLowerCase()}?`, kpiEtiqueta: `${principalSeguro.pedidos.toLocaleString("es-GT")} pedidos`, kpiPct: principalSeguro.pct,
+      conclusion: `${principalSeguro.nombre} aparece en ${principalSeguro.pedidos.toLocaleString("es-GT")} pedidos confirmados.`,
+    },
+    {
+      id: "alternativa", etiqueta: "Alternativa", pregunta: `¿Cuál complementa la venta de ${lectura.nombre.toLowerCase()}?`, kpiEtiqueta: alternativaSegura.nombre, kpiPct: alternativaSegura.pct,
+      conclusion: `${alternativaSegura.nombre} es la siguiente lectura para contrastar el mix.`,
+    },
+    {
+      id: "cobertura", etiqueta: "Cobertura", pregunta: `¿Qué tan visible es la lectura de ${lectura.nombre.toLowerCase()}?`, kpiEtiqueta: "valor identificado", kpiPct: lectura.cobertura,
+      conclusion: `${lectura.cobertura.toFixed(2)}% del valor ya permite decidir sobre ${lectura.nombre.toLowerCase()}.`,
+    },
+  ];
+}
 
 function BarrasDeLectura({ lectura, lecturas, fmt }: { lectura: LecturaAgenteProducto; lecturas: Record<AgenteProducto, LecturaAgenteProducto>; fmt: (valor: number) => string }) {
   const tieneValor = lectura.filas.some((fila) => fila.valor > 0);
@@ -48,6 +72,7 @@ export default function PaginaCategoriasProducto() {
 
   const lecturas = construirLecturasProductoVentas(dataset);
   const lectura = lecturas[activo];
+  const analisisPerimetro = construirAnalisisPerimetro(lectura);
   const capacidades: Record<AgenteProducto, string> = {
     familia: `${lecturas.familia.cobertura.toFixed(1)}% identificado`,
     tipo: `${lecturas.tipo.cobertura.toFixed(1)}% identificado`,
@@ -64,6 +89,6 @@ export default function PaginaCategoriasProducto() {
       <h1 className="min-w-0 whitespace-nowrap text-center text-[clamp(1.75rem,3.35vw,3.15rem)] font-black leading-none tracking-[-.065em] text-[#111827]">Clasificación <span className="bg-[linear-gradient(90deg,#467deb,#8cc8ff)] bg-clip-text text-transparent">comercial de productos</span></h1>
       <div className="justify-self-end"><BarraUsuario dataset={dataset} modulo="ventas" /></div>
     </header>
-    <div id="sec-productos"><PanelReporteAgentes agentes={agentes} activo={activo} tono={tono} onSeleccionar={setActivo} onTonoCambiar={setTono} titulo="Clasificación comercial de productos" corte="última venta disponible"><BarrasDeLectura lectura={lectura} lecturas={lecturas} fmt={fmt} /></PanelReporteAgentes></div>
+    <div id="sec-productos"><PanelReporteAgentes agentes={agentes} activo={activo} tono={tono} analisis={analisisPerimetro} onSeleccionar={setActivo} onTonoCambiar={setTono} titulo="Clasificación comercial de productos" corte="última venta disponible"><BarrasDeLectura lectura={lectura} lecturas={lecturas} fmt={fmt} /></PanelReporteAgentes></div>
   </div>;
 }
