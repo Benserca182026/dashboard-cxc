@@ -105,19 +105,18 @@ export function MapaB18Producto({ lecturas, corte, fuente, moneda }: { lecturas:
       <div className="b18-map-marca">{siglas[categoria]}</div><p>Categorías</p>
       <div className="b18-map-lista">{(Object.keys(lecturas) as AgenteProductoVentas[]).map((id) => <button key={id} type="button" onClick={() => { setCategoria(id); setRolActivo("detecta"); }} aria-pressed={categoria === id}><span>{siglas[id]}</span>{nombres[id]}</button>)}</div>
       <div className="b18-map-status"><span>Agent status</span><b>● Lectura activa</b><p>{lectura.senal}</p></div>
+      <div className="b18-map-b18" aria-label="B18, coordinador de lectura">B<span>18</span></div>
     </aside>
     <div className="b18-map-canvas">
       <header className="b18-map-header"><div><p>Reporte general</p><h2>Clasificación comercial de productos</h2></div><span>Corte: {corte}</span></header>
       <div className="b18-map-grid">
         {roles.map((item) => <TarjetaRol key={item.id} item={item} lectura={lectura} insignia={siglas[categoria]} activa={item.id === rolActivo} onSeleccionar={() => setRolActivo(item.id)} />)}
         <article className="b18-centro" aria-live="polite">
-          <div className="b18-centro-orbita" aria-hidden="true" />
-          <div className="b18-centro-mascota">B<span>18</span></div>
-          <p className="b18-centro-eyebrow">B18 coordina las cuatro lecturas</p>
+          <p className="b18-centro-eyebrow">Reporte visual · {lectura.nombre}</p>
           <h3>{lectura.pregunta}</h3>
-          <div className="b18-centro-viz"><div className="b18-dona-principal" style={{ "--b18-color": activo.color, "--b18-pct": `${Math.min(principal?.pct ?? 0, 100) * 3.6}deg` } as CSSProperties}><span>{(principal?.pct ?? 0).toFixed(2)}<small>%</small></span><em>{principal?.nombre ?? "Sin señal"}</em></div><div><p>Hecho demostrado</p><strong>{lectura.hallazgo}</strong><span>{lectura.explicacion}</span></div></div>
-          <div className="b18-resumen"><p><b>Problema completo</b>{lectura.problema}</p><p><b>Lo que aún no sabemos</b>La clasificación es inferida desde SKU y nombre; no sustituye el maestro Odoo.</p><p><b>Riesgo principal</b>{lectura.cobertura < 90 ? `La cobertura de ${pct(lectura.cobertura)} limita cualquier decisión por esta categoría.` : "La concentración observada no demuestra margen, inventario ni causalidad."}</p><p><b>Tensión entre lecturas</b>{activo.nombre} prioriza una perspectiva; B18 requiere contrastarla con las otras tres antes de decidir.</p></div>
-          <div className="b18-decision"><p>Decisión humana requerida</p><strong>{activo.accion}</strong></div>
+          <div className="b18-centro-viz"><div className="b18-dona-principal" style={{ "--b18-color": activo.color, "--b18-pct": `${Math.min(principal?.pct ?? 0, 100) * 3.6}deg` } as CSSProperties}><span>{(principal?.pct ?? 0).toFixed(2)}<small>%</small></span><em>{principal?.nombre ?? "Sin señal"}</em></div><div className="b18-centro-barras" aria-label="Distribución de la categoría activa">{lectura.filas.slice(0, 3).map((fila, indice) => <div key={fila.nombre}><span>{fila.nombre}</span><b>{pct(fila.pct)}</b><i style={{ width: `${Math.max(fila.pct, 3)}%`, opacity: 1 - indice * .18, backgroundColor: activo.color }} /></div>)}</div></div>
+          <div className="b18-centro-metricas"><div><b>{(principal?.pedidos ?? 0).toLocaleString("es-GT")}</b><span>pedidos con señal</span></div><div><b>{pct(lectura.cobertura)}</b><span>cobertura identificada</span></div><div><b>{lectura.filas.length}</b><span>segmentos visibles</span></div></div>
+          <div className="b18-decision"><p>Siguiente validación</p><strong>{activo.accion}</strong></div>
           <dl className="b18-metadatos"><div><dt>Fuente</dt><dd>{fuente}</dd></div><div><dt>Capa</dt><dd>Composición de líneas, no venta total</dd></div><div><dt>Corte</dt><dd>{corte}</dd></div><div><dt>Moneda</dt><dd>{moneda}</dd></div><div><dt>Cobertura</dt><dd>{pct(lectura.cobertura)}</dd></div><div><dt>Límite</dt><dd>SKU/nombre inferido</dd></div></dl>
         </article>
       </div>
