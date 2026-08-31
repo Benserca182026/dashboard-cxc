@@ -12,6 +12,7 @@ type RolLectura = {
   kpi: number;
   etiqueta: string;
   resumen: string;
+  problema: string;
   accion: string;
   grafica: "dona" | "barras" | "pareto" | "cobertura";
 };
@@ -45,24 +46,28 @@ function construirRoles(lectura: LecturaAgenteProducto): RolLectura[] {
       id: "detecta", nombre: "Detecta", color: colores.detecta, grafica: "dona",
       kpi: principal?.pct ?? 0, etiqueta: uno,
       resumen: `${(principal?.pedidos ?? 0).toLocaleString("es-GT")} pedidos incluyen esta señal.`,
+      problema: `${uno} concentra ${pct(principal?.pct ?? 0)} de la composición observada.`,
       accion: "Confirmar la señal antes de usarla como decisión comercial.",
     },
     {
       id: "explica", nombre: "Explica", color: colores.explica, grafica: "barras",
       kpi: topDos, etiqueta: "Top 2 del mix",
       resumen: "Tres bandas muestran la distribución observada.",
+      problema: `Las dos primeras señales reúnen ${pct(topDos)}: el mix puede estar concentrado.`,
       accion: "Contrastar el patrón con el maestro comercial.",
     },
     {
       id: "prioriza", nombre: "Prioriza", color: colores.prioriza, grafica: "pareto",
       kpi: principal?.pedidos ?? 0, etiqueta: "pedidos",
       resumen: coberturaBaja ? `Cobertura ${pct(lectura.cobertura)}: lectura incompleta.` : `${uno} lidera el Pareto de la categoría.`,
+      problema: coberturaBaja ? `Solo ${pct(lectura.cobertura)} de la composición tiene lectura identificada.` : `${uno} domina los pedidos de esta categoría.`,
       accion: "Ordenar la revisión por pedidos, peso y cobertura.",
     },
     {
       id: "recomienda", nombre: "Recomienda", color: colores.recomienda, grafica: "cobertura",
       kpi: lectura.cobertura, etiqueta: "cobertura",
       resumen: "Sin margen ni inventario: validar antes de actuar.",
+      problema: coberturaBaja ? `La cobertura es ${pct(lectura.cobertura)}; hay señal no identificada que puede sesgar la lectura.` : "La clasificación está suficientemente cubierta, pero no prueba margen ni inventario.",
       accion: "Evaluar una acción solo con maestro, margen e inventario.",
     },
   ];
@@ -84,11 +89,14 @@ function MiniGrafica({ tipo, color, lectura }: { tipo: RolLectura["grafica"]; co
 }
 
 function TarjetaRol({ item, lectura, insignia, activa, onSeleccionar }: { item: RolLectura; lectura: LecturaAgenteProducto; insignia: string; activa: boolean; onSeleccionar: () => void }) {
-  return <button type="button" className={`b18-rol-card b18-rol-${item.id} ${activa ? "is-active" : ""}`} onClick={onSeleccionar} aria-pressed={activa} style={{ "--b18-role": item.color } as CSSProperties}>
+  return <button type="button" className={`b18-rol-card b18-rol-${item.id} ${activa ? "is-active" : ""}`} onClick={onSeleccionar} aria-pressed={activa} aria-label={`${item.nombre}. ${item.problema}`} style={{ "--b18-role": item.color } as CSSProperties}>
     <span className="b18-connector" aria-hidden="true" />
-    <div className="b18-rol-heading"><span>{insignia}</span><strong>{item.nombre}</strong></div>
-    <div className="b18-rol-content"><div className="b18-rol-kpi"><strong>{item.kpi.toLocaleString("es-GT", { maximumFractionDigits: item.id === "prioriza" ? 0 : 2 })}{item.id === "prioriza" ? "" : "%"}</strong><span>{item.etiqueta}</span></div><MiniGrafica tipo={item.grafica} color={item.color} lectura={lectura} /></div>
-    <p className="b18-rol-resumen">{item.resumen}</p>
+    <div className="b18-rol-visual">
+      <div className="b18-rol-heading"><span>{insignia}</span><strong>{item.nombre}</strong></div>
+      <div className="b18-rol-content"><div className="b18-rol-kpi"><strong>{item.kpi.toLocaleString("es-GT", { maximumFractionDigits: item.id === "prioriza" ? 0 : 2 })}{item.id === "prioriza" ? "" : "%"}</strong><span>{item.etiqueta}</span></div><MiniGrafica tipo={item.grafica} color={item.color} lectura={lectura} /></div>
+      <p className="b18-rol-resumen">{item.resumen}</p>
+    </div>
+    <div className="b18-rol-detalle" aria-hidden="true"><span>Diagnóstico comercial</span><strong>{item.problema}</strong><p><b>Impacto</b>{item.resumen}</p><p><b>Siguiente paso</b>{item.accion}</p></div>
   </button>;
 }
 

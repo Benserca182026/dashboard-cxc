@@ -356,6 +356,19 @@ body.producto-lienzo-blanco::before {
 .tarjeta-comercial > div:first-child p { overflow: hidden; margin: 0; color: #4b80ee; font-size: 8px; font-weight: 900; text-overflow: ellipsis; white-space: nowrap; }.tarjeta-comercial h3 { min-height: 20px; margin: 5px 0 0; color: #334766; font-size: 8px; font-weight: 850; line-height: 1.18; }.tarjeta-comercial-kpi { display: flex; align-items: center; gap: 7px; margin-top: 5px; }.tarjeta-comercial-kpi .micro-kpi { flex: 1; min-width: 0; margin-top: 0; }.tarjeta-comercial-lectura { display: block; margin-top: 5px; color: #7d8da9; font-size: 7px; font-weight: 700; line-height: 1.2; }
 .micro-visual { display: flex; flex: 0 0 auto; width: 30px; height: 30px; align-items: end; justify-content: center; gap: 2px; }.micro-dona { position: relative; align-items: center; border-radius: 50%; }.micro-dona::after { position: absolute; inset: 6px; border-radius: 50%; background: white; content: ""; }.micro-dona i { position: relative; z-index: 1; color: #4b80ee; font-size: 6px; font-style: normal; font-weight: 900; }.micro-pareto { padding: 4px; border-bottom: 2px solid #e8effd; }.micro-pareto i { display: block; width: 6px; border-radius: 3px 3px 0 0; background: linear-gradient(#86c6ff,#4b80ee); }.micro-barras { flex-direction: column; align-items: flex-start; justify-content: center; }.micro-barras i { display: block; height: 5px; border-radius: 99px; background: linear-gradient(90deg,#4b80ee,#8cc8ff); }
 .mascota-b18-figura { align-items: center; touch-action: none; }.mascota-b18-figura i { display: inline-block; transform: translateY(2px); }
+
+/* Las cuatro tarjetas funcionan como una consola: la lectura normal es casi
+   enteramente gráfica; el diagnóstico comercial aparece sólo al explorarla. */
+.b18-rol-card { overflow:hidden; cursor:pointer; }
+.b18-rol-visual { display:flex; min-height:0; flex:1; flex-direction:column; width:100%; transition:opacity .18s ease,transform .18s ease; }
+.b18-rol-detalle { position:absolute; inset:0; display:flex; flex-direction:column; justify-content:center; gap:9px; padding:18px; background:linear-gradient(145deg,#fff, color-mix(in srgb,var(--b18-role) 7%,#fff)); color:#18316b; opacity:0; pointer-events:none; transform:translateY(10px); transition:opacity .18s ease,transform .18s ease; }
+.b18-rol-detalle > span { color:var(--b18-role); font-size:9px; font-weight:950; letter-spacing:.1em; text-transform:uppercase; }
+.b18-rol-detalle > strong { color:#17326a; font-size:13px; font-weight:900; line-height:1.28; }
+.b18-rol-detalle p { margin:0; color:#62799f; font-size:10px; font-weight:700; line-height:1.28; }
+.b18-rol-detalle p b { display:block; margin-bottom:2px; color:var(--b18-role); font-size:8px; font-weight:950; letter-spacing:.08em; text-transform:uppercase; }
+.b18-rol-card:hover .b18-rol-visual,.b18-rol-card:focus-visible .b18-rol-visual { opacity:.08; transform:scale(.98); }
+.b18-rol-card:hover .b18-rol-detalle,.b18-rol-card:focus-visible .b18-rol-detalle { opacity:1; pointer-events:auto; transform:none; }
+@media (hover:none) { .b18-rol-card:focus .b18-rol-visual { opacity:.08; transform:scale(.98); }.b18-rol-card:focus .b18-rol-detalle { opacity:1; pointer-events:auto; transform:none; } }
 @media (max-width: 760px) { .tarjeta-comercial { width: 124px; padding: 8px; }.tarjeta-comercial-0 { left: 7px; top: 7px; }.tarjeta-comercial-1 { right: 7px; top: 7px; }.tarjeta-comercial-2 { bottom: 7px; left: 7px; }.tarjeta-comercial-3 { right: 7px; bottom: 7px; }.tarjeta-comercial-4 { bottom: 7px; }.tarjeta-comercial-lectura { display: none; } }
 @media (max-width: 900px) { .mascota-b18 { left: 10px; bottom: 12px; }.mascota-b18-en-detalle { left: 9px; bottom: 9px; }.mascota-b18-figura { width: 54px; height: 54px; }.mascota-b18-figura b { font-size: 23px; } }
 
