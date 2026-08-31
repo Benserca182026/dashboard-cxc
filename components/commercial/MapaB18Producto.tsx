@@ -121,9 +121,28 @@ function DiagnosticoB18({ lecturas, corte, onCerrar }: { lecturas: Record<Agente
   </div>;
 }
 
+type PestanaDrilldown = "resultado" | "problema" | "accion";
+
+function DrilldownRol({ item, lectura, insignia, onCerrar }: { item: RolLectura; lectura: LecturaAgenteProducto; insignia: string; onCerrar: () => void }) {
+  const [pestana, setPestana] = useState<PestanaDrilldown>("resultado");
+  const principal = lectura.filas[0];
+  const pestanas: { id: PestanaDrilldown; nombre: string }[] = [{ id: "resultado", nombre: "Resultado" }, { id: "problema", nombre: "Diagnóstico" }, { id: "accion", nombre: "Acción" }];
+
+  return <div className="b18-drilldown-velo" role="presentation" onPointerDown={(evento) => evento.target === evento.currentTarget && onCerrar()}>
+    <section className="b18-drilldown" role="dialog" aria-modal="true" aria-labelledby="b18-drilldown-titulo" style={{ "--b18-role": item.color } as CSSProperties}>
+      <header><div><p>Agente comercial · {insignia}</p><h2 id="b18-drilldown-titulo">{item.nombre}: lectura ampliada</h2><span>{lectura.nombre} · corte de ventas confirmado</span></div><button type="button" onClick={onCerrar} aria-label="Cerrar lectura ampliada">×</button></header>
+      <nav className="b18-drilldown-tabs" aria-label="Secciones del agente">{pestanas.map((tab) => <button key={tab.id} type="button" aria-pressed={pestana === tab.id} onClick={() => setPestana(tab.id)}>{tab.nombre}</button>)}</nav>
+      {pestana === "resultado" ? <div className="b18-drilldown-resultados"><div className="b18-drilldown-kpi"><div className="b18-diagnostico-dona" style={{ "--b18-color": item.color, "--b18-pct": `${Math.min(principal?.pct ?? 0, 100) * 3.6}deg` } as CSSProperties}><strong>{(principal?.pct ?? 0).toFixed(0)}%</strong></div><div><small>Señal principal</small><strong>{principal?.nombre ?? "Sin señal"}</strong><span>{(principal?.pedidos ?? 0).toLocaleString("es-GT")} pedidos · {pct(lectura.cobertura)} de cobertura</span></div></div><div className="b18-drilldown-barras">{lectura.filas.slice(0, 5).map((fila) => <div key={fila.nombre}><span>{fila.nombre}</span><b>{pct(fila.pct)}</b><i style={{ width: `${Math.max(fila.pct, 3)}%` }} /></div>)}</div></div> : null}
+      {pestana === "problema" ? <div className="b18-drilldown-texto"><small>Problema encontrado</small><h3>{lectura.problema}</h3><p>{lectura.hallazgo}</p><dl><div><dt>Impacto observado</dt><dd>{item.resumen}</dd></div><div><dt>Límite de lectura</dt><dd>La clasificación se infiere desde SKU y nombre; no sustituye el maestro comercial.</dd></div></dl></div> : null}
+      {pestana === "accion" ? <div className="b18-drilldown-texto"><small>Recomendación del agente</small><h3>{item.accion}</h3><p>{lectura.accion}</p><dl><div><dt>Decisión humana</dt><dd>Validar margen, inventario y maestro comercial antes de ejecutar una acción.</dd></div><div><dt>Fuente</dt><dd>Ventas confirmadas + líneas de pedido + productos.</dd></div></dl></div> : null}
+    </section>
+  </div>;
+}
+
 export function MapaB18Producto({ lecturas, corte, fuente, moneda }: { lecturas: Record<AgenteProductoVentas, LecturaAgenteProducto>; corte: string; fuente: string; moneda: string }) {
   const [categoria, setCategoria] = useState<AgenteProductoVentas>("familia");
   const [rolActivo, setRolActivo] = useState<Rol>("detecta");
+  const [rolDrilldown, setRolDrilldown] = useState<Rol | null>(null);
   const [diagnosticoAbierto, setDiagnosticoAbierto] = useState(false);
   const lectura = lecturas[categoria];
   const roles = useMemo(() => construirRoles(lectura), [lectura]);
@@ -140,7 +159,7 @@ export function MapaB18Producto({ lecturas, corte, fuente, moneda }: { lecturas:
     <div className="b18-map-canvas">
       <header className="b18-map-header"><div><p>Reporte general</p><h2>Clasificación comercial de productos</h2></div><span>Corte: {corte}</span></header>
       <div className="b18-map-grid">
-        {roles.map((item) => <TarjetaRol key={item.id} item={item} lectura={lectura} insignia={siglas[categoria]} activa={item.id === rolActivo} onSeleccionar={() => setRolActivo(item.id)} />)}
+        {roles.map((item) => <TarjetaRol key={item.id} item={item} lectura={lectura} insignia={siglas[categoria]} activa={item.id === rolActivo} onSeleccionar={() => { setRolActivo(item.id); setRolDrilldown(item.id); }} />)}
         <article className="b18-centro" aria-live="polite">
           <p className="b18-centro-eyebrow">Reporte visual · {lectura.nombre}</p>
           <h3>{lectura.pregunta}</h3>
@@ -151,6 +170,7 @@ export function MapaB18Producto({ lecturas, corte, fuente, moneda }: { lecturas:
         </article>
       </div>
     </div>
+    {rolDrilldown ? <DrilldownRol item={roles.find((rol) => rol.id === rolDrilldown) ?? roles[0]} lectura={lectura} insignia={siglas[categoria]} onCerrar={() => setRolDrilldown(null)} /> : null}
     {diagnosticoAbierto ? <DiagnosticoB18 lecturas={lecturas} corte={corte} onCerrar={() => setDiagnosticoAbierto(false)} /> : null}
   </section>;
 }
