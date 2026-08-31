@@ -99,22 +99,22 @@ function TarjetaRol({ item, lectura, insignia, activa, onSeleccionar }: { item: 
   </button>;
 }
 
-function DiagnosticoB18({ lecturas, corte, onCerrar }: { lecturas: Record<AgenteProductoVentas, LecturaAgenteProducto>; corte: string; onCerrar: () => void }) {
+function DiagnosticoB18({ lecturas, corte, onCerrar, onAbrirAgente }: { lecturas: Record<AgenteProductoVentas, LecturaAgenteProducto>; corte: string; onCerrar: () => void; onAbrirAgente: (id: AgenteProductoVentas) => void }) {
   const categorias = Object.keys(lecturas) as AgenteProductoVentas[];
+  const familias = lecturas.familia;
+  const tipo = lecturas.tipo;
+  const principalFamilia = familias.filas[0];
+  const topDosTipo = tipo.filas.slice(0, 2).reduce((suma, fila) => suma + fila.pct, 0);
   return <div className="b18-diagnostico-velo" role="presentation" onPointerDown={(evento) => evento.target === evento.currentTarget && onCerrar()}>
-    <section className="b18-diagnostico" role="dialog" aria-modal="true" aria-labelledby="diagnostico-b18-titulo">
-      <header><div><p>Diagnóstico integral</p><h2 id="diagnostico-b18-titulo">B<span>18</span> · problemas encontrados</h2><small>Lectura de composición de líneas confirmadas · corte {corte}</small></div><button type="button" onClick={onCerrar} aria-label="Cerrar diagnóstico B18">×</button></header>
-      <div className="b18-diagnostico-grid">{categorias.map((id) => {
+    <section className="b18-diagnostico b18-dashboard" role="dialog" aria-modal="true" aria-labelledby="diagnostico-b18-titulo">
+      <header><div><p>Dashboard B18 · lectura integral</p><h2 id="diagnostico-b18-titulo">Clasificación comercial de productos</h2><small>Ventas confirmadas y composición de líneas · corte {corte}</small></div><button type="button" onClick={onCerrar} aria-label="Cerrar dashboard B18">×</button></header>
+      <div className="b18-dashboard-kpis"><div><span>Familia líder</span><strong>{principalFamilia?.nombre ?? "Sin señal"}</strong><b>{pct(principalFamilia?.pct ?? 0)}</b></div><div><span>Pedidos con señal</span><strong>{(principalFamilia?.pedidos ?? 0).toLocaleString("es-GT")}</strong><b>familia líder</b></div><div><span>Concentración del mix</span><strong>{pct(topDosTipo)}</strong><b>top 2 tipos</b></div><div><span>Menor cobertura</span><strong>{pct(Math.min(...categorias.map((id) => lecturas[id].cobertura)))}</strong><b>requiere validación</b></div></div>
+      <div className="b18-dashboard-grid"><article className="b18-dashboard-mix"><div className="b18-dashboard-titulo"><span>Composición comercial</span><h3>¿Qué sostiene la venta?</h3></div><div className="b18-dashboard-mix-body"><div className="b18-dona-principal" style={{ "--b18-color": colores.detecta, "--b18-pct": `${Math.min(principalFamilia?.pct ?? 0, 100) * 3.6}deg` } as CSSProperties}><span>{(principalFamilia?.pct ?? 0).toFixed(0)}<small>%</small></span><em>{principalFamilia?.nombre ?? "Sin señal"}</em></div><div className="b18-dashboard-barras">{familias.filas.slice(0, 4).map((fila) => <div key={fila.nombre}><span>{fila.nombre}</span><b>{pct(fila.pct)}</b><i style={{ width: `${Math.max(fila.pct, 3)}%` }} /></div>)}</div></div></article><article className="b18-dashboard-cobertura"><div className="b18-dashboard-titulo"><span>Calidad de la lectura</span><h3>¿Dónde hay incertidumbre?</h3></div><div className="b18-dashboard-cobertura-lista">{categorias.map((id) => <div key={id}><span>{siglas[id]} · {nombres[id]}</span><b>{pct(lecturas[id].cobertura)}</b><i style={{ width: `${lecturas[id].cobertura}%` }} /></div>)}</div><p>La cobertura indica cuánto valor tiene clasificación inferida desde SKU/nombre.</p></article></div>
+      <section className="b18-dashboard-problemas" aria-label="Problemas encontrados"><div className="b18-dashboard-titulo"><span>Problemas encontrados</span><h3>Qué requiere revisión antes de decidir</h3></div><div>{categorias.map((id) => {
         const lectura = lecturas[id];
         const principal = lectura.filas[0];
-        return <article key={id}>
-          <div className="b18-diagnostico-card-title"><span>{siglas[id]}</span><b>{nombres[id]}</b><em>{pct(lectura.cobertura)} cobertura</em></div>
-          <div className="b18-diagnostico-kpi"><div className="b18-diagnostico-dona" style={{ "--b18-color": "#1681ed", "--b18-pct": `${Math.min(principal?.pct ?? 0, 100) * 3.6}deg` } as CSSProperties}><strong>{(principal?.pct ?? 0).toFixed(0)}%</strong></div><div><strong>{principal?.nombre ?? "Sin señal"}</strong><span>{(principal?.pedidos ?? 0).toLocaleString("es-GT")} pedidos con señal</span></div></div>
-          <p><b>Hallazgo</b>{lectura.hallazgo}</p>
-          <p><b>Problema</b>{lectura.problema}</p>
-          <p><b>Validación</b>{lectura.accion}</p>
-        </article>;
-      })}</div>
+        return <button type="button" key={id} onClick={() => onAbrirAgente(id)}><span>{siglas[id]}</span><div><strong>{nombres[id]}</strong><p>{lectura.problema}</p></div><b>{pct(lectura.cobertura)}</b><em>Ver agente →</em></button>;
+      })}</div></section>
       <footer>Fuente: ventas + venta_lineas + productos · Clasificación inferida desde SKU/nombre · Moneda no agregable: segmentar por moneda.</footer>
     </section>
   </div>;
@@ -170,6 +170,6 @@ export function MapaB18Producto({ lecturas, corte, fuente, moneda }: { lecturas:
       </div>
     </div>
     {rolDrilldown ? <DrilldownRol item={roles.find((rol) => rol.id === rolDrilldown) ?? roles[0]} lectura={lectura} insignia={siglas[categoria]} onCerrar={() => setRolDrilldown(null)} /> : null}
-    {diagnosticoAbierto ? <DiagnosticoB18 lecturas={lecturas} corte={corte} onCerrar={() => setDiagnosticoAbierto(false)} /> : null}
+    {diagnosticoAbierto ? <DiagnosticoB18 lecturas={lecturas} corte={corte} onCerrar={() => setDiagnosticoAbierto(false)} onAbrirAgente={(id) => { setCategoria(id); setRolActivo("detecta"); setRolDrilldown("detecta"); setDiagnosticoAbierto(false); }} /> : null}
   </section>;
 }
