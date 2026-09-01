@@ -1,37 +1,45 @@
 "use client";
 
-import Link from "next/link";
-import { useState } from "react";
-import { BarraUsuario } from "@/components/BarraUsuario";
+import { useEffect, useMemo } from "react";
 import { SkeletonPagina } from "@/components/Basicos";
-import { PanelReporteAgentes } from "@/components/commercial/PanelReporteAgentes";
-import type { AgenteLateral } from "@/components/commercial/PanelAgentesLateral";
-import { leerVentasReales } from "@/lib/lecturas-ventas-reales";
+import { BarraUsuario } from "@/components/BarraUsuario";
+import { MapaB18Ventas } from "@/components/commercial/MapaB18Ventas";
+import { construirMapaVentasB18 } from "@/lib/agentes-ventas-b18";
 import { useApp } from "@/lib/store";
-import type { TonoMascota } from "@/components/commercial/MascotaB18";
 
-type AgenteVenta = "evolucion" | "clientes" | "ticket" | "portafolio";
-
-function Filas({ filas, fmt }: { filas: { etiqueta: string; valor: number; detalle?: string }[]; fmt: (valor: number) => string }) {
-  const maximo = Math.max(1, ...filas.map((fila) => fila.valor));
-  return <div className="mt-6 space-y-3">{filas.map((fila) => <div key={fila.etiqueta}><div className="flex justify-between gap-3 text-[11px] font-bold text-[#536783]"><span className="truncate">{fila.etiqueta}</span><span className="shrink-0 text-[#477ce7]">{fmt(fila.valor)}</span></div><div className="mt-1.5 h-2 overflow-hidden rounded-full bg-[#edf3ff]"><i className="block h-full rounded-full bg-[linear-gradient(90deg,#4b80ee,#8cc8ff)]" style={{ width: `${(fila.valor / maximo) * 100}%` }} /></div>{fila.detalle ? <p className="mt-1 text-[9px] font-semibold text-[#8795af]">{fila.detalle}</p> : null}</div>)}</div>;
-}
-
+/**
+ * Ventas comerciales con la misma estructura B18 que la clasificación de
+ * productos: cuatro agentes alrededor de un reporte visual.
+ *
+ * Los cuatro contestan una sola pregunta —de dónde viene el crecimiento— y
+ * todos leen la MISMA capa: `amount_total` de sale.order, con el IVA del 12%
+ * incluido. El rótulo de esa decisión viaja visible en el encabezado y se
+ * repite dentro del mapa: no es un detalle de pie de página.
+ */
 export default function PaginaVentas() {
-  const { dataset, cargando, fmt } = useApp();
-  const [activo, setActivo] = useState<AgenteVenta>("evolucion");
-  const [tono, setTono] = useState<TonoMascota>("analisis");
+  const { cargando, dataset, fmt } = useApp();
+  useEffect(() => {
+    document.body.classList.add("b18-lienzo-blanco");
+    return () => document.body.classList.remove("b18-lienzo-blanco");
+  }, []);
+
+  const mapa = useMemo(() => construirMapaVentasB18(dataset, fmt), [dataset, fmt]);
+
   if (cargando) return <SkeletonPagina />;
-  const lectura = leerVentasReales(dataset);
-  const ticketComparable = lectura.comparable && lectura.actual && lectura.comparable.pedidos > 0 && lectura.actual.pedidos > 0
-    ? ((lectura.actual.valor / lectura.actual.pedidos) / (lectura.comparable.valor / lectura.comparable.pedidos) - 1) * 100 : 0;
-  const agentes: AgenteLateral<AgenteVenta>[] = [
-    { id: "evolucion", iniciales: "VE", nombre: "Evolución", senal: lectura.variacionValor === null ? "Sin comparable" : `${lectura.variacionValor >= 0 ? "+" : ""}${lectura.variacionValor.toFixed(2)}% comparable`, pregunta: "¿La venta crece al mismo ritmo que los pedidos?", kpiPct: Math.max(0, lectura.variacionValor ?? 0), kpiEtiqueta: "crecimiento", kpiVisual: "barras", accion: "Comparar períodos equivalentes, no meses incompletos.", color: "#4b80ee", suave: "#eaf1ff" },
-    { id: "clientes", iniciales: "CL", nombre: "Clientes", senal: `Top 5 · ${lectura.participacionTop5.toFixed(2)}%`, pregunta: "¿Qué cuentas concentran la venta?", kpiPct: lectura.participacionTop5, kpiEtiqueta: "Top 5", kpiVisual: "pareto", accion: "Diferenciar atención a cuentas estratégicas.", color: "#4b80ee", suave: "#eaf1ff" },
-    { id: "ticket", iniciales: "TI", nombre: "Ticket", senal: `${fmt(lectura.ticket)} por pedido`, pregunta: "¿El valor por pedido también está creciendo?", kpiPct: Math.max(0, ticketComparable), kpiEtiqueta: "ticket comparable", kpiVisual: "barras", accion: "Distinguir más pedidos de pedidos de mayor valor.", color: "#4b80ee", suave: "#eaf1ff" },
-    { id: "portafolio", iniciales: "PO", nombre: "Portafolio", senal: lectura.familiaLider ? `${lectura.familiaLider.nombre} · ${lectura.familiaLider.pct.toFixed(2)}%` : "Sin líneas", pregunta: "¿Qué familia compone la demanda?", kpiPct: lectura.familiaLider?.pct ?? 0, kpiEtiqueta: lectura.familiaLider?.nombre ?? "familia", kpiVisual: "dona", accion: "Abrir la lectura de productos antes de decidir surtido.", color: "#4b80ee", suave: "#eaf1ff" },
-  ];
-  const encabezado = tono === "riesgo" ? "Riesgo comercial" : tono === "atencion" ? "Prioridad comercial" : tono === "oportunidad" ? "Oportunidad comercial" : "Lectura completa";
-  const centro = activo === "evolucion" ? <><p className="text-[10px] font-black uppercase tracking-[.16em] text-[#7197ec]">{encabezado} · Evolución</p><h3 className="mt-2 text-[clamp(1.55rem,2.7vw,2.3rem)] font-black tracking-[-.06em] text-[#14203a]">La venta comparable crece {lectura.variacionValor === null ? "sin base equivalente" : `${lectura.variacionValor.toFixed(2)}%`}.</h3><p className="mt-3 text-sm leading-relaxed text-[#667793]">Entre el 1 de enero y el {lectura.hasta}, la venta confirmada por Odoo suma {lectura.actual ? fmt(lectura.actual.valor) : "sin dato"}. La comparación usa los mismos días de 2025 para no interpretar agosto parcial como un mes cerrado.</p><Filas fmt={fmt} filas={lectura.meses.slice(-6).map((mes) => ({ etiqueta: mes.periodo, valor: mes.valor, detalle: `${mes.pedidos} pedidos confirmados` }))} /></> : activo === "clientes" ? <><p className="text-[10px] font-black uppercase tracking-[.16em] text-[#7197ec]">{encabezado} · Clientes</p><h3 className="mt-2 text-[clamp(1.55rem,2.7vw,2.3rem)] font-black tracking-[-.06em] text-[#14203a]">Cinco cuentas reúnen {lectura.participacionTop5.toFixed(2)}% de la venta.</h3><p className="mt-3 text-sm leading-relaxed text-[#667793]">La concentración no es un problema por sí sola: define dónde conviene profundizar relación comercial, seguimiento y propuesta de catálogo.</p><Filas fmt={fmt} filas={lectura.clientes.slice(0, 5).map((cliente) => ({ etiqueta: cliente.etiqueta, valor: cliente.valor, detalle: `${cliente.pedidos} pedidos · ticket ${fmt(cliente.ticket)}` }))} /><Link href="/ventas/clientes" className="mt-6 inline-flex rounded-full bg-[#eaf1ff] px-4 py-2 text-[10px] font-black text-[#4176df]">Abrir ficha comercial de clientes →</Link></> : activo === "ticket" ? <><p className="text-[10px] font-black uppercase tracking-[.16em] text-[#7197ec]">{encabezado} · Ticket</p><h3 className="mt-2 text-[clamp(1.55rem,2.7vw,2.3rem)] font-black tracking-[-.06em] text-[#14203a]">Cada pedido confirmado promedia {fmt(lectura.ticket)}.</h3><div className="mt-7 grid gap-3 sm:grid-cols-2"><div className="rounded-2xl bg-[#f5f8ff] p-5"><p className="text-[9px] font-black uppercase tracking-[.14em] text-[#7d91b8]">Pedidos confirmados</p><b className="mt-2 block text-2xl font-black text-[#243553]">{lectura.pedidos.toLocaleString("es-GT")}</b></div><div className="rounded-2xl bg-[#f5f8ff] p-5"><p className="text-[9px] font-black uppercase tracking-[.14em] text-[#7d91b8]">Cambio de ticket comparable</p><b className="mt-2 block text-2xl font-black text-[#243553]">{ticketComparable >= 0 ? "+" : ""}{ticketComparable.toFixed(2)}%</b></div></div><p className="mt-5 text-sm leading-relaxed text-[#667793]">El ticket se calcula sólo con total confirmado Odoo dividido entre pedidos confirmados; no mezcla la composición de líneas a precio de lista.</p></> : <><p className="text-[10px] font-black uppercase tracking-[.16em] text-[#7197ec]">{encabezado} · Portafolio</p><h3 className="mt-2 text-[clamp(1.55rem,2.7vw,2.3rem)] font-black tracking-[-.06em] text-[#14203a]">{lectura.familiaLider?.nombre ?? "La familia principal"} concentra {lectura.familiaLider?.pct.toFixed(2) ?? "0.00"}% de la composición.</h3><p className="mt-3 text-sm leading-relaxed text-[#667793]">Esta lectura usa las líneas y SKU de los pedidos confirmados. Es una composición comercial, distinta de la venta neta cerrada por Odoo.</p><div className="mt-7 rounded-2xl bg-[#f5f8ff] p-5"><p className="text-[9px] font-black uppercase tracking-[.14em] text-[#7d91b8]">Composición de la familia principal</p><b className="mt-2 block text-2xl font-black text-[#243553]">{lectura.familiaLider ? fmt(lectura.familiaLider.valor) : "—"}</b></div><Link href="/ventas/productos" className="mt-6 inline-flex rounded-full bg-[#eaf1ff] px-4 py-2 text-[10px] font-black text-[#4176df]">Abrir clasificación comercial de productos →</Link></>;
-  return <div className="space-y-3"><header className="mx-auto grid w-full max-w-5xl grid-cols-[1fr_auto_1fr] items-start gap-4 pt-3"><span /><h1 className="whitespace-nowrap text-center text-[clamp(1.75rem,3.35vw,3.15rem)] font-black leading-none tracking-[-.065em] text-[#111827]">Ventas <span className="bg-[linear-gradient(90deg,#467deb,#8cc8ff)] bg-clip-text text-transparent">comerciales</span></h1><div className="justify-self-end"><BarraUsuario dataset={dataset} modulo="ventas" /></div></header><PanelReporteAgentes agentes={agentes} activo={activo} tono={tono} onSeleccionar={setActivo} onTonoCambiar={setTono} titulo="Radar comercial de ventas" corte={lectura.hasta ?? "sin fecha"}>{centro}</PanelReporteAgentes></div>;
+
+  return <main className="b18-prototype-page">
+    <header className="b18-prototype-title">
+      <div>
+        <p>Ventas · {mapa.declaracion}</p>
+        <h1>Ventas <span>comerciales</span></h1>
+      </div>
+      <BarraUsuario dataset={dataset} modulo="ventas" />
+    </header>
+    {/* La excepción de moneda se declara arriba del mapa, no dentro de un modal:
+        el año afectado se sigue mostrando, pero su monto no es un total en
+        quetzales y eso tiene que leerse ANTES de compararlo con otro año.
+        Va fuera del encabezado para ocupar el ancho completo también en móvil. */}
+    {mapa.avisoMoneda ? <p className="b18-vt-aviso b18-vt-aviso-moneda"><b>Moneda</b>{mapa.avisoMoneda}</p> : null}
+    <MapaB18Ventas mapa={mapa} fmt={fmt} />
+  </main>;
 }

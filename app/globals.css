@@ -235,7 +235,9 @@ body {
 /* Categorías de producto usa un lienzo blanco propio: el azul queda sólo en
    las señales del agente y sus sombras, no como fondo de toda la aplicación. */
 body.producto-lienzo-blanco,
-body.producto-lienzo-blanco::before {
+body.producto-lienzo-blanco::before,
+body.b18-lienzo-blanco,
+body.b18-lienzo-blanco::before {
   background: #ffffff !important;
 }
 
@@ -607,3 +609,201 @@ body.producto-lienzo-blanco::before {
 @keyframes agent-breathe { 0%,100% { scale: 1; } 50% { scale: 1.07; } }
 @media (max-width: 900px) { .agent-stage { min-height: auto; padding: 14px; } .agent-stage-grid { grid-template-columns: repeat(2,minmax(0,1fr)); gap: 14px; } .module-ventas { min-height: 230px; } .agent-orbit-layer { position: relative; display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 8px; margin-top: 16px; } .agent-orb { position: relative; top: auto !important; right: auto !important; bottom: auto !important; left: auto !important; width: auto; padding: 6px; animation: none; } }
 @media (max-width: 560px) { .agent-stage-grid { grid-template-columns: 1fr; } .agent-orbit-layer { grid-template-columns: repeat(2,minmax(0,1fr)); } }
+
+/* Ventas · el reporte central reune las cuatro lecturas sin parrafos: una fila
+   de senales y un comparativo visual sustituyen al texto vertical. */
+.b18-centro-senales { display:grid; width:100%; grid-template-columns:repeat(4,minmax(0,1fr)); gap:5px; margin-top:9px; }
+.b18-centro-senales button { display:grid; min-width:0; gap:2px; border:1px solid #e6edfb; border-radius:10px; padding:5px 4px 6px; background:#fbfdff; color:inherit; font-family:inherit; text-align:center; cursor:pointer; transition:border-color .18s ease,box-shadow .18s ease,transform .18s ease; }
+.b18-centro-senales button:hover,.b18-centro-senales button:focus-visible { outline:none; border-color:color-mix(in srgb,var(--b18-chip) 45%,#dce8ff); box-shadow:0 8px 18px rgba(72,111,185,.14); transform:translateY(-1px); }
+.b18-centro-senales button[aria-pressed="true"] { border-color:color-mix(in srgb,var(--b18-chip) 55%,#dce8ff); background:color-mix(in srgb,var(--b18-chip) 8%,#fff); }
+.b18-centro-senales i { display:block; width:100%; height:3px; border-radius:99px; background:var(--b18-chip); }
+.b18-centro-senales strong { display:block; overflow:hidden; color:#17336f; font-size:11px; font-weight:950; letter-spacing:-.045em; text-overflow:ellipsis; white-space:nowrap; }
+.b18-centro-senales span { display:block; overflow:hidden; color:#7386ad; font-size:8px; font-weight:800; text-overflow:ellipsis; white-space:nowrap; }
+.b18-centro-comparativo { width:100%; margin-top:9px; border:1px solid #e6edfb; border-radius:13px; padding:8px 11px 9px; background:#fbfdff; text-align:left; }
+.b18-centro-comparativo > p { display:flex; align-items:baseline; justify-content:space-between; gap:8px; margin:0 0 6px; color:#4b7ee4; font-size:8px; font-weight:950; letter-spacing:.1em; text-transform:uppercase; }
+.b18-centro-comparativo > p b { flex:none; color:#17336f; font-size:10px; letter-spacing:0; }
+.b18-centro-comparativo > div { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:2px 8px; align-items:end; }
+.b18-centro-comparativo > div + div { margin-top:6px; }
+.b18-centro-comparativo > div span { overflow:hidden; color:#345184; font-size:9px; font-weight:850; text-overflow:ellipsis; white-space:nowrap; }
+.b18-centro-comparativo > div b { color:#477bed; font-size:9px; white-space:nowrap; }
+.b18-centro-comparativo > div i { grid-column:1 / -1; display:block; height:7px; border-radius:999px; background:var(--b18-comp); }
+.b18-centro-comparativo > div:last-child i { background:#d9e4f7; }
+@media (max-width:700px) { .b18-centro-senales { grid-template-columns:repeat(2,minmax(0,1fr)); } }
+
+/* ── VENTAS · sólo este mapa ────────────────────────────────────────────────
+   Todo lo de abajo está bajo `.b18-map-ventas` o usa el prefijo `b18-vt-`, que
+   no existe en ninguna otra página. Los modales de Ventas se renderizan DENTRO
+   de la sección `.b18-map-ventas`, así que el scope también los alcanza y nada
+   de esto puede pisar la dona, el grid ni el B18 de /ventas/productos. */
+
+/* El reporte de Ventas carga más bloques que el de Productos: se compacta sólo
+   este centro para que todo entre al 100% de zoom sin recorrer la pantalla. */
+.b18-map-ventas .b18-centro { padding:16px 16px 11px; }
+/* Las tarjetas de Ventas llevan tres piezas (KPI, micrográfico y una línea):
+   se centran en su caja para no dejar una franja muerta bajo la señal. */
+.b18-map-ventas .b18-rol-card,.b18-map-ventas .b18-rol-visual { justify-content:center; }
+.b18-map-ventas .b18-centro-eyebrow { margin-top:0; font-size:12px; }
+.b18-map-ventas .b18-centro h3 { margin-top:6px; padding:7px 11px; font-size:15px; letter-spacing:-.04em; line-height:1.2; }
+.b18-map-ventas .b18-centro-senales { margin-top:8px; }
+.b18-map-ventas .b18-centro-metricas { gap:6px; margin-top:9px; }
+.b18-map-ventas .b18-centro-metricas div { padding:6px 5px; }
+.b18-map-ventas .b18-centro-metricas b { font-size:12px; }
+.b18-map-ventas .b18-centro .b18-metadatos { gap:3px 9px; margin-top:9px; padding-top:6px; }
+.b18-map-ventas .b18-centro .b18-metadatos div { max-width:100%; }
+
+/* El conector de cada rol toma el color de SU agente: en Ventas los cuatro
+   roles no son los mismos colores que en Productos. */
+.b18-map-ventas .b18-rol-explica .b18-connector { color:#7b2bf4; background:linear-gradient(90deg,#c7a6ff,#7b2bf4); }
+.b18-map-ventas .b18-rol-recomienda .b18-connector { color:#f97316; background:linear-gradient(90deg,#ffc38a,#f97316); }
+
+/* Micrográfico de la tarjeta: la barra del período parcial va rayada, nunca
+   lisa — así no se lee como un año comparable con los demás. */
+.b18-map-ventas .b18-mini-pareto i { width:17%; }
+.b18-map-ventas .b18-mini-pareto i.b18-vt-parcial { background-image:repeating-linear-gradient(135deg,rgba(255,255,255,.85) 0 3px,transparent 3px 6px); }
+
+/* La historia: tres factores que multiplican, no tres indicadores sueltos. */
+.b18-vt-historia { display:grid; width:100%; grid-template-columns:repeat(3,minmax(0,1fr)); gap:6px; margin-top:9px; }
+.b18-vt-historia button { display:grid; min-width:0; gap:1px; border:1px solid #e6edfb; border-left:3px solid var(--b18-chip); border-radius:10px; padding:6px 7px; background:#fbfdff; color:inherit; font-family:inherit; text-align:left; cursor:pointer; transition:border-color .18s ease,box-shadow .18s ease,transform .18s ease; }
+.b18-vt-historia button:hover,.b18-vt-historia button:focus-visible { outline:none; border-color:color-mix(in srgb,var(--b18-chip) 45%,#dce8ff); border-left-color:var(--b18-chip); box-shadow:0 8px 18px rgba(72,111,185,.14); transform:translateY(-1px); }
+.b18-vt-historia strong { color:var(--b18-chip); font-size:14px; font-weight:950; letter-spacing:-.05em; }
+.b18-vt-historia span { overflow:hidden; color:#17336f; font-size:9px; font-weight:900; text-overflow:ellipsis; white-space:nowrap; }
+.b18-vt-historia small { display:-webkit-box; overflow:hidden; -webkit-box-orient:vertical; -webkit-line-clamp:2; color:#7386ad; font-size:8px; font-weight:750; line-height:1.25; }
+.b18-vt-identidad { width:100%; margin:6px 0 0; color:#7386ad; font-size:8px; font-weight:800; letter-spacing:.02em; text-align:center; }
+
+/* Enlace contextual a Productos. Ventas NO muestra composición de líneas: sólo
+   ofrece la puerta a la página donde esa capa sí vive. */
+.b18-vt-enlace { display:block; width:100%; margin-top:9px; border:1px dashed #cddcf6; border-radius:11px; padding:7px 10px; color:#3273e0; font-size:9px; font-weight:850; line-height:1.3; text-align:center; text-decoration:none; }
+.b18-vt-enlace:hover,.b18-vt-enlace:focus-visible { outline:none; border-color:#8fb4ee; background:#f4f8ff; }
+
+/* Series del drill-down: barra + cifra + una línea de contexto por período. */
+.b18-vt-cabecera { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; margin-top:16px; }
+.b18-vt-cabecera > div { border:1px solid #e3ebfb; border-radius:14px; padding:11px 13px; background:#f8fbff; }
+.b18-vt-cabecera small { display:block; color:var(--b18-role); font-size:9px; font-weight:950; letter-spacing:.1em; text-transform:uppercase; }
+.b18-vt-cabecera strong { display:block; margin-top:4px; color:#17336f; font-size:20px; font-weight:950; letter-spacing:-.05em; }
+.b18-vt-cabecera span { display:block; margin-top:3px; color:#62799f; font-size:10px; font-weight:750; line-height:1.3; }
+.b18-vt-panel { display:grid; gap:16px; }
+.b18-vt-serie { display:grid; gap:12px; }
+.b18-vt-serie > div { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:3px 12px; align-items:end; }
+.b18-vt-serie span { display:flex; align-items:baseline; gap:6px; overflow:hidden; color:#274474; font-size:12px; font-weight:850; white-space:nowrap; }
+.b18-vt-serie span em { border-radius:99px; padding:1px 5px; background:#fdf0dc; color:#a45b06; font-size:8px; font-style:normal; font-weight:950; letter-spacing:.06em; text-transform:uppercase; }
+.b18-vt-serie b { color:var(--b18-role,#274474); font-size:12px; white-space:nowrap; }
+.b18-vt-serie i { grid-column:1 / -1; display:block; height:10px; border-radius:999px; }
+.b18-vt-serie > div.is-parcial i { background-image:repeating-linear-gradient(135deg,rgba(255,255,255,.85) 0 4px,transparent 4px 8px); }
+.b18-vt-serie small { grid-column:1 / -1; color:#7387ad; font-size:9px; font-weight:750; line-height:1.3; }
+.b18-vt-pico { border:1px solid #e3ebfb; border-radius:14px; padding:12px 14px; background:#f8fbff; }
+.b18-vt-pico span { display:block; color:var(--b18-role,#3273e0); font-size:9px; font-weight:950; letter-spacing:.1em; text-transform:uppercase; }
+.b18-vt-pico strong { display:block; margin-top:4px; color:#17336f; font-size:15px; font-weight:950; letter-spacing:-.03em; }
+.b18-vt-pico small { display:block; margin-top:4px; color:#7387ad; font-size:9px; font-weight:750; line-height:1.35; }
+.b18-vt-nota { margin:0; color:#63799e; font-size:12px; font-weight:700; line-height:1.45; }
+.b18-vt-vacio { margin:0; color:#7387ad; font-size:11px; font-weight:750; }
+.b18-vt-ficha { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin:0; }
+.b18-vt-ficha div { min-width:0; border:1px solid #e3ebfb; border-radius:13px; padding:11px 12px; background:#f8fbff; }
+.b18-vt-ficha div:first-child { grid-column:1 / -1; }
+.b18-vt-ficha div:nth-last-child(-n+3) { grid-column:1 / -1; }
+.b18-vt-ficha dt { color:var(--b18-role); font-size:9px; font-weight:950; letter-spacing:.08em; text-transform:uppercase; }
+.b18-vt-ficha dd { margin:4px 0 0; color:#60779d; font-size:11px; font-weight:750; line-height:1.4; overflow-wrap:anywhere; }
+
+/* B18 de Ventas: la lectura principal es un gráfico de barras ANUAL. Cada barra
+   lleva su venta, sus pedidos, sus clientes y su ticket, y abre sus meses. */
+.b18-vt-barras-anuales { display:grid; grid-auto-flow:column; grid-auto-columns:minmax(0,1fr); gap:12px; margin-top:22px; }
+.b18-vt-anio { display:grid; min-width:0; grid-template-rows:auto 132px auto auto auto; gap:6px; align-items:end; border:1px solid #e3ebfb; border-radius:18px; padding:14px 12px; background:rgba(255,255,255,.92); color:inherit; font-family:inherit; text-align:center; cursor:pointer; transition:border-color .18s ease,box-shadow .18s ease,transform .18s ease; }
+.b18-vt-anio:hover,.b18-vt-anio:focus-visible { outline:none; border-color:#a9c4f7; box-shadow:0 12px 26px rgba(72,111,185,.16); transform:translateY(-2px); }
+.b18-vt-anio.is-abierto { border-color:#3978e7; background:#f4f8ff; box-shadow:0 0 0 2px rgba(57,120,231,.18); }
+.b18-vt-anio-monto { color:#163370; font-size:14px; font-weight:950; letter-spacing:-.05em; }
+.b18-vt-anio > i { display:block; width:100%; align-self:end; border-radius:10px 10px 4px 4px; background:linear-gradient(180deg,#57c8ff,#0789e6); }
+.b18-vt-anio.is-parcial > i { background:linear-gradient(180deg,#ffc38a,#f97316); background-image:repeating-linear-gradient(135deg,rgba(255,255,255,.8) 0 5px,transparent 5px 10px),linear-gradient(180deg,#ffc38a,#f97316); }
+.b18-vt-anio strong { display:flex; align-items:center; justify-content:center; gap:6px; color:#17336f; font-size:16px; font-weight:950; letter-spacing:-.04em; }
+.b18-vt-anio strong em { border-radius:99px; padding:1px 6px; background:#fdf0dc; color:#a45b06; font-size:8px; font-style:normal; font-weight:950; letter-spacing:.06em; text-transform:uppercase; }
+.b18-vt-anio dl { display:grid; gap:3px; margin:0; }
+.b18-vt-anio dl div { display:flex; align-items:baseline; justify-content:space-between; gap:8px; }
+.b18-vt-anio dt { color:#7a8cad; font-size:9px; font-weight:900; letter-spacing:.05em; text-transform:uppercase; }
+.b18-vt-anio dd { margin:0; color:#1b3976; font-size:11px; font-weight:900; }
+.b18-vt-anio > small { color:#8093b4; font-size:8px; font-weight:750; line-height:1.25; }
+.b18-vt-ayuda { margin:14px 0 0; border:1px dashed #cddcf6; border-radius:14px; padding:11px 14px; color:#7387ad; font-size:10px; font-weight:750; line-height:1.4; }
+.b18-vt-meses { margin-top:16px; border:1px solid #e2eaf9; border-radius:20px; padding:18px; background:rgba(255,255,255,.9); }
+.b18-vt-meses-lista { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:11px 20px; margin-top:15px; }
+.b18-vt-meses-lista > div { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:3px 10px; align-items:end; }
+.b18-vt-meses-lista span { display:flex; align-items:baseline; gap:6px; overflow:hidden; color:#315184; font-size:11px; font-weight:850; white-space:nowrap; }
+.b18-vt-meses-lista span em { border-radius:99px; padding:1px 5px; background:#fdf0dc; color:#a45b06; font-size:8px; font-style:normal; font-weight:950; letter-spacing:.06em; text-transform:uppercase; }
+.b18-vt-meses-lista b { color:#3978e7; font-size:11px; white-space:nowrap; }
+.b18-vt-meses-lista i { grid-column:1 / -1; display:block; height:8px; border-radius:99px; background:linear-gradient(90deg,#1588e5,#78c9ff); }
+.b18-vt-meses-lista > div.is-parcial i { background:linear-gradient(90deg,#f97316,#ffc38a); }
+.b18-vt-meses-lista small { grid-column:1 / -1; color:#7387ad; font-size:9px; font-weight:750; line-height:1.3; }
+.b18-vt-descomposicion { margin-top:16px; border:1px solid #e2eaf9; border-radius:20px; padding:18px; background:rgba(255,255,255,.9); }
+.b18-vt-factores { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:12px; margin-top:15px; }
+.b18-vt-factores button { display:grid; min-width:0; gap:2px; border:1px solid #e5ecfa; border-left:4px solid var(--b18-chip); border-radius:14px; padding:12px 14px; background:#f9fbff; color:inherit; font-family:inherit; text-align:left; cursor:pointer; transition:border-color .18s ease,box-shadow .18s ease,transform .18s ease; }
+.b18-vt-factores button:hover,.b18-vt-factores button:focus-visible { outline:none; border-color:#a9c4f7; border-left-color:var(--b18-chip); box-shadow:0 10px 22px rgba(72,111,185,.12); transform:translateY(-2px); }
+.b18-vt-factores strong { color:var(--b18-chip); font-size:20px; font-weight:950; letter-spacing:-.05em; }
+.b18-vt-factores span { color:#1b3976; font-size:12px; font-weight:900; }
+.b18-vt-factores small { color:#6d82a8; font-size:10px; font-weight:750; line-height:1.3; }
+.b18-vt-descomposicion > p { margin:14px 0 0; border-top:1px solid #e8eefb; padding-top:11px; color:#7588aa; font-size:10px; font-weight:800; }
+
+/* Entre 760 y 1179 el molde apila el reporte sobre dos filas de tarjetas y
+   les reserva 260px. Las de Ventas llevan tres piezas, no cinco: se bajan
+   para que no queden con una franja vacía arriba y abajo. */
+@media (min-width:760px) and (max-width:1179px) { .b18-map-ventas .b18-rol-card { min-height:180px; } }
+@media (max-width:980px) {
+  .b18-vt-barras-anuales { grid-auto-flow:row; grid-auto-columns:auto; grid-template-columns:repeat(2,minmax(0,1fr)); }
+  .b18-vt-anio { grid-template-rows:auto 90px auto auto auto; }
+}
+@media (max-width:760px) {
+  .b18-vt-meses-lista,.b18-vt-factores,.b18-vt-ficha { grid-template-columns:1fr; }
+  .b18-vt-ficha div:nth-last-child(-n+3) { grid-column:auto; }
+  .b18-vt-cabecera { grid-template-columns:1fr; }
+}
+@media (max-width:700px) {
+  .b18-map-ventas .b18-centro { padding:22px 16px 14px; }
+  /* Las cifras en moneda son más largas que un porcentaje: se ajusta el cuerpo
+     para que no queden cortadas en pantalla angosta. */
+  .b18-map-ventas .b18-rol-kpi strong { font-size:16px; }
+  .b18-map-ventas .b18-centro-metricas { grid-template-columns:repeat(2,minmax(0,1fr)); }
+  .b18-map-ventas .b18-centro-metricas div:last-child { grid-column:1 / -1; }
+  .b18-map-ventas .b18-centro .b18-centro-metricas b { font-size:12px; }
+  .b18-map-ventas .b18-centro-senales strong { font-size:10px; }
+  .b18-vt-historia { grid-template-columns:1fr; }
+  .b18-vt-barras-anuales { grid-template-columns:1fr; }
+  .b18-vt-anio { grid-template-rows:auto 64px auto auto auto; }
+}
+
+/* ── VENTAS · rótulos que no pueden quedar en letra chica ───────────────────
+   Todo lo de abajo usa el prefijo `b18-vt-`, que no existe en ninguna otra
+   página, o está bajo `.b18-map-ventas`. Nada de esto alcanza a /ventas/productos.
+
+   La capa que se lee (facturación confirmada con IVA incluido) dejó de viajar
+   como metadato de 9px: si se lee como venta neta, todas las cifras de la
+   página quedan un 12% arriba de lo que el lector cree. Va en un rótulo con
+   contraste propio, repetido en el encabezado, en el mapa, en el B18 y en cada
+   drill-down. */
+.b18-vt-declaracion { display:inline-flex; align-items:baseline; flex-wrap:wrap; gap:4px 9px; margin-top:8px; border:1px solid #b9d4f6; border-radius:999px; padding:7px 14px; background:#e8f2ff; }
+.b18-vt-declaracion strong { color:#0f4fa8; font-size:12px; font-weight:950; letter-spacing:-.01em; }
+.b18-vt-declaracion span { color:#5d7cae; font-size:10px; font-weight:800; }
+.b18-map-header .b18-vt-declaracion { margin-top:0; }
+.b18-prototype-title .b18-vt-declaracion { margin-top:10px; }
+.b18-prototype-page > p.b18-vt-aviso { margin:0 0 16px; }
+
+/* Avisos: un límite que cambia cómo se lee la cifra de al lado. No es una nota
+   al pie — se pone en el flujo, antes de que alguien compare el número. */
+p.b18-vt-aviso,div.b18-vt-aviso { margin:10px 0 0; border:1px solid #f0d9ae; border-left:4px solid #e08c1b; border-radius:12px; padding:9px 13px; background:#fff8ec; color:#7a5a20; font-size:11px; font-weight:750; letter-spacing:0; line-height:1.45; text-transform:none; }
+p.b18-vt-aviso b,div.b18-vt-aviso b { display:block; margin-bottom:3px; color:#9a5c05; font-size:9px; font-weight:950; letter-spacing:.1em; text-transform:uppercase; }
+div.b18-vt-aviso p { margin:0; color:inherit; font-size:11px; font-weight:750; line-height:1.45; }
+div.b18-vt-aviso ul { margin:7px 0 0; padding-left:17px; }
+div.b18-vt-aviso li { color:#8a6427; font-size:10px; font-weight:800; line-height:1.5; }
+p.b18-vt-aviso-identidad,div.b18-vt-aviso-identidad { border-color:#cfe3c9; border-left-color:#2f8a4d; background:#f2fbf4; color:#3d6349; }
+div.b18-vt-aviso-identidad b { color:#1f7040; }
+div.b18-vt-aviso-identidad li { color:#4a7059; }
+.b18-drilldown .b18-vt-aviso { margin-top:14px; }
+.b18-diagnostico .b18-vt-aviso { margin-top:14px; }
+
+/* Un año con un pedido en otra moneda no es un total en quetzales: la barra lo
+   dice en la barra misma, no sólo en el pie del modal. */
+/* La tarjeta del año con aviso de moneda es más alta que las otras. Sin esto,
+   las filas 'auto' de las tarjetas cortas se estiran para rellenar y sus
+   etiquetas quedan unos pixeles más abajo que las de la tarjeta alta: las
+   barras dejan de leerse como una misma escala. */
+.b18-vt-anio { align-content:start; }
+.b18-vt-anio-moneda { display:block; margin-top:5px; border-radius:9px; padding:5px 7px; background:#fff4e2; color:#9a5c05; font-weight:850; line-height:1.3; }
+
+/* El nombre de la métrica de calidad es distinto por agente y a veces largo
+   (dispersión de ticket, mediana sobre promedio): se deja envolver en vez de
+   recortarse a la mitad. */
+.b18-map-ventas .b18-vt-cabecera small { letter-spacing:.05em; line-height:1.3; white-space:normal; }
