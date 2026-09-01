@@ -69,6 +69,13 @@ const TAMANO_PAGINA = 1000; // límite por defecto de PostgREST por respuesta
 /** Único estado de Odoo que es una venta. "draft"/"sent" son presupuestos; "Cancelado" es un pedido caído. */
 const ESTADO_VENTA_CONFIRMADA = "sale";
 
+// El dataset contiene varias tablas y miles de líneas. La navegación interna
+// no debe volver a descargarlo ni reconstruir B18 si el navegador ya lo tiene.
+// Este caché vive durante la sesión de la aplicación: no cambia la fuente ni
+// oculta una actualización de Odoo, porque el corte sigue declarado arriba.
+let datasetRealEnMemoria: Dataset | null = null;
+let cargaDatasetRealEnCurso: Promise<Dataset> | null = null;
+
 /**
  * FECHA DE CORTE DEL DATASET REAL — la única, declarada en un solo lugar.
  *
@@ -212,7 +219,7 @@ interface FilaMovimientoSupabase {
   ubicacion_hasta: string | null;
 }
 
-export async function cargarDatasetReal(): Promise<Dataset> {
+async function cargarDatasetRealDesdeOrigen(): Promise<Dataset> {
   const [clientesRaw, facturasRaw, pagosRaw, productosRaw, ventasRaw, ventaLineasRaw, movimientosRaw] =
     await Promise.all([
       traerTodo<FilaClienteSupabase>("clientes", "id_cliente"),
@@ -354,4 +361,24 @@ export async function cargarDatasetReal(): Promise<Dataset> {
     ventaLineas,
     movimientosInventario,
   };
+}
+
+/**
+ * Comparte una sola carga entre las rutas del dashboard. Al entrar a Ventas,
+ * Productos o B18 después de una primera lectura, React recibe el mismo
+ * dataset ya verificado en memoria en vez de reiniciar las siete consultas.
+ */
+export function cargarDatasetReal(): Promise<Dataset> {
+  if (datasetRealEnMemoria) return Promise.resolve(datasetRealEnMemoria);
+  if (!cargaDatasetRealEnCurso) {
+    cargaDatasetRealEnCurso = cargarDatasetRealDesdeOrigen()
+      .then((dataset) => {
+        datasetRealEnMemoria = dataset;
+        return dataset;
+      })
+      .finally(() => {
+        cargaDatasetRealEnCurso = null;
+      });
+  }
+  return cargaDatasetRealEnCurso;
 }

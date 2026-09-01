@@ -45,6 +45,7 @@ type LineaComercial = VentaLinea & {
 
 const normalizar = (valor: string) => valor.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase();
 const redondear = (valor: number) => Math.round(valor * 100) / 100;
+const lecturasPorDataset = new WeakMap<Dataset, Record<AgenteProductoVentas, LecturaAgenteProducto>>();
 
 /**
  * Clasificación deliberadamente inferida y local: no escribe catálogo ni Odoo.
@@ -118,6 +119,8 @@ function filasPor(items: LineaComercial[], atributo: keyof Clasificacion, etique
 
 /** Fuente única para los cuatro agentes: pedidos Odoo confirmados + líneas + SKU. */
 export function construirLecturasProductoVentas(dataset: Dataset): Record<AgenteProductoVentas, LecturaAgenteProducto> {
+  const lecturaEnCache = lecturasPorDataset.get(dataset);
+  if (lecturaEnCache) return lecturaEnCache;
   const productos = new Map((dataset.productos ?? []).map((producto) => [producto.id_producto, producto]));
   const ventas = new Map((dataset.ventas ?? []).filter((venta) => venta.estado_odoo === "sale").map((venta) => [venta.id_venta, venta]));
   const lineas: LineaComercial[] = (dataset.ventaLineas ?? []).flatMap((linea) => {
@@ -140,7 +143,7 @@ export function construirLecturasProductoVentas(dataset: Dataset): Record<Agente
   const moPendiente = pendiente(modelo.filas, "Sin clasificar");
   const liPendiente = pendiente(licencia.filas, "Sin señal de licencia");
 
-  return {
+  const resultado = {
     familia: {
       iniciales: "FA", nombre: "Familias", senal: `${fa.nombre} · ${fa.pct.toFixed(2)}% de composición`,
       titulo: "¿Qué familia sostiene la venta?", pregunta: "¿Qué familia sostiene la venta?", kpiVisual: "dona",
@@ -177,5 +180,7 @@ export function construirLecturasProductoVentas(dataset: Dataset): Record<Agente
       accion: "Contrastar las licencias identificadas con el maestro comercial antes de definir una campaña por propiedad.",
       kpiPct: li.pct, kpiEtiqueta: li.nombre, filas: licencia.filas.filter((fila) => fila.nombre !== "Sin señal de licencia").slice(0, 5), cobertura: licencia.cobertura,
     },
-  };
+  } satisfies Record<AgenteProductoVentas, LecturaAgenteProducto>;
+  lecturasPorDataset.set(dataset, resultado);
+  return resultado;
 }

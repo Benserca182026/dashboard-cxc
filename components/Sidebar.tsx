@@ -41,6 +41,7 @@ function Boton({ href, etiqueta, icono, activo, onIr }: {
     <li className="group relative">
       <Link
         href={href}
+        prefetch={true}
         onClick={onIr}
         aria-label={etiqueta}
         aria-current={activo ? "page" : undefined}
@@ -71,6 +72,7 @@ export function Sidebar() {
       {/* Marca reducida a su inicial, como el logo del riel de la referencia. */}
       <Link
         href="/"
+        prefetch={true}
         aria-label="Dashboard CxC — inicio"
         className="mb-4 grid h-10 w-10 place-items-center rounded-[14px] bg-tinta text-[13px] font-extrabold text-white"
       >
