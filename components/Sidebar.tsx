@@ -20,7 +20,7 @@ const ITEMS = [
   { href: "/ventas", etiqueta: "Ventas", icono: "◈", grupo: "Operación" },
   { href: "/ventas/canales", etiqueta: "Canales y tipo de cliente", icono: "▤", grupo: "Operación" },
   { href: "/ventas/productos", etiqueta: "Categorías de producto", icono: "◇", grupo: "Operación" },
-  { href: "/ventas/clientes", etiqueta: "Ficha comercial de clientes", icono: "◌", grupo: "Operación" },
+  { href: "/ventas/clientes", etiqueta: "Cartera comercial de clientes", icono: "◌", grupo: "Operación" },
   { href: "/ventas/detalle", etiqueta: "Detalle de venta", icono: "▧", grupo: "Operación" },
   { href: "/ventas/vendedores", etiqueta: "Vendedores", icono: "♙", grupo: "Operación" },
   { href: "/ventas/empresa-region", etiqueta: "Empresa y región", icono: "◫", grupo: "Operación" },

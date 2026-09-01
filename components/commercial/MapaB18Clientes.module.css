@@ -1,0 +1,1403 @@
+/* ══════════════════════════════════════════════════════════════════════════
+   B18 · CLIENTES
+   ──────────────────────────────────────────────────────────────────────────
+   Este archivo REPRODUCE el lenguaje visual de las clases `.b18-*` de
+   app/globals.css; no lo importa ni lo extiende. La copia es deliberada: el
+   CSS global es compartido con /ventas/productos y /ventas/ventas, y una regla
+   agregada allí para esta pantalla se convierte, tarde o temprano, en un
+   cambio de aspecto en dos páginas que ya funcionaban.
+
+   Los valores (radios, sombras, colores de tinta, pesos 750/850/950, escalas
+   de 8 a 27px, la marca naranja de lo parcial) están copiados uno a uno del
+   molde para que esta pantalla se lea como hermana y no como prima lejana.
+
+   CAPAS Y COLOR — la única decisión de color que importa acá: el tono no es
+   decoración, es la capa del dato. Azul = venta confirmada. Violeta =
+   composición de líneas. Verde = cartera CxC. Pizarra = alcance del dato. Dos
+   cifras de distinto color nunca se suman entre sí, y la barra de secciones,
+   agrupada por capa, es la leyenda de esa regla.
+   ══════════════════════════════════════════════════════════════════════════ */
+
+.raiz {
+  --acento: #0789e6;
+  --suave: #e8f2ff;
+  --borde-acento: #b9d4f6;
+  --tinta: #17336f;
+  --tinta-media: #274474;
+  --tinta-suave: #62799f;
+  --tinta-tenue: #7387ad;
+  --rotulo: #7a8cad;
+  --linea: #e3ebfb;
+  --linea-tenue: #e8eefb;
+  --tarjeta: rgba(255, 255, 255, 0.94);
+  --interno: #f8fbff;
+  --parcial: #f97316;
+  --parcial-suave: #fdf0dc;
+  --parcial-tinta: #a45b06;
+
+  /* CUIDADO al tocar esta regla: el modal del agente es `position: fixed` y vive
+     dentro de `.raiz`. Hoy escapa a este `overflow: hidden` porque `.raiz` no
+     crea bloque contenedor. Agregarle `transform`, `filter`, `perspective`,
+     `contain` o `container-type` haría que el modal quedara recortado dentro de
+     la tarjeta. Si hace falta alguna de ésas, sacar el modal a un portal. */
+  overflow: hidden;
+  border: 1px solid #e5edff;
+  border-radius: 30px;
+  padding: 22px 24px 24px;
+  background: linear-gradient(140deg, #fbfdff, #f3f7ff);
+  box-shadow: 0 26px 60px rgba(55, 91, 166, 0.12);
+  color: var(--tinta);
+  font-size: 13px;
+}
+
+.raiz *,
+.raiz *::before,
+.raiz *::after { box-sizing: border-box; }
+
+.raiz button {
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.raiz :focus-visible {
+  outline: 2px solid var(--acento);
+  outline-offset: 2px;
+}
+
+/* ── Tonos por capa ──────────────────────────────────────────────────────
+   Van SIEMPRE anidados bajo `.raiz`. Un CSS Module sólo renombra clases e
+   ids: un `[data-tono="venta"]` suelto se compilaría como regla global y
+   pintaría cualquier `data-tono` del resto del dashboard. */
+
+.raiz [data-tono="venta"] { --acento: #0789e6; --suave: #e8f2ff; --borde-acento: #b9d4f6; }
+.raiz [data-tono="composicion"] { --acento: #7b2bf4; --suave: #f2ecff; --borde-acento: #d6c4fa; }
+.raiz [data-tono="cxc"] { --acento: #0d8a68; --suave: #e6f6f0; --borde-acento: #aedbca; }
+.raiz [data-tono="cobertura"] { --acento: #4a6ea8; --suave: #edf2fa; --borde-acento: #ccdaee; }
+.raiz [data-tono="parcial"] { --acento: #e08c1b; --suave: #fff8ec; --borde-acento: #f0d9ae; }
+
+/* ── Cabecera ──────────────────────────────────────────────────────────── */
+
+.cabecera {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 14px 20px;
+  flex-wrap: wrap;
+}
+
+.cabecera > div:first-child p {
+  margin: 0;
+  color: #547ce0;
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.cabecera h2 {
+  margin: 7px 0 0;
+  color: #11245e;
+  font-size: 24px;
+  font-weight: 950;
+  letter-spacing: -0.05em;
+}
+
+/* La capa que se está leyendo no viaja como metadato de 9px: si no se ve, la
+   cifra se lee como venta neta y está 12% arriba de lo que el lector cree. */
+.declaracion {
+  display: inline-flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 3px 9px;
+  border: 1px solid #b9d4f6;
+  border-radius: 999px;
+  padding: 7px 14px;
+  background: #e8f2ff;
+}
+.declaracion strong { color: #0f4fa8; font-size: 12px; font-weight: 950; }
+.declaracion span { color: #5d7cae; font-size: 10px; font-weight: 800; }
+
+.limiteGlobal {
+  margin: 12px 0 0;
+  border: 1px solid #f0d9ae;
+  border-left: 4px solid #e08c1b;
+  border-radius: 12px;
+  padding: 9px 13px;
+  background: #fff8ec;
+  color: #7a5a20;
+  font-size: 11px;
+  font-weight: 750;
+  line-height: 1.45;
+}
+.limiteGlobal b {
+  display: block;
+  margin-bottom: 3px;
+  color: #9a5c05;
+  font-size: 9px;
+  font-weight: 950;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+/* ── Tira de agentes ───────────────────────────────────────────────────── */
+
+/* Dos columnas y no cuatro: la página vive dentro de un contenedor de 1152px,
+   y en cuatro columnas la etiqueta del KPI y la señal del agente se cortaban
+   con puntos suspensivos. Un texto recortado que sólo se completa al abrir es
+   exactamente el defecto que esta pantalla persigue. */
+.agentes {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.agente {
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr) 66px;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  border: 1px solid var(--linea);
+  border-left: 4px solid var(--acento);
+  border-radius: 16px;
+  padding: 11px 13px;
+  background: var(--tarjeta);
+  text-align: left;
+  box-shadow: 0 10px 22px rgba(70, 104, 175, 0.08);
+  transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
+}
+.agente:hover,
+.agente:focus-visible {
+  border-color: #a9c4f7;
+  border-left-color: var(--acento);
+  box-shadow: 0 14px 28px rgba(72, 111, 185, 0.16);
+  transform: translateY(-2px);
+}
+
+.agenteSigla {
+  display: grid;
+  width: 34px;
+  height: 34px;
+  place-items: center;
+  border: 2px solid var(--acento);
+  border-radius: 50%;
+  color: var(--acento);
+  font-size: 11px;
+  font-weight: 950;
+}
+
+.agenteCuerpo { display: grid; min-width: 0; gap: 1px; }
+.agenteCuerpo strong {
+  color: var(--acento);
+  font-size: 19px;
+  font-weight: 950;
+  letter-spacing: -0.06em;
+  line-height: 1;
+}
+.agenteCuerpo em {
+  color: var(--tinta);
+  font-size: 9px;
+  font-style: normal;
+  font-weight: 900;
+  line-height: 1.28;
+}
+.agenteCuerpo small {
+  color: var(--tinta-tenue);
+  font-size: 9px;
+  font-weight: 750;
+  line-height: 1.32;
+}
+
+.micro {
+  display: flex;
+  height: 40px;
+  align-items: flex-end;
+  justify-content: flex-end;
+  gap: 2px;
+  border-bottom: 2px solid #e9effb;
+  padding-bottom: 2px;
+}
+.micro i {
+  display: block;
+  flex: 1 1 0;
+  min-height: 4px;
+  border-radius: 4px 4px 1px 1px;
+  background: var(--acento);
+  opacity: 0.85;
+}
+.micro i[data-parcial] {
+  background-image: repeating-linear-gradient(135deg, rgba(255, 255, 255, 0.85) 0 3px, transparent 3px 6px);
+  background-color: var(--parcial);
+}
+
+/* ── Navegación por capas ──────────────────────────────────────────────── */
+
+.navegacion {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 14px;
+  margin-top: 16px;
+  border-bottom: 1px solid var(--linea);
+  padding-bottom: 12px;
+}
+
+.grupo { min-width: 0; }
+.grupo > p {
+  margin: 0 0 5px 2px;
+  color: var(--acento);
+  font-size: 8px;
+  font-weight: 950;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+.grupo > div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  border-radius: 999px;
+  padding: 3px;
+  background: var(--suave);
+}
+.grupo button {
+  border: 1px solid transparent;
+  border-radius: 999px;
+  padding: 7px 13px;
+  color: #6b81ab;
+  font-size: 11px;
+  font-weight: 900;
+  white-space: nowrap;
+}
+.grupo button:hover { color: var(--acento); }
+.grupo button[aria-pressed="true"] {
+  border-color: var(--borde-acento);
+  background: #fff;
+  color: var(--acento);
+  box-shadow: 0 6px 14px rgba(53, 87, 154, 0.12);
+}
+
+/* ── Panel ─────────────────────────────────────────────────────────────── */
+
+.panel {
+  display: grid;
+  gap: 14px;
+  margin-top: 16px;
+}
+
+.encabezado > p {
+  margin: 0;
+  color: var(--acento);
+  font-size: 9px;
+  font-weight: 950;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+.encabezado h3 {
+  margin: 4px 0 0;
+  color: var(--tinta);
+  font-size: 19px;
+  font-weight: 950;
+  letter-spacing: -0.045em;
+}
+.encabezado span {
+  display: block;
+  margin-top: 5px;
+  max-width: 78ch;
+  color: var(--tinta-suave);
+  font-size: 11px;
+  font-weight: 750;
+  line-height: 1.4;
+}
+
+/* ── Aviso de capa ─────────────────────────────────────────────────────── */
+
+.aviso {
+  margin: 0;
+  border: 1px solid var(--borde-acento);
+  border-left: 4px solid var(--acento);
+  border-radius: 12px;
+  padding: 9px 13px;
+  background: var(--suave);
+  color: var(--tinta-media);
+  font-size: 11px;
+  font-weight: 750;
+  line-height: 1.45;
+}
+.aviso b {
+  display: block;
+  margin-bottom: 3px;
+  color: var(--acento);
+  font-size: 9px;
+  font-weight: 950;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+/* ── Métricas ──────────────────────────────────────────────────────────── */
+
+.metricas {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+.metrica {
+  min-width: 0;
+  border: 1px solid var(--linea);
+  border-radius: 16px;
+  padding: 13px 14px;
+  background: var(--tarjeta);
+  box-shadow: 0 8px 20px rgba(70, 104, 175, 0.06);
+}
+.metrica b {
+  display: block;
+  color: var(--tinta);
+  font-size: 20px;
+  font-weight: 950;
+  letter-spacing: -0.05em;
+  line-height: 1.05;
+  overflow-wrap: anywhere;
+}
+.metrica span {
+  display: block;
+  margin-top: 5px;
+  color: var(--tinta-suave);
+  font-size: 10px;
+  font-weight: 850;
+  line-height: 1.25;
+}
+.metrica small {
+  display: block;
+  margin-top: 7px;
+  border-top: 1px solid var(--linea-tenue);
+  padding-top: 6px;
+  color: var(--tinta-tenue);
+  font-size: 9px;
+  font-weight: 750;
+  line-height: 1.32;
+}
+
+/* ── Recencia ──────────────────────────────────────────────────────────── */
+
+.tramos {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+.tramo {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+  border: 1px solid var(--linea);
+  border-radius: 18px;
+  padding: 13px 14px;
+  background: var(--tarjeta);
+  text-align: left;
+  box-shadow: 0 8px 20px rgba(70, 104, 175, 0.06);
+  transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
+}
+.tramo:hover { border-color: #a9c4f7; transform: translateY(-2px); }
+.tramo[data-abierto] {
+  border-color: var(--acento);
+  background: var(--suave);
+  box-shadow: 0 0 0 2px rgba(7, 137, 230, 0.16);
+}
+.tramo strong {
+  color: var(--acento);
+  font-size: 24px;
+  font-weight: 950;
+  letter-spacing: -0.06em;
+  line-height: 1;
+}
+.tramo span { color: var(--tinta); font-size: 11px; font-weight: 900; }
+.tramo i {
+  display: block;
+  height: 8px;
+  border-radius: 99px;
+  background: linear-gradient(90deg, var(--acento), color-mix(in srgb, var(--acento) 45%, #fff));
+}
+.tramo small { color: var(--tinta-tenue); font-size: 9px; font-weight: 800; }
+/* El tramo frío es el hallazgo de la sección, no un tramo más de la escala. */
+.tramo[data-frio] { --acento: #d4691d; }
+.tramo[data-frio][data-abierto] { box-shadow: 0 0 0 2px rgba(212, 105, 29, 0.18); }
+
+/* ── Concentración ─────────────────────────────────────────────────────── */
+
+.cortes {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 10px;
+}
+.corte {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+  border: 1px solid var(--linea);
+  border-radius: 18px;
+  padding: 13px 14px;
+  background: var(--tarjeta);
+  text-align: left;
+  box-shadow: 0 8px 20px rgba(70, 104, 175, 0.06);
+  transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
+}
+.corte:hover { border-color: #a9c4f7; transform: translateY(-2px); }
+.corte[data-abierto] {
+  border-color: var(--acento);
+  background: var(--suave);
+  box-shadow: 0 0 0 2px rgba(7, 137, 230, 0.16);
+}
+.corte span {
+  color: var(--rotulo);
+  font-size: 9px;
+  font-weight: 950;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+.corte strong {
+  color: var(--tinta);
+  font-size: 20px;
+  font-weight: 950;
+  letter-spacing: -0.05em;
+  line-height: 1;
+}
+/* La barra de participación lleva su riel: 41.59% sin riel se lee como 41.59%
+   de un total desconocido; con riel se lee sobre el 100% de la venta. */
+.corte i {
+  display: block;
+  height: 8px;
+  border-radius: 99px;
+  background: #e6edf9;
+}
+.corte i u {
+  display: block;
+  height: 100%;
+  border-radius: 99px;
+  background: linear-gradient(90deg, var(--acento), color-mix(in srgb, var(--acento) 45%, #fff));
+}
+.corte small { color: var(--tinta-tenue); font-size: 9px; font-weight: 800; overflow-wrap: anywhere; }
+
+/* ── Bloque de detalle (lo que abre el clic) ───────────────────────────── */
+
+.detalleBloque {
+  border: 1px solid var(--linea);
+  border-radius: 20px;
+  padding: 16px 18px;
+  background: rgba(255, 255, 255, 0.9);
+}
+
+.ayuda {
+  margin: 0;
+  border: 1px dashed #cddcf6;
+  border-radius: 14px;
+  padding: 11px 14px;
+  color: var(--tinta-tenue);
+  font-size: 10px;
+  font-weight: 750;
+  line-height: 1.4;
+}
+
+.vacio { margin: 0; color: var(--tinta-tenue); font-size: 11px; font-weight: 750; }
+
+/* ── Lista de clientes ─────────────────────────────────────────────────── */
+
+.lista { display: grid; gap: 4px; }
+
+.listaTitulo {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  margin: 0 0 6px;
+  color: var(--tinta);
+  font-size: 12px;
+  font-weight: 950;
+}
+.listaTitulo em {
+  color: var(--tinta-tenue);
+  font-size: 9px;
+  font-style: normal;
+  font-weight: 850;
+  white-space: nowrap;
+}
+/* "10 de 243" no es el mismo rótulo que "5 clientes listados": el primero dice
+   que hay 233 que no están en pantalla. Se destaca para que no se lea como una
+   contradicción con el número del tramo, que es lo que pasaba antes. */
+.listaTitulo em[data-truncada] {
+  border: 1px solid #f0d9ae;
+  border-radius: 999px;
+  padding: 3px 9px;
+  background: var(--parcial-suave);
+  color: var(--parcial-tinta);
+  font-weight: 950;
+}
+
+.listaCabecera,
+.listaItem > button {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto 58px 74px;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  text-align: left;
+}
+
+.listaCabecera {
+  border-bottom: 1px solid var(--linea);
+  padding: 0 10px 6px;
+}
+.listaCabecera span,
+.listaCabecera b,
+.listaCabecera i,
+.listaCabecera u {
+  color: var(--rotulo);
+  font-size: 8px;
+  font-style: normal;
+  font-weight: 950;
+  letter-spacing: 0.1em;
+  text-decoration: none;
+  text-transform: uppercase;
+}
+.listaCabecera i, .listaCabecera u { text-align: right; }
+
+.listaItem { border-bottom: 1px solid var(--linea-tenue); }
+.listaItem > button {
+  border-radius: 11px;
+  padding: 9px 10px;
+  transition: background 0.15s ease;
+}
+.listaItem > button:hover { background: var(--interno); }
+.listaItem[data-abierta] > button { background: var(--suave); }
+.listaItem > button > span {
+  overflow: hidden;
+  color: var(--tinta-media);
+  font-size: 11px;
+  font-weight: 850;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.listaItem > button > b { color: var(--acento); font-size: 11px; font-weight: 950; white-space: nowrap; }
+.listaItem > button > i,
+.listaItem > button > u {
+  color: var(--tinta-tenue);
+  font-size: 10px;
+  font-style: normal;
+  font-weight: 850;
+  text-align: right;
+  text-decoration: none;
+}
+
+.listaDetalle {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 8px;
+  margin: 0 0 10px;
+  border: 1px solid var(--linea);
+  border-radius: 14px;
+  padding: 11px 12px;
+  background: var(--interno);
+}
+.listaDetalle dt {
+  color: var(--acento);
+  font-size: 8px;
+  font-weight: 950;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.listaDetalle dd {
+  margin: 4px 0 0;
+  color: var(--tinta-suave);
+  font-size: 11px;
+  font-weight: 800;
+  overflow-wrap: anywhere;
+}
+
+/* Truncamiento: es un límite del dato, así que se marca como se marca todo lo
+   parcial en esta pantalla —naranja— y no en gris de nota al pie. El rótulo
+   "10 de 243" arriba dice cuánto falta; este renglón dice por qué. */
+.listaTruncada {
+  margin: 8px 0 0;
+  border: 1px dashed #f0d9ae;
+  border-radius: 12px;
+  padding: 8px 11px;
+  background: var(--parcial-suave);
+  color: var(--parcial-tinta);
+  font-size: 10px;
+  font-weight: 800;
+  line-height: 1.4;
+}
+.listaTruncada b { font-weight: 950; }
+
+/* ── Barras horizontales ───────────────────────────────────────────────── */
+
+.barras { display: grid; gap: 11px; }
+.barra {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
+  gap: 3px 12px;
+  width: 100%;
+  border-radius: 10px;
+  padding: 4px 6px;
+  text-align: left;
+}
+.barra:hover { background: var(--interno); }
+.barra[data-abierta] { background: var(--suave); }
+.barra > span {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  overflow: hidden;
+  color: var(--tinta-media);
+  font-size: 12px;
+  font-weight: 850;
+  white-space: nowrap;
+}
+.barra > span em {
+  border-radius: 99px;
+  padding: 1px 5px;
+  background: var(--parcial-suave);
+  color: var(--parcial-tinta);
+  font-size: 8px;
+  font-style: normal;
+  font-weight: 950;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.barra > b { color: var(--acento); font-size: 12px; font-weight: 950; white-space: nowrap; }
+.barra > i {
+  grid-column: 1 / -1;
+  display: block;
+  height: 10px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--acento), color-mix(in srgb, var(--acento) 45%, #fff));
+}
+.barra[data-parcial] > i {
+  background-image: repeating-linear-gradient(135deg, rgba(255, 255, 255, 0.85) 0 4px, transparent 4px 8px),
+    linear-gradient(90deg, var(--parcial), #ffc38a);
+}
+.barra > small {
+  grid-column: 1 / -1;
+  color: var(--tinta-tenue);
+  font-size: 9px;
+  font-weight: 750;
+  line-height: 1.35;
+}
+
+/* ── Comparativo ───────────────────────────────────────────────────────── */
+
+.comparativo {
+  display: grid;
+  gap: 7px;
+  border: 1px solid var(--linea);
+  border-radius: 16px;
+  padding: 14px 16px;
+  background: var(--interno);
+}
+.comparativo > p {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 0;
+  color: var(--tinta);
+  font-size: 11px;
+  font-weight: 900;
+}
+.comparativo > p b { color: var(--acento); font-size: 16px; font-weight: 950; letter-spacing: -0.04em; }
+.comparativo > div {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
+  gap: 3px 12px;
+}
+.comparativo > div span { color: var(--tinta-media); font-size: 11px; font-weight: 850; }
+.comparativo > div b { color: var(--tinta); font-size: 11px; font-weight: 950; white-space: nowrap; }
+.comparativo > div i {
+  grid-column: 1 / -1;
+  display: block;
+  height: 9px;
+  border-radius: 99px;
+  background: linear-gradient(90deg, var(--acento), color-mix(in srgb, var(--acento) 45%, #fff));
+}
+.comparativo > div[data-previo] i { background: #c9d8ef; }
+.comparativo > small { color: var(--tinta-tenue); font-size: 9px; font-weight: 750; line-height: 1.35; }
+
+/* ── Serie mensual ─────────────────────────────────────────────────────── */
+
+.serieBarra {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px 14px;
+}
+.conmutador {
+  display: flex;
+  gap: 4px;
+  border-radius: 999px;
+  padding: 3px;
+  background: var(--suave);
+}
+.conmutador button {
+  border-radius: 999px;
+  padding: 6px 14px;
+  color: #6b81ab;
+  font-size: 11px;
+  font-weight: 900;
+}
+.conmutador button[aria-pressed="true"] {
+  background: #fff;
+  color: var(--acento);
+  box-shadow: 0 5px 12px rgba(53, 87, 154, 0.14);
+}
+.escala { margin: 0; color: var(--tinta-tenue); font-size: 9px; font-weight: 850; }
+.escala b { color: var(--tinta); font-size: 11px; font-weight: 950; }
+
+/* 49 meses no caben legibles a 390px. En vez de recortar la serie —que sería
+   esconder período— el gráfico hace scroll horizontal DENTRO de su marco: la
+   página nunca se desplaza en horizontal. */
+.serieMarco {
+  overflow-x: auto;
+  border: 1px solid var(--linea);
+  border-radius: 20px;
+  padding: 16px 16px 12px;
+  background: rgba(255, 255, 255, 0.9);
+}
+.serie {
+  display: flex;
+  align-items: flex-end;
+  gap: 3px;
+  min-width: 660px;
+  height: 208px;
+}
+/* Rejilla y no columna flex: así el alto porcentual de la barra se mide contra
+   la banda del gráfico y no contra la banda más la etiqueta —que dejaría la
+   escala corta justo en el mes más alto. */
+.mes {
+  display: grid;
+  flex: 1 1 0;
+  min-width: 11px;
+  grid-template-rows: minmax(0, 1fr) auto;
+  justify-items: center;
+  align-items: end;
+  gap: 4px;
+  height: 100%;
+  border-radius: 6px 6px 8px 8px;
+  padding: 0 1px 2px;
+}
+.mes:hover { background: var(--interno); }
+.mes[data-abierto] { background: var(--suave); box-shadow: inset 0 0 0 1px var(--borde-acento); }
+.mes > i {
+  display: block;
+  width: 100%;
+  align-self: end;
+  border-radius: 5px 5px 2px 2px;
+  background: linear-gradient(180deg, color-mix(in srgb, var(--acento) 55%, #fff), var(--acento));
+}
+.mes[data-parcial] > i {
+  background-image: repeating-linear-gradient(135deg, rgba(255, 255, 255, 0.85) 0 4px, transparent 4px 8px),
+    linear-gradient(180deg, #ffc38a, var(--parcial));
+}
+.mes[data-abierto] > i { box-shadow: 0 0 0 2px rgba(7, 137, 230, 0.28); }
+/* La etiqueta se gira: con 49 meses es la única manera de que se lean todas y
+   no una de cada seis. */
+.mes > span {
+  height: 38px;
+  color: var(--tinta-tenue);
+  font-size: 8px;
+  font-weight: 850;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+  writing-mode: vertical-rl;
+  transform: rotate(180deg);
+}
+.mes[data-parcial] > span { color: var(--parcial-tinta); font-weight: 950; }
+
+.mesFicha {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  gap: 9px;
+  margin: 0;
+}
+.mesFicha > p {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin: 0;
+  color: var(--tinta);
+  font-size: 13px;
+  font-weight: 950;
+}
+.mesFicha > p em {
+  border-radius: 99px;
+  padding: 2px 8px;
+  background: var(--parcial-suave);
+  color: var(--parcial-tinta);
+  font-size: 8px;
+  font-style: normal;
+  font-weight: 950;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.mesFicha > div {
+  border: 1px solid var(--linea);
+  border-radius: 13px;
+  padding: 10px 12px;
+  background: var(--interno);
+}
+.mesFicha dt {
+  color: var(--acento);
+  font-size: 8px;
+  font-weight: 950;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.mesFicha dd { margin: 4px 0 0; color: var(--tinta); font-size: 13px; font-weight: 950; letter-spacing: -0.03em; }
+.mesFicha .mesNota { grid-column: 1 / -1; border-color: #f0d9ae; background: #fff8ec; }
+.mesFicha .mesNota dt { color: #9a5c05; }
+.mesFicha .mesNota dd { color: #7a5a20; font-size: 11px; font-weight: 750; letter-spacing: 0; line-height: 1.4; }
+
+/* ── Composición ───────────────────────────────────────────────────────── */
+
+.compo { display: grid; gap: 11px; }
+.compoFila {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
+  gap: 3px 12px;
+  width: 100%;
+  border-radius: 10px;
+  padding: 4px 6px;
+  text-align: left;
+}
+.compoFila:hover { background: var(--interno); }
+.compoFila[data-abierta] { background: var(--suave); }
+.compoFila > span {
+  overflow: hidden;
+  color: var(--tinta-media);
+  font-size: 12px;
+  font-weight: 850;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.compoFila > b { color: var(--acento); font-size: 12px; font-weight: 950; white-space: nowrap; }
+/* Barra rayada a propósito: la composición no es una cifra maciza de dinero. */
+.compoFila > i {
+  grid-column: 1 / -1;
+  display: block;
+  height: 10px;
+  border-radius: 999px;
+  background-image: repeating-linear-gradient(135deg, rgba(255, 255, 255, 0.7) 0 5px, transparent 5px 10px),
+    linear-gradient(90deg, var(--acento), color-mix(in srgb, var(--acento) 40%, #fff));
+}
+.compoFila > small {
+  grid-column: 1 / -1;
+  color: var(--tinta-tenue);
+  font-size: 9px;
+  font-weight: 750;
+  line-height: 1.35;
+}
+
+/* ── CxC ───────────────────────────────────────────────────────────────── */
+
+/* Otra capa, otra piel. El fondo oscuro es la señal de que estas tres cifras
+   no pertenecen a la misma familia que las de cartera y no se suman con ellas. */
+.cxc {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  align-items: stretch;
+  gap: 10px;
+  border-radius: 22px;
+  padding: 18px;
+  background: linear-gradient(140deg, #103a33, #0b2b26);
+  box-shadow: 0 18px 40px rgba(9, 46, 40, 0.24);
+}
+.cxcPieza { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.cxcPieza > em {
+  flex: none;
+  color: #6fcfb0;
+  font-size: 20px;
+  font-style: normal;
+  font-weight: 950;
+}
+.cxcPieza > div {
+  flex: 1 1 auto;
+  min-width: 0;
+  border: 1px solid rgba(146, 224, 199, 0.28);
+  border-radius: 16px;
+  padding: 13px 14px;
+  background: rgba(255, 255, 255, 0.06);
+}
+.cxcPieza[data-neta] > div { border-color: #6fcfb0; background: rgba(111, 207, 176, 0.14); }
+.cxcPieza b {
+  display: block;
+  color: #eafaf4;
+  font-size: 19px;
+  font-weight: 950;
+  letter-spacing: -0.05em;
+  overflow-wrap: anywhere;
+}
+.cxcPieza span {
+  display: block;
+  margin-top: 5px;
+  color: #8fd3ba;
+  font-size: 9px;
+  font-weight: 950;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+.cxcPieza small {
+  display: block;
+  margin-top: 7px;
+  border-top: 1px solid rgba(146, 224, 199, 0.24);
+  padding-top: 6px;
+  color: #b6ded0;
+  font-size: 9px;
+  font-weight: 750;
+  line-height: 1.35;
+}
+
+/* CxC · ESTADO PENDIENTE ─────────────────────────────────────────────────
+   Misma losa oscura y mismo verde que la ecuación: la capa no cambia porque
+   falte el dato, y si acá se pusiera una tarjeta clara volvería a parecerse a
+   las de venta. Lo que cambia es el borde —punteado— y que no hay un solo
+   número: ningún Q0.00 de relleno, ninguna cifra "No derivable" dentro de una
+   ecuación, ninguna cartera bruta presentada como cálculo de esta pantalla. Un
+   número inventado es indistinguible de uno medido. */
+.cxcPendiente {
+  display: grid;
+  justify-items: start;
+  gap: 12px;
+  border: 1px dashed rgba(146, 224, 199, 0.46);
+  border-radius: 22px;
+  padding: 20px;
+  background: linear-gradient(140deg, #103a33, #0b2b26);
+  box-shadow: 0 18px 40px rgba(9, 46, 40, 0.24);
+}
+.cxcEstado {
+  margin: 0;
+  border: 1px solid rgba(146, 224, 199, 0.4);
+  border-radius: 999px;
+  padding: 5px 12px;
+  background: rgba(255, 255, 255, 0.07);
+  color: #8fd3ba;
+  font-size: 9px;
+  font-weight: 950;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+.cxcMensaje {
+  margin: 0;
+  max-width: 92ch;
+  color: #eafaf4;
+  font-size: 14px;
+  font-weight: 850;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+/* El enlace es la única acción de la sección. Va como botón y no como texto
+   subrayado porque es lo único que se puede hacer acá. */
+.cxcEnlace {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid #6fcfb0;
+  border-radius: 14px;
+  padding: 10px 15px;
+  background: rgba(111, 207, 176, 0.14);
+  color: #eafaf4;
+  font-size: 12px;
+  font-weight: 950;
+  text-decoration: none;
+}
+.cxcEnlace:hover { background: rgba(111, 207, 176, 0.24); }
+.cxcEnlace em { font-size: 13px; font-style: normal; color: #8fd3ba; }
+
+/* ── Cobertura ─────────────────────────────────────────────────────────── */
+
+.resumenCobertura {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+.resumenCobertura > div {
+  border: 1px solid var(--linea);
+  border-left: 4px solid var(--tinta-tenue);
+  border-radius: 16px;
+  padding: 11px 14px;
+  background: var(--tarjeta);
+}
+.resumenCobertura b {
+  display: block;
+  color: var(--tinta);
+  font-size: 22px;
+  font-weight: 950;
+  letter-spacing: -0.06em;
+  line-height: 1;
+}
+.resumenCobertura span {
+  display: block;
+  margin-top: 4px;
+  color: var(--tinta-suave);
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.resumenCobertura > div[data-estado="existe"] { border-left-color: #2f8a4d; }
+.resumenCobertura > div[data-estado="parcial"] { border-left-color: #e08c1b; }
+.resumenCobertura > div[data-estado="falta"] { border-left-color: #c0392b; }
+
+.cobertura { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.coberturaFila {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: baseline;
+  gap: 4px 10px;
+  min-width: 0;
+  border: 1px solid var(--linea);
+  border-radius: 16px;
+  padding: 12px 14px;
+  background: var(--tarjeta);
+}
+.coberturaFila em {
+  border-radius: 99px;
+  padding: 3px 9px;
+  font-size: 8px;
+  font-style: normal;
+  font-weight: 950;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.coberturaFila strong { color: var(--tinta); font-size: 12px; font-weight: 950; }
+.coberturaFila p {
+  grid-column: 1 / -1;
+  margin: 2px 0 0;
+  color: var(--tinta-tenue);
+  font-size: 10px;
+  font-weight: 750;
+  line-height: 1.38;
+}
+.coberturaFila[data-estado="existe"] em { background: #e6f6ec; color: #1f7040; }
+.coberturaFila[data-estado="parcial"] em { background: #fdf0dc; color: #a45b06; }
+.coberturaFila[data-estado="falta"] em { background: #fdeae7; color: #a5281a; }
+.coberturaFila[data-estado="existe"] { border-left: 4px solid #2f8a4d; }
+.coberturaFila[data-estado="parcial"] { border-left: 4px solid #e08c1b; }
+.coberturaFila[data-estado="falta"] { border-left: 4px solid #c0392b; }
+
+.noAfirmable {
+  border: 1px dashed #d8c0bb;
+  border-radius: 18px;
+  padding: 14px 16px;
+  background: #fdf6f4;
+}
+.noAfirmable > p {
+  margin: 0;
+  color: #a5281a;
+  font-size: 9px;
+  font-weight: 950;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+.noAfirmable ul {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 10px 0 0;
+  padding: 0;
+  list-style: none;
+}
+.noAfirmable li {
+  border: 1px solid #eccfc9;
+  border-radius: 99px;
+  padding: 5px 11px;
+  background: #fff;
+  color: #8c3a2c;
+  font-size: 10px;
+  font-weight: 850;
+}
+.noAfirmable small {
+  display: block;
+  margin-top: 11px;
+  color: #96695f;
+  font-size: 9px;
+  font-weight: 750;
+  line-height: 1.4;
+}
+
+/* ── Procedencia ───────────────────────────────────────────────────────── */
+
+.proc {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 8px 10px;
+  margin: 2px 0 0;
+  border: 1px solid var(--linea);
+  border-radius: 18px;
+  padding: 13px 15px;
+  background: var(--interno);
+}
+.proc > div { min-width: 0; }
+.proc dt {
+  color: var(--acento);
+  font-size: 8px;
+  font-weight: 950;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+.proc dd {
+  margin: 3px 0 0;
+  color: var(--tinta-suave);
+  font-size: 10px;
+  font-weight: 800;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+.proc dd b { color: var(--tinta); font-weight: 950; }
+.procCapa, .procLimite { grid-column: 1 / -1; }
+.procCapa dd { color: var(--tinta); font-size: 11px; font-weight: 950; }
+.procLimite dd { color: var(--parcial-tinta); font-weight: 850; }
+
+/* ── Modal del agente ──────────────────────────────────────────────────── */
+
+.velo {
+  position: fixed;
+  z-index: 75;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgba(8, 20, 54, 0.42);
+  backdrop-filter: blur(10px);
+}
+.modal {
+  --tinta: #17336f;
+  --tinta-media: #274474;
+  --tinta-suave: #62799f;
+  --tinta-tenue: #7387ad;
+  --rotulo: #7a8cad;
+  --linea: #e3ebfb;
+  --linea-tenue: #e8eefb;
+  --tarjeta: rgba(255, 255, 255, 0.94);
+  --interno: #f8fbff;
+  --suave: #eef4ff;
+  --borde-acento: #b9d4f6;
+  --parcial: #f97316;
+  --parcial-suave: #fdf0dc;
+  --parcial-tinta: #a45b06;
+
+  display: grid;
+  gap: 14px;
+  width: min(880px, 100%);
+  max-height: 88vh;
+  overflow: auto;
+  border: 1px solid rgba(255, 255, 255, 0.85);
+  border-radius: 28px;
+  padding: 26px;
+  background: linear-gradient(145deg, #fff, #f4f8ff);
+  box-shadow: 0 30px 90px rgba(3, 22, 66, 0.42);
+}
+.modal button { border: 0; background: none; color: inherit; font: inherit; cursor: pointer; }
+.modal :focus-visible { outline: 2px solid var(--acento); outline-offset: 2px; }
+.modal > header { display: flex; align-items: flex-start; justify-content: space-between; gap: 20px; }
+.modal > header p {
+  margin: 0;
+  color: var(--acento);
+  font-size: 10px;
+  font-weight: 950;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+.modal > header h3 {
+  margin: 6px 0 4px;
+  color: #122a67;
+  font-size: 25px;
+  font-weight: 950;
+  letter-spacing: -0.055em;
+}
+.modal > header span { color: var(--tinta-tenue); font-size: 11px; font-weight: 750; }
+.modal > header button {
+  display: grid;
+  width: 36px;
+  height: 36px;
+  flex: none;
+  place-items: center;
+  border: 1px solid #dfeaff;
+  border-radius: 50%;
+  background: #fff;
+  color: #536d9b;
+  font-size: 24px;
+  line-height: 1;
+}
+
+.modalKpi { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.modalKpi > div { border: 1px solid var(--linea); border-radius: 14px; padding: 11px 13px; background: var(--interno); }
+.modalKpi small {
+  display: block;
+  color: var(--acento);
+  font-size: 9px;
+  font-weight: 950;
+  letter-spacing: 0.08em;
+  line-height: 1.3;
+  text-transform: uppercase;
+}
+.modalKpi strong {
+  display: block;
+  margin-top: 4px;
+  color: var(--tinta);
+  font-size: 22px;
+  font-weight: 950;
+  letter-spacing: -0.05em;
+}
+
+.ficha { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin: 0; }
+.ficha > div { border: 1px solid var(--linea); border-radius: 13px; padding: 11px 12px; background: var(--interno); }
+.ficha dt {
+  color: var(--acento);
+  font-size: 9px;
+  font-weight: 950;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.ficha dd { margin: 4px 0 0; color: var(--tinta-suave); font-size: 11px; font-weight: 750; line-height: 1.4; overflow-wrap: anywhere; }
+.fichaFormula { grid-column: 1 / -1; }
+.fichaFormula dd { font-family: ui-monospace, "SFMono-Regular", "Consolas", monospace; font-size: 10px; }
+
+/* ══ Escritorio angosto ═══════════════════════════════════════════════════ */
+
+@media (max-width: 1180px) {
+  .metricas { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .cortes { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .ficha { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (max-width: 860px) {
+  .raiz { border-radius: 24px; padding: 18px 16px 20px; }
+  .metricas { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .tramos { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .cortes { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .cobertura { grid-template-columns: 1fr; }
+  .ficha { grid-template-columns: 1fr; }
+  .modalKpi { grid-template-columns: 1fr; }
+  .velo { padding: 12px; }
+  .modal { padding: 20px 16px; max-height: 92vh; }
+  .modal > header h3 { font-size: 21px; }
+  /* La resta de cartera se lee de arriba abajo cuando no cabe de izquierda a
+     derecha; el signo se conserva porque es el que dice que se restan. */
+  .cxc { grid-template-columns: 1fr; padding: 14px; }
+  .cxcPieza { align-items: stretch; }
+  .cxcPieza > em { display: grid; place-items: center; width: 22px; }
+}
+
+/* ══ Móvil 390px ══════════════════════════════════════════════════════════ */
+
+@media (max-width: 560px) {
+  .raiz { border-radius: 20px; padding: 16px 12px 18px; }
+  .cabecera h2 { font-size: 21px; }
+  .declaracion { border-radius: 16px; }
+
+  .agentes { grid-template-columns: 1fr; gap: 8px; }
+  .agente { grid-template-columns: 30px minmax(0, 1fr) 52px; padding: 10px 11px; }
+  .agenteSigla { width: 30px; height: 30px; font-size: 10px; }
+  .agenteCuerpo strong { font-size: 17px; }
+  .micro { height: 34px; }
+
+  /* La barra de secciones no se recorta ni se colapsa en un desplegable: se
+     desplaza en horizontal conservando los grupos, que son la leyenda de capa. */
+  /* El degradado del borde derecho es la señal de que la barra sigue: sin él,
+     las capas de composición, CxC y alcance quedan fuera de cuadro sin que
+     nada avise de que existen. */
+  .navegacion {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    gap: 10px;
+    padding-bottom: 14px;
+    scrollbar-width: thin;
+    mask-image: linear-gradient(90deg, #000 calc(100% - 26px), transparent);
+  }
+  .grupo { flex: none; }
+  .grupo > div { flex-wrap: nowrap; }
+  .grupo button { padding: 7px 11px; font-size: 11px; }
+
+  .encabezado h3 { font-size: 17px; }
+  .detalleBloque { border-radius: 16px; padding: 13px 12px; }
+
+  .metricas { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+  .metrica { border-radius: 14px; padding: 11px; }
+  .metrica b { font-size: 17px; }
+
+  .tramos, .cortes { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+  .tramo, .corte { border-radius: 15px; padding: 11px; }
+  .tramo strong { font-size: 21px; }
+  .corte strong { font-size: 17px; }
+
+  /* Cuatro columnas de 74px no entran en 390px: el nombre y la venta quedan
+     arriba, los pedidos y los días abajo. Ninguna columna desaparece. */
+  .listaCabecera { display: none; }
+  .listaItem > button {
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 2px 10px;
+  }
+  .listaItem > button > i { grid-column: 1; text-align: left; }
+  .listaItem > button > u { grid-column: 2; }
+  .listaDetalle { grid-template-columns: 1fr; }
+
+  .serieMarco { border-radius: 16px; padding: 12px 10px 10px; }
+  .serie { height: 172px; }
+  .serieBarra { gap: 6px; }
+
+  .resumenCobertura { gap: 8px; }
+  .resumenCobertura > div { padding: 9px 10px; }
+  .resumenCobertura b { font-size: 18px; }
+  .resumenCobertura span { font-size: 9px; }
+
+  .proc { grid-template-columns: 1fr; border-radius: 15px; padding: 12px; }
+  .cxcPieza b { font-size: 17px; }
+
+  /* El enlace pasa a ancho completo: en 390px un botón corto al lado de un
+     párrafo de tres líneas se pierde, y es la única acción de la sección. */
+  .cxcPendiente { border-radius: 18px; padding: 16px 14px; gap: 10px; }
+  .cxcMensaje { font-size: 12px; }
+  .cxcEnlace { justify-content: space-between; width: 100%; padding: 11px 13px; font-size: 11px; }
+
+  .listaTruncada { font-size: 9px; padding: 8px 10px; }
+  /* En móvil el rótulo se va a su propia línea antes que encogerse: "10 de 243"
+     partido a la mitad no se entiende. */
+  .listaTitulo { flex-wrap: wrap; gap: 6px; }
+}
+
+/* ── v3 · "Ver ficha del cliente" ──────────────────────────────────────
+   Vive DENTRO del detalle de la fila, que ya está abierto por un clic.
+   No es un enlace flotante ni aparece al pasar el mouse: para llegar acá
+   el usuario ya eligió a este cliente. */
+.listaFicha {
+  grid-column: 1 / -1;
+  margin-top: 10px;
+  padding-top: 12px;
+  border-top: 1px dashed #d7e2f4;
+}
+.listaFicha button {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 16px;
+  border: 1px solid #b9cdf0;
+  border-radius: 999px;
+  background: #ffffff;
+  color: #17336f;
+  font-size: 11.5px;
+  font-weight: 850;
+  letter-spacing: -0.01em;
+  cursor: pointer;
+  transition: background 120ms ease, border-color 120ms ease;
+}
+.listaFicha button:hover { background: #eef4ff; border-color: #8fb2e8; }
+.listaFicha button:focus-visible { outline: 2px solid #4b80ee; outline-offset: 2px; }
+.listaFicha button span { font-size: 13px; }
+
+@media (max-width: 560px) {
+  .listaFicha button { width: 100%; justify-content: center; }
+}

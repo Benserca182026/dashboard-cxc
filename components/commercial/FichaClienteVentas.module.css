@@ -1,0 +1,218 @@
+/* Ficha individual de cliente. CSS aislado: no toca globals.css.
+   Mismos valores del molde de /ventas/productos (radios, sombras, tintas). */
+
+.velo {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  display: grid;
+  place-items: start center;
+  padding: 32px 16px;
+  overflow-y: auto;
+  background: rgba(16, 32, 66, 0.42);
+  backdrop-filter: blur(3px);
+}
+
+.ficha {
+  width: min(920px, 100%);
+  padding: 28px 30px 30px;
+  border-radius: 30px;
+  background: #ffffff;
+  box-shadow: 0 26px 60px rgba(55, 91, 166, 0.12);
+  color: #274474;
+}
+
+.cabecera { display: flex; align-items: flex-start; justify-content: space-between; gap: 20px; }
+.cabecera p {
+  margin: 0 0 4px;
+  font-size: 10px;
+  font-weight: 950;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: #7387ad;
+}
+.cabecera h2 {
+  margin: 0;
+  font-size: clamp(1.25rem, 2.4vw, 1.75rem);
+  font-weight: 950;
+  letter-spacing: -0.05em;
+  line-height: 1.05;
+  color: #11245e;
+}
+
+.cerrar {
+  flex: 0 0 auto;
+  width: 36px;
+  height: 36px;
+  border: 1px solid #dee7f6;
+  border-radius: 999px;
+  background: #ffffff;
+  color: #62799f;
+  font-size: 19px;
+  line-height: 1;
+  cursor: pointer;
+}
+.cerrar:hover { background: #f2f6fd; }
+.cerrar:focus-visible { outline: 2px solid #4b80ee; outline-offset: 2px; }
+
+.capa {
+  margin: 14px 0 0;
+  padding: 9px 14px;
+  border-radius: 999px;
+  background: #eef4ff;
+  color: #17336f;
+  font-size: 11px;
+  font-weight: 850;
+  display: inline-block;
+}
+
+.metricas {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 18px;
+}
+.metricas > div {
+  padding: 14px 16px;
+  border: 1px solid #e8eefa;
+  border-radius: 18px;
+  background: #fbfcff;
+}
+.metricas b {
+  display: block;
+  font-size: 20px;
+  font-weight: 950;
+  letter-spacing: -0.045em;
+  color: #11245e;
+}
+.metricas span {
+  display: block;
+  margin-top: 4px;
+  font-size: 10.5px;
+  font-weight: 750;
+  line-height: 1.35;
+  color: #62799f;
+}
+
+.titulo {
+  margin: 26px 0 4px;
+  font-size: 13.5px;
+  font-weight: 950;
+  letter-spacing: -0.03em;
+  color: #17336f;
+}
+.bajada { margin: 0 0 12px; font-size: 11.5px; font-weight: 700; color: #7387ad; }
+
+.aviso {
+  margin: 0 0 12px;
+  padding: 11px 14px;
+  border-left: 3px solid #a45b06;
+  border-radius: 0 14px 14px 0;
+  background: #fdf0dc;
+  color: #7a4405;
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 1.45;
+}
+
+.historial > div,
+.productos > div {
+  display: grid;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  border-radius: 14px;
+  font-size: 11.5px;
+  font-weight: 800;
+}
+.historial > div { grid-template-columns: 92px 1fr auto; }
+.historial > div:nth-child(odd) { background: #f7faff; }
+.historial span { color: #274474; }
+.historial i { font-style: normal; font-weight: 700; color: #93a6c6; }
+.historial b { color: #11245e; }
+
+.productos > div {
+  position: relative;
+  grid-template-columns: 1fr auto auto;
+  overflow: hidden;
+  background: #f7faff;
+  margin-bottom: 6px;
+}
+.productos span { color: #274474; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.productos i { font-style: normal; font-weight: 700; color: #7387ad; }
+.productos b { color: #11245e; }
+.productos u {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  height: 3px;
+  background: #c9b08a;
+  border-radius: 999px;
+}
+
+.truncado { margin: 8px 0 0; font-size: 10.5px; font-weight: 800; color: #a45b06; }
+.vacio { margin: 0; font-size: 11.5px; font-weight: 750; color: #7387ad; }
+
+.cartera {
+  padding: 16px 18px;
+  border: 1px solid #cfe6d8;
+  border-radius: 20px;
+  background: #f2faf5;
+}
+.cartera p { margin: 0; font-size: 12px; font-weight: 800; color: #14503a; }
+.cartera b { font-size: 17px; font-weight: 950; }
+.carteraNota { margin-top: 6px !important; font-size: 10.5px !important; font-weight: 700 !important; color: #4a7d67 !important; }
+.carteraEnlace {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 12px;
+  padding: 9px 16px;
+  border-radius: 999px;
+  background: #14503a;
+  color: #ffffff;
+  font-size: 11px;
+  font-weight: 850;
+  text-decoration: none;
+}
+.carteraEnlace:hover { background: #0e3b2b; }
+
+.procedencia {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px 24px;
+  margin: 26px 0 0;
+  padding: 16px 18px;
+  border-radius: 20px;
+  background: #f7faff;
+}
+.procedencia dt {
+  font-size: 9.5px;
+  font-weight: 950;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #7387ad;
+}
+.procedencia dd {
+  margin: 3px 0 0;
+  font-size: 11px;
+  font-weight: 750;
+  line-height: 1.45;
+  color: #274474;
+}
+
+@media (max-width: 720px) {
+  .metricas { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .procedencia { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 560px) {
+  .velo { padding: 12px 8px; }
+  .ficha { padding: 20px 16px 22px; border-radius: 22px; }
+  .metricas { grid-template-columns: 1fr; }
+  .historial > div { grid-template-columns: 84px 1fr; }
+  .historial i { display: none; }
+  .productos > div { grid-template-columns: 1fr auto; }
+  .productos i { display: none; }
+  .carteraEnlace { width: 100%; justify-content: center; }
+}
