@@ -1401,3 +1401,288 @@
 @media (max-width: 560px) {
   .listaFicha button { width: 100%; justify-content: center; }
 }
+
+/* ══════════════════════════════════════════════════════════════════════════
+   JERARQUÍA DEL MAPA · lo que el molde global NO trae
+   ──────────────────────────────────────────────────────────────────────────
+   La estructura —riel, dos agentes por lado, reporte central, botón B18— es la
+   del molde compartido (`.b18-map*` en app/globals.css) y se usa tal cual. Acá
+   sólo vive lo que esta pantalla agrega encima:
+
+     · la lectura ejecutiva y las notas de capa del reporte central,
+     · el bloque comparativo contra la ventana equivalente del año anterior,
+     · las barras de recencia clicables del centro,
+     · y DOS correcciones de disponibilidad que no se pueden hacer en el global
+       sin afectar a /ventas y /ventas/productos: el molde esconde el estado del
+       agente por debajo de 980px y el botón B18 por debajo de 700px. Acá los dos
+       son parte de la jerarquía pedida, así que se restituyen —con dos clases,
+       para ganarle en especificidad sin `!important`—.
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/* El riel conserva su estado y su botón B18 en cualquier ancho: sin ellos, en
+   móvil no habría manera de abrir el dashboard integral. */
+.mapa .estadoAgente { display: block; }
+.mapa .botonB18 { display: flex; }
+
+@media (max-width: 980px) {
+  .mapa .estadoAgente { grid-column: 1 / -1; }
+  .mapa .botonB18 { grid-column: 1 / -1; justify-self: start; margin-top: 4px; }
+}
+
+/* ── Tarjeta de agente ─────────────────────────────────────────────────────
+   El KPI principal y su etiqueta son del molde. La métrica secundaria es de
+   esta pantalla: existe para que la tarjeta no tenga que repetir el KPI de
+   otra para dar contexto. */
+.tarjetaApoyo {
+  display: block;
+  max-width: 100%;
+  margin-top: 3px;
+  color: #7b8dae;
+  font-size: 9px;
+  font-style: normal;
+  font-weight: 850;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+}
+
+/* El siguiente paso sólo lo lleva Recomienda: es la única de las cuatro cuya
+   respuesta es una llamada y no una lectura. Va al pie, después de la señal,
+   para que se lea como consecuencia y no como otro KPI. */
+.tarjetaPie {
+  width: 100%;
+  margin: 9px 0 0;
+  border-top: 1px dashed #e7edf9;
+  padding-top: 8px;
+  color: #4d6a8c;
+  font-size: 9px;
+  font-weight: 800;
+  line-height: 1.32;
+}
+.tarjetaPie b {
+  display: block;
+  margin-bottom: 2px;
+  color: #178c4e;
+  font-size: 8px;
+  font-weight: 950;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+/* ── Reporte ejecutivo central ─────────────────────────────────────────── */
+
+.centro { overflow: auto; }
+
+/* UNA lectura, arriba de todo lo demás. Si el centro empieza con un gráfico,
+   el lector arma la conclusión solo y a veces la arma mal. */
+.centro .lecturaEjecutiva {
+  width: 100%;
+  margin: 11px 0 0;
+  border: 1px solid #dce8ff;
+  border-left: 3px solid #0789e6;
+  border-radius: 4px 12px 12px 4px;
+  padding: 9px 12px;
+  background: #f4f8ff;
+  color: #17336f;
+  font-size: 12px;
+  font-weight: 850;
+  line-height: 1.4;
+  text-align: left;
+}
+
+.comparacion { width: 100%; min-width: 0; margin-top: 12px; text-align: left; }
+.comparacion > p {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 2px 8px;
+  margin: 0 0 6px;
+}
+.comparacion > p span {
+  color: #4b7ee4;
+  font-size: 9px;
+  font-weight: 950;
+  letter-spacing: 0.08em;
+  line-height: 1.3;
+  text-transform: uppercase;
+}
+.comparacion > p em { color: #7386ad; font-size: 9px; font-style: normal; font-weight: 800; }
+
+/* Los cuatro tramos de recencia, clicables: cada uno abre la evidencia del
+   agente que los calcula. El tramo frío se pinta distinto porque es el que
+   sostiene la mitad problemática de la lectura ejecutiva. */
+.tramosCentro { display: grid; min-width: 0; gap: 8px; }
+.tramosCentro button {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
+  gap: 3px 8px;
+  border: 0;
+  border-radius: 9px;
+  padding: 3px 5px;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.tramosCentro button:hover { background: #f4f8ff; }
+.tramosCentro button:focus-visible { outline: 2px solid #0789e6; outline-offset: 2px; }
+.tramosCentro span {
+  min-width: 0;
+  overflow: hidden;
+  color: #345184;
+  font-size: 10px;
+  font-weight: 850;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.tramosCentro b { color: #0789e6; font-size: 10px; font-weight: 950; white-space: nowrap; }
+.tramosCentro i { grid-column: 1 / -1; display: block; height: 9px; border-radius: 999px; background: #0789e6; }
+.tramosCentro button[data-frio] b { color: #d4691d; }
+.tramosCentro button[data-frio] i { background: #d4691d; }
+
+/* Las dos notas que no pueden faltar en el centro: hasta dónde llega el
+   snapshot, y que la cartera es otra capa que no se suma con esta. Van en un
+   contenedor propio para que las dos compartan una sola separación con el
+   bloque de arriba en vez de dos. */
+.notasCentro { display: grid; width: 100%; gap: 9px; margin-top: 10px; }
+.centro .notasCentro .notaCentro,
+.centro .notasCentro .notaCxc { margin-top: 0; }
+
+.centro .notaCentro,
+.centro .notaCxc {
+  width: 100%;
+  margin: 10px 0 0;
+  border: 1px solid #f0d9ae;
+  border-left: 3px solid #e08c1b;
+  border-radius: 10px;
+  padding: 7px 10px;
+  background: #fff8ec;
+  color: #7a5a20;
+  font-size: 9px;
+  font-weight: 750;
+  line-height: 1.4;
+  text-align: left;
+}
+.centro .notaCentro b,
+.centro .notaCxc b {
+  display: block;
+  margin-bottom: 3px;
+  color: #9a5c05;
+  font-size: 8px;
+  font-weight: 950;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+.centro .notaCxc {
+  border-color: #aedbca;
+  border-left-color: #0d8a68;
+  background: #e6f6f0;
+  color: #33685a;
+}
+.centro .notaCxc b { color: #0d8a68; }
+.centro .notaCxc a { margin-left: 5px; color: #0b6f54; font-weight: 950; text-decoration: underline; }
+
+/* ── Panel B18 ─────────────────────────────────────────────────────────────
+   Lleva también la clase `raiz`, que es la que define los tonos por capa de
+   las siete secciones. Estas reglas van DESPUÉS de `.raiz` a propósito: misma
+   especificidad, gana la última, y así el panel deja de ser una tarjeta del
+   flujo para ser la superficie del diálogo. */
+.panelB18 {
+  display: grid;
+  gap: 14px;
+  width: min(1180px, 100%);
+  max-height: 88vh;
+  overflow: auto;
+  border: 1px solid rgba(255, 255, 255, 0.85);
+  border-radius: 28px;
+  padding: 26px;
+  background: linear-gradient(145deg, #fff, #f4f8ff);
+  box-shadow: 0 30px 90px rgba(3, 22, 66, 0.42);
+}
+
+.cabeceraDerecha { display: flex; align-items: flex-start; gap: 12px; }
+
+/* `.raiz button` (0,1,1) le gana a una clase suelta: el botón de cierre se
+   escribe con el panel por delante para recuperar su forma. */
+.panelB18 .cerrarPanel {
+  display: grid;
+  width: 36px;
+  height: 36px;
+  flex: none;
+  place-items: center;
+  border: 1px solid var(--linea);
+  border-radius: 50%;
+  background: #fff;
+  color: var(--tinta-suave);
+  font-size: 19px;
+  line-height: 1;
+}
+.panelB18 .cerrarPanel:hover { border-color: #b9d4f6; color: #0f4fa8; }
+
+/* El drill-down del agente ya no cuelga de `.raiz` —vive dentro del mapa—, así
+   que los tonos por capa se repiten acá. Sin esto, la procedencia del modal
+   perdería el color de su capa, que es el único aviso de que esa cifra no se
+   suma con la de al lado. */
+.modal [data-tono="venta"] { --acento: #0789e6; --suave: #e8f2ff; --borde-acento: #b9d4f6; }
+.modal [data-tono="composicion"] { --acento: #7b2bf4; --suave: #f2ecff; --borde-acento: #d6c4fa; }
+.modal [data-tono="cxc"] { --acento: #0d8a68; --suave: #e6f6f0; --borde-acento: #aedbca; }
+.modal [data-tono="cobertura"] { --acento: #4a6ea8; --suave: #edf2fa; --borde-acento: #ccdaee; }
+.modal [data-tono="parcial"] { --acento: #e08c1b; --suave: #fff8ec; --borde-acento: #f0d9ae; }
+
+@media (max-width: 700px) {
+  .panelB18 { max-height: 90vh; border-radius: 21px; padding: 18px; }
+  .cabeceraDerecha { width: 100%; justify-content: space-between; }
+  .centro .lecturaEjecutiva { font-size: 12px; }
+  /* En móvil la elipsis se comía la mitad del rótulo del tramo ("Más de…"),
+     que es justamente el que sostiene la lectura ejecutiva. */
+  .tramosCentro span { overflow: visible; white-space: normal; }
+}
+
+/* ── EL ALTO DE LAS CUATRO TARJETAS ────────────────────────────────────────
+   La fila la estira el centro, que es la pieza más alta del lienzo. Antes la
+   tarjeta centraba su contenido dentro de ese alto prestado (`justify-content:
+   center`) y quedaba con un tercio de aire arriba y otro abajo: contenido
+   flotando en una caja que no le pertenece.
+
+   Acá la tarjeta OCUPA su alto en vez de flotar en él —cabecera arriba, señal
+   abajo— y el hueco del medio se lo queda el micrográfico, que crece hasta
+   llenarlo. Es exactamente lo que hace /ventas: ahí la tarjeta se ve llena
+   porque el gráfico es tan alto como el espacio disponible, no porque haya
+   menos contenido. El tope evita que en pantallas muy altas el micrográfico
+   pase de ser una lectura a ser un cartel. */
+.tarjeta { justify-content: stretch; }
+.tarjeta :global(.b18-rol-visual) { flex: 1; justify-content: flex-start; }
+.tarjeta :global(.b18-rol-content) { flex: 1; align-items: stretch; }
+.tarjeta :global(.b18-rol-kpi) { align-content: center; }
+.tarjeta :global(.b18-mini-pareto),
+.tarjeta :global(.b18-mini-barras) {
+  height: 100%;
+  min-height: 70px;
+  max-height: 210px;
+  align-self: center;
+}
+/* Las barras horizontales reparten el alto entre sí en vez de amontonarse en
+   el centro: con dos barras —Explica— o con cinco —Prioriza— el bloque se lee
+   igual de lleno. */
+.tarjeta :global(.b18-mini-barras) {
+  grid-auto-rows: minmax(9px, 1fr);
+  align-content: stretch;
+  align-items: center;
+  gap: 6px;
+}
+.tarjeta :global(.b18-mini-barras) i { height: 100%; max-height: 40px; border-radius: 8px; }
+
+/* En móvil las tarjetas ya no comparten fila con nadie: el alto vuelve a ser
+   el de su contenido y el micrográfico deja de estirarse. */
+@media (max-width: 700px) {
+  .tarjeta :global(.b18-mini-pareto),
+  .tarjeta :global(.b18-mini-barras) { height: 88px; max-height: 88px; }
+}
+
+/* El anillo del centro es más chico que el del molde de Productos porque acá
+   convive con el bloque comparativo: el texto se ajusta para no montarse. */
+.centro :global(.b18-dona-principal) span { font-size: 16px; }
+.centro :global(.b18-dona-principal) em { font-size: 7px; line-height: 1.25; }

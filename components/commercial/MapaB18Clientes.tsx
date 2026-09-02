@@ -1,7 +1,7 @@
 /// <reference types="vite/client" />
 "use client";
 
-import { useEffect, useState, type CSSProperties } from "react";
+import { useEffect, useState, type CSSProperties, type ReactNode } from "react";
 import type {
   AgenteClientesB18,
   BarraClientesB18,
@@ -15,6 +15,7 @@ import type {
   PropsMapaB18Clientes,
   PuntoSerieClientesB18,
   SeccionB18Clientes,
+  SlotClientesB18,
   TramoRecenciaB18,
 } from "@/lib/contrato-clientes-b18";
 import est from "./MapaB18Clientes.module.css";
@@ -490,7 +491,24 @@ function SeccionCobertura({ panel }: { panel: PropsMapaB18Clientes["mapa"]["b18"
 
 // ── Drill-down de agente ───────────────────────────────────────────────────
 
-function DrilldownAgente({ agente, onCerrar, onVerFicha }: { agente: LecturaAgenteClienteB18; onCerrar: () => void; onVerFicha?: (clienteId: string) => void }) {
+/**
+ * EL DRILL-DOWN MUESTRA LA EVIDENCIA DE SU AGENTE, Y NADA MÁS.
+ *
+ * Antes recibía una `listaExtra` con clientes de otro agente —Prioriza abría
+ * la lista de recuperación—. Eso volvía a mezclar las dos preguntas: quien
+ * abría "de cuántas cuentas depende el año" terminaba leyendo "a quién llamo
+ * primero". Cada agente responde con su propia lista; la de recuperación se
+ * abre desde Recomienda, que es de donde sale.
+ */
+function DrilldownAgente({ agente, color, onCerrar, onVerFicha }: {
+  agente: LecturaAgenteClienteB18;
+  /** Color del slot en el lienzo. El drill-down tiene que abrirse del color de
+   *  la tarjeta que lo abrió, o deja de leerse como la misma pieza. */
+  color?: string;
+  onCerrar: () => void;
+  onVerFicha?: (clienteId: string) => void;
+}) {
+  const acento = color ?? agente.color;
   useEffect(() => {
     const salir = (ev: KeyboardEvent) => { if (ev.key === "Escape") onCerrar(); };
     window.addEventListener("keydown", salir);
@@ -498,7 +516,7 @@ function DrilldownAgente({ agente, onCerrar, onVerFicha }: { agente: LecturaAgen
   }, [onCerrar]);
 
   return <div className={est.velo} role="presentation" onPointerDown={(ev) => ev.target === ev.currentTarget && onCerrar()}>
-    <section className={est.modal} role="dialog" aria-modal="true" aria-labelledby="b18cl-modal" style={{ "--acento": agente.color } as CSSProperties}>
+    <section className={est.modal} role="dialog" aria-modal="true" aria-labelledby="b18cl-modal" style={{ "--acento": acento } as CSSProperties}>
       <header>
         <div>
           <p>{agente.slot.toUpperCase()} · {agente.iniciales}</p>
@@ -513,7 +531,7 @@ function DrilldownAgente({ agente, onCerrar, onVerFicha }: { agente: LecturaAgen
         <div><small>Cobertura · {agente.procedencia.cobertura.etiqueta}</small><strong>{agente.procedencia.cobertura.valor.toFixed(2)}%</strong></div>
       </div>
 
-      <Barras filas={agente.barras} color={agente.color} />
+      <Barras filas={agente.barras} color={acento} />
       <Metricas items={agente.metricas} tono="venta" />
       {agente.comparativo ? <Comparativo c={agente.comparativo} /> : null}
       {agente.lista.length > 0 ? <ListaClientes filas={agente.lista} total={agente.listaTotal} titulo="Clientes de esta lectura" onVerFicha={onVerFicha} /> : null}
@@ -573,79 +591,487 @@ const GRUPOS: Grupo[] = [
   { capa: "Alcance", tono: "cobertura", items: [{ id: "cobertura", nombre: "Cobertura y límites" }] },
 ];
 
-// ── Raíz ───────────────────────────────────────────────────────────────────
+// ── Panel B18 · el dashboard integral, cerrado por defecto ─────────────────
 
-export function MapaB18Clientes({ mapa, fmt, onVerFicha }: PropsMapaB18Clientes) {
-  const [seccion, setSeccion] = useState<SeccionB18Clientes>("cartera");
-  const [agente, setAgente] = useState<AgenteClientesB18 | null>(null);
+/**
+ * B18 NO es la página: es el dashboard integral que se consulta desde el riel.
+ * Vive en una superficie propia —velo + panel— por la misma razón que el
+ * drill-down de agente: si se despliega dentro del mapa, el reporte ejecutivo
+ * del centro deja de ser el centro y la pantalla vuelve a ser una lista de
+ * siete secciones. Se abre SÓLO con el botón B18 y se cierra con la ×, con
+ * Escape o tocando fuera.
+ *
+ * Lleva la clase `raiz` además de la suya porque los tonos por capa están
+ * definidos como `.raiz [data-tono="…"]`: sin ese ancestro, las siete secciones
+ * perderían el color que separa venta de composición, de CxC y de cobertura,
+ * que es justamente lo que la barra de pestañas agrupada existe para enseñar.
+ */
+function PanelB18({ mapa, fmt, seccion, onSeccion, onCerrar, onVerFicha }: {
+  mapa: PropsMapaB18Clientes["mapa"];
+  fmt?: (valor: number) => string;
+  seccion: SeccionB18Clientes;
+  onSeccion: (id: SeccionB18Clientes) => void;
+  onCerrar: () => void;
+  onVerFicha?: (clienteId: string) => void;
+}) {
   const { b18 } = mapa;
-  const abierto = agente ? mapa.agentes.find((a) => a.id === agente) ?? null : null;
+  useEffect(() => {
+    const salir = (ev: KeyboardEvent) => { if (ev.key === "Escape") onCerrar(); };
+    window.addEventListener("keydown", salir);
+    return () => window.removeEventListener("keydown", salir);
+  }, [onCerrar]);
 
-  return <section className={est.raiz} aria-label="Dashboard B18 de clientes">
-    <header className={est.cabecera}>
-      <div>
-        <p>Dashboard B18 · lectura integral</p>
-        <h2>Clientes</h2>
+  return <div className={est.velo} role="presentation" onPointerDown={(ev) => ev.target === ev.currentTarget && onCerrar()}>
+    <section className={`${est.raiz} ${est.panelB18}`} role="dialog" aria-modal="true" aria-labelledby="b18cl-panel">
+      <header className={est.cabecera}>
+        <div>
+          <p>Dashboard integral · siete secciones</p>
+          <h2 id="b18cl-panel">B18 · dashboard integral de Clientes</h2>
+        </div>
+        <div className={est.cabeceraDerecha}>
+          <div className={est.declaracion}>
+            <strong>{mapa.procedencia.capa}</strong>
+            <span>{mapa.procedencia.moneda} · período {mapa.procedencia.periodo} · corte {mapa.procedencia.corte}</span>
+          </div>
+          <button type="button" className={est.cerrarPanel} onClick={onCerrar} aria-label="Cerrar B18 y volver al mapa">×</button>
+        </div>
+      </header>
+
+      <p className={est.limiteGlobal}><b>Límite de toda la pantalla</b>{mapa.procedencia.limite}</p>
+
+      <nav className={est.navegacion} aria-label="Secciones del dashboard de clientes">
+        {GRUPOS.map((g) => <div key={g.capa} className={est.grupo} data-tono={g.tono}>
+          <p>{g.capa}</p>
+          <div>
+            {g.items.map((it) => <button
+              key={it.id}
+              type="button"
+              aria-pressed={seccion === it.id}
+              onClick={() => onSeccion(it.id)}
+            >{it.nombre}</button>)}
+          </div>
+        </div>)}
+      </nav>
+
+      <div className={est.panel} data-tono={TONO_SECCION[seccion]}>
+        {seccion === "cartera" ? <SeccionCartera panel={b18.cartera} /> : null}
+        {seccion === "recencia" ? <SeccionRecencia panel={b18.recencia} onVerFicha={onVerFicha} /> : null}
+        {seccion === "concentracion" ? <SeccionConcentracion panel={b18.concentracion} onVerFicha={onVerFicha} /> : null}
+        {seccion === "serie" ? <SeccionSerie panel={b18.serie} fmt={fmt} /> : null}
+        {seccion === "composicion" ? <SeccionComposicion panel={b18.composicion} /> : null}
+        {seccion === "cxc" ? <SeccionCxc panel={b18.cxc} /> : null}
+        {seccion === "cobertura" ? <SeccionCobertura panel={b18.cobertura} /> : null}
       </div>
-      <div className={est.declaracion}>
-        <strong>{mapa.procedencia.capa}</strong>
-        <span>{mapa.procedencia.moneda} · período {mapa.procedencia.periodo} · corte {mapa.procedencia.corte}</span>
+    </section>
+  </div>;
+}
+
+// ── Los cuatro agentes del mapa ────────────────────────────────────────────
+
+/**
+ * EL COLOR ES DEL SLOT, NO DEL DATO.
+ *
+ * El mapa entrega los cuatro agentes con el mismo azul porque el contrato no
+ * describe dónde cae cada uno en el lienzo: esa es una decisión de la vista.
+ * Por eso el color se aplica acá, por posición, y `lib/agentes-clientes-b18.ts`
+ * no se toca. Ninguna cifra cambia por esto.
+ */
+const COLOR_SLOT: Record<SlotClientesB18, string> = {
+  detecta: "#0789e6",
+  prioriza: "#16a34a",
+  explica: "#7b2bf4",
+  recomienda: "#f97316",
+};
+
+const NOMBRE_SLOT: Record<SlotClientesB18, string> = {
+  detecta: "Detecta",
+  explica: "Explica",
+  prioriza: "Prioriza",
+  recomienda: "Recomienda",
+};
+
+/** Columnas: tramos, frecuencia. Alturas normalizadas que ya vienen del mapa. */
+function MiniColumnas({ puntos, color }: { puntos: { etiqueta: string; alto: number }[]; color: string }) {
+  return <div className="b18-mini-pareto" aria-hidden="true">
+    {puntos.map((p, i) => <i
+      key={`${p.etiqueta}-${i}`}
+      style={{ height: `${Math.max(p.alto, 10)}%`, backgroundColor: color, opacity: 1 - i * 0.13 }}
+    />)}
+  </div>;
+}
+
+/** Filas: ranking de impacto, comparación de dos períodos. */
+function MiniFilas({ puntos, color }: { puntos: { clave: string; ancho: number; tenue?: boolean }[]; color: string }) {
+  return <div className="b18-mini-barras" aria-hidden="true">
+    {puntos.map((p, i) => <i
+      key={p.clave}
+      style={{ width: `${Math.max(p.ancho, 7)}%`, backgroundColor: p.tenue ? "#d3ddf0" : color, opacity: p.tenue ? 1 : 1 - i * 0.11 }}
+    />)}
+  </div>;
+}
+
+type Tarjeta = {
+  agente: LecturaAgenteClienteB18;
+  color: string;
+  /** KPI principal de la tarjeta. Ninguno se repite entre las cuatro. */
+  kpi: string;
+  kpiEtiqueta: string;
+  /** Métrica secundaria. Tampoco repite el KPI de otra tarjeta. */
+  apoyo: string;
+  mini: ReactNode;
+  /** Qué abre el clic, dicho en la etiqueta accesible. */
+  abre: string;
+  /**
+   * Siguiente paso, cuando la tarjeta es la que dice a quién llamar. Sólo lo
+   * lleva Recomienda: es el único de los cuatro cuya respuesta es una acción
+   * de seguimiento y no una lectura. Las otras tres lo tienen en su
+   * drill-down, donde el paso se puede auditar contra la lista.
+   */
+  pie?: string | null;
+};
+
+/**
+ * Cada tarjeta arma su lectura desde `mapa`. NO hay un solo número escrito a
+ * mano: los conteos salen de las barras del propio agente y los porcentajes,
+ * de su `kpi` ya formateado.
+ *
+ * CADA TARJETA CONTESTA UNA PREGUNTA DISTINTA Y NINGUNA COMPARTE SU CIFRA
+ * PRINCIPAL CON OTRA. Antes, Prioriza y Recomienda mostraban las dos el mismo
+ * número —las cuentas del Top 50 histórico detenidas más de 90 días—, así que
+ * dos de los cuatro agentes decían lo mismo con distinto rótulo y el lienzo
+ * perdía un cuadrante. El reparto es:
+ *
+ *   Detecta     · quién dejó de comprar        → tramos de recencia
+ *   Prioriza    · de cuántas cuentas depende   → concentración Top 5/10/20/50
+ *   Explica     · de dónde viene el movimiento → comparable contra el año previo
+ *   Recomienda  · a quién llamo primero        → recurrentes y cuentas detenidas
+ *
+ * Las cuentas detenidas viven en Recomienda y en ningún otro lado del lienzo:
+ * son una lista de llamadas, no una medida de concentración.
+ */
+function construirTarjetas(mapa: PropsMapaB18Clientes["mapa"]): Tarjeta[] {
+  const porId = (id: AgenteClientesB18) => mapa.agentes.find((a) => a.id === id) ?? null;
+  const barra = (a: LecturaAgenteClienteB18 | null, clave: string) => a?.barras.find((b) => b.clave === clave) ?? null;
+  const entero = (n: number) => n.toLocaleString("es-GT");
+
+  const recencia = porId("recencia");
+  const concentracion = porId("concentracion");
+  const comparable = porId("comparable");
+  const recuperacion = porId("recuperacion");
+
+  const tarjetas: Tarjeta[] = [];
+
+  // DETECTA · quién dejó de comprar.
+  if (recencia) {
+    const mas90 = barra(recencia, "90+");
+    tarjetas.push({
+      agente: recencia,
+      color: COLOR_SLOT.detecta,
+      kpi: mas90 ? entero(mas90.valor) : recencia.kpi,
+      kpiEtiqueta: mas90 ? "clientes con más de 90 días sin comprar" : recencia.kpiEtiqueta,
+      apoyo: `${recencia.kpi} ${recencia.kpiEtiqueta}`,
+      mini: <MiniColumnas puntos={recencia.barras.map((b) => ({ etiqueta: b.etiqueta, alto: b.ancho }))} color={COLOR_SLOT.detecta} />,
+      abre: "Abrir el drill-down de recencia: los cuatro tramos y sus clientes",
+    });
+  }
+
+  // PRIORIZA · de cuántas cuentas depende el resultado del año.
+  // El KPI sale del agente de concentración y de ninguno más: Top 5 sobre la
+  // venta del año. El apoyo estira la misma lectura —Top 10 y cuántos clientes
+  // juntan la mitad—, que es lo que convierte el porcentaje en una decisión.
+  if (concentracion) {
+    const top10 = barra(concentracion, "top10");
+    const mitad = concentracion.metricas.find((m) => m.etiqueta.includes("mitad")) ?? null;
+    const apoyo = [
+      top10 ? `${top10.texto} en el ${top10.etiqueta}` : null,
+      mitad ? `${mitad.valor} ${mitad.etiqueta}` : null,
+    ].filter(Boolean).join(" · ");
+    tarjetas.push({
+      agente: concentracion,
+      color: COLOR_SLOT.prioriza,
+      kpi: concentracion.kpi,
+      kpiEtiqueta: concentracion.kpiEtiqueta,
+      apoyo: apoyo.length > 0 ? apoyo : concentracion.hallazgo,
+      mini: <MiniFilas puntos={concentracion.barras.map((b) => ({ clave: b.clave, ancho: b.ancho }))} color={COLOR_SLOT.prioriza} />,
+      abre: "Abrir el drill-down de concentración: Top 1, 5, 10, 20 y 50 sobre la venta del año, y las cuentas que los componen",
+    });
+  }
+
+  // EXPLICA · de dónde viene el crecimiento.
+  if (comparable) {
+    const compradores = barra(comparable, "compradores");
+    tarjetas.push({
+      agente: comparable,
+      color: COLOR_SLOT.explica,
+      kpi: comparable.kpi,
+      kpiEtiqueta: comparable.kpiEtiqueta,
+      apoyo: compradores ? `${compradores.detalle} compradores` : comparable.senal,
+      /* Los últimos doce meses de compradores, en columnas: es el mismo
+         micrográfico que llevan las tarjetas de /ventas. Dos barras sueltas
+         —el año contra su comparable— no llenaban el alto de la tarjeta y
+         además repetían el bloque comparativo que ya está en el centro y en
+         el drill-down; la serie sí dice algo que ninguno de los dos dice. */
+      mini: <MiniColumnas puntos={comparable.micro.map((m) => ({ etiqueta: m.etiqueta, alto: m.alto }))} color={COLOR_SLOT.explica} />,
+      abre: "Abrir el drill-down de crecimiento: compradores, pedidos, venta y ticket comparables",
+    });
+  }
+
+  // RECOMIENDA · a quién llamar primero. Acá —y sólo acá— viven los dormidos:
+  // los recurrentes que sostienen la base, las cuentas grandes detenidas y el
+  // siguiente paso de seguimiento.
+  if (recuperacion) {
+    /* Las cuentas detenidas son la señal de esta tarjeta —`senal` ya las dice
+       al pie—, así que el apoyo no las repite: suma el otro grupo dormido,
+       el que compró una sola vez. */
+    const unica = barra(recuperacion, "unica");
+    const apoyo = unica ? `${unica.texto} con una sola compra en el año` : "";
+    tarjetas.push({
+      agente: recuperacion,
+      color: COLOR_SLOT.recomienda,
+      kpi: recuperacion.kpi,
+      kpiEtiqueta: recuperacion.kpiEtiqueta,
+      apoyo: apoyo.length > 0 ? apoyo : recuperacion.senal,
+      mini: <MiniColumnas puntos={recuperacion.micro.map((m) => ({ etiqueta: m.etiqueta, alto: m.alto }))} color={COLOR_SLOT.recomienda} />,
+      abre: "Abrir la acción: cuentas detenidas del Top 50, clientes de una sola compra y recuperación de dormidos",
+      pie: recuperacion.accion,
+    });
+  }
+
+  return tarjetas;
+}
+
+/**
+ * La tarjeta es un botón entero y su único gesto es el CLIC. No hay una sola
+ * cifra que aparezca al pasar el mouse: con teclado o en una tablet esa
+ * información no existiría.
+ */
+function TarjetaAgente({ tarjeta, activa, onAbrir }: { tarjeta: Tarjeta; activa: boolean; onAbrir: () => void }) {
+  const { agente } = tarjeta;
+  return <button
+    type="button"
+    className={`b18-rol-card b18-rol-${agente.slot} ${est.tarjeta} ${activa ? "is-active" : ""}`}
+    style={{ "--b18-role": tarjeta.color } as CSSProperties}
+    onClick={onAbrir}
+    aria-pressed={activa}
+    aria-label={`${NOMBRE_SLOT[agente.slot]} · ${agente.nombre}. ${tarjeta.kpi} ${tarjeta.kpiEtiqueta}. ${tarjeta.abre}`}
+  >
+    <span className="b18-connector" aria-hidden="true" />
+    <div className="b18-rol-visual">
+      <div className="b18-rol-heading"><span>{agente.iniciales}</span><strong>{NOMBRE_SLOT[agente.slot]}</strong></div>
+      <div className="b18-rol-content">
+        <div className="b18-rol-kpi">
+          <strong>{tarjeta.kpi}</strong>
+          <span>{tarjeta.kpiEtiqueta}</span>
+          <em className={est.tarjetaApoyo}>{tarjeta.apoyo}</em>
+        </div>
+        {tarjeta.mini}
       </div>
-    </header>
+      <p className="b18-rol-resumen">{agente.senal}</p>
+      {tarjeta.pie ? <p className={est.tarjetaPie}><b>Siguiente</b>{tarjeta.pie}</p> : null}
+    </div>
+  </button>;
+}
 
-    <p className={est.limiteGlobal}><b>Límite de toda la pantalla</b>{mapa.procedencia.limite}</p>
+// ── Reporte ejecutivo central ──────────────────────────────────────────────
 
-    {/* Los cuatro agentes no son una sección: son las señales que abren el
-        detalle de cada lectura. Van arriba, en una tira, y se abren con clic. */}
-    <div className={est.agentes} role="group" aria-label="Lecturas de los agentes">
-      {mapa.agentes.map((a) => <button
-        key={a.id}
-        type="button"
-        className={est.agente}
-        onClick={() => setAgente(a.id)}
-        style={{ "--acento": a.color } as CSSProperties}
-        aria-label={`${a.titulo}. ${a.senal}. Abrir lectura completa`}
+/**
+ * El centro es UN reporte, no un resumen de las siete pestañas de B18: una
+ * lectura ejecutiva, la comparación contra la misma ventana del año anterior,
+ * el gráfico de recencia de la cartera, tres cifras de apoyo y la procedencia.
+ * Todo lo demás —serie mensual, composición, CxC, cobertura— se consulta en
+ * B18, que se abre desde el riel.
+ *
+ * EL ENCABEZADO NO SE REPITE. Quién es esta pantalla y a qué corte está lo
+ * dice UNA sola vez el encabezado del lienzo (`.b18-map-header`). El centro
+ * arranca directo en su lectura ejecutiva, igual que el de /ventas: ahí el
+ * primer renglón del centro tampoco vuelve a decir "Reporte general", dice la
+ * conclusión. Un título repetido a dos centímetros de sí mismo no orienta:
+ * ocupa el lugar donde debería estar la primera frase que sí informa.
+ */
+function ReporteCentral({ mapa, activo, onAbrirAgente }: {
+  mapa: PropsMapaB18Clientes["mapa"];
+  activo: LecturaAgenteClienteB18 | null;
+  onAbrirAgente: (id: AgenteClientesB18) => void;
+}) {
+  const porId = (id: AgenteClientesB18) => mapa.agentes.find((a) => a.id === id) ?? null;
+  const recencia = porId("recencia");
+  const comparable = porId("comparable");
+
+  /* El porcentaje del anillo es el KPI de recencia, que ya viene formateado
+     ("66.94%"): se lee para dibujar el ángulo, no se recalcula. Si el mapa no
+     trae lectura, el anillo queda en cero y el texto lo dice. */
+  const pctSinCompra = Number.parseFloat((recencia?.kpi ?? "").replace(",", "."));
+  const anillo = Number.isFinite(pctSinCompra) ? pctSinCompra : 0;
+
+  const frase = comparable && recencia
+    ? `La base de compradores se mueve ${comparable.kpi} contra la misma ventana del año anterior, pero ${recencia.senal}.`
+    : "El snapshot no trae pedidos confirmados suficientes para una lectura ejecutiva.";
+
+  const apoyoBuscado = ["clientes con venta histórica", "pedidos confirmados", "ticket mediano por pedido"]
+    .map((etiqueta) => mapa.b18.cartera.metricas.find((m) => m.etiqueta === etiqueta))
+    .filter((m): m is MetricaClientesB18 => Boolean(m));
+  const apoyo = apoyoBuscado.length === 3 ? apoyoBuscado : mapa.b18.cartera.metricas.slice(0, 3);
+
+  const cxc = mapa.b18.cxc;
+
+  return <article className={`b18-centro ${est.centro}`} aria-label="Reporte ejecutivo de la cartera de clientes">
+    <p className={est.lecturaEjecutiva}>{frase}</p>
+
+    {comparable ? <div className={est.comparacion}>
+      <p>
+        <span>{comparable.comparativo?.titulo ?? "Año en curso contra la misma ventana del año anterior"}</span>
+        <em>{comparable.procedencia.periodo}</em>
+      </p>
+      {/* Cada factor abre la evidencia del agente que lo calcula. */}
+      <div className="b18-vt-historia">
+        {comparable.barras.map((b) => <button
+          key={b.clave}
+          type="button"
+          onClick={() => onAbrirAgente("comparable")}
+          style={{ "--b18-chip": COLOR_SLOT.explica } as CSSProperties}
+          aria-label={`${b.etiqueta}: ${b.texto}, ${b.detalle}. Abrir la evidencia del comparable`}
+        >
+          <strong>{b.texto}</strong><span>{b.etiqueta}</span><small>{b.detalle}</small>
+        </button>)}
+      </div>
+    </div> : null}
+
+    {recencia ? <div className="b18-centro-viz">
+      <div
+        className="b18-dona-principal"
+        role="img"
+        aria-label={`${recencia.kpi} de la cartera histórica sin compra confirmada en más de 90 días`}
+        style={{ "--b18-color": COLOR_SLOT.detecta, "--b18-pct": `${Math.min(anillo, 100) * 3.6}deg` } as CSSProperties}
       >
-        <span className={est.agenteSigla}>{a.iniciales}</span>
-        <span className={est.agenteCuerpo}>
-          <strong>{a.kpi}</strong>
-          <em>{a.kpiEtiqueta}</em>
-          <small>{a.senal}</small>
-        </span>
-        <span className={est.micro} aria-hidden="true">
-          {a.micro.map((m, i) => <i key={`${m.etiqueta}-${i}`} data-parcial={m.parcial || undefined} style={{ height: `${Math.max(m.alto, 8)}%` }} />)}
-        </span>
-      </button>)}
+        <span>{recencia.kpi}</span>
+        <em>+90 días</em>
+      </div>
+      <div className={est.tramosCentro} role="group" aria-label="Recencia de la cartera">
+        {recencia.barras.map((b) => <button
+          key={b.clave}
+          type="button"
+          onClick={() => onAbrirAgente("recencia")}
+          data-frio={b.clave === "90+" || undefined}
+          aria-label={`${b.etiqueta}: ${b.texto}. Abrir el listado de recencia`}
+        >
+          <span>{b.etiqueta}</span>
+          <b>{b.texto}</b>
+          <i style={{ width: `${Math.max(b.ancho, 3)}%` }} />
+        </button>)}
+      </div>
+    </div> : null}
+
+    <div className="b18-centro-metricas">
+      {apoyo.map((m) => <div key={m.etiqueta}><b>{m.valor}</b><span>{m.etiqueta}</span></div>)}
     </div>
 
-    <nav className={est.navegacion} aria-label="Secciones del dashboard de clientes">
-      {GRUPOS.map((g) => <div key={g.capa} className={est.grupo} data-tono={g.tono}>
-        <p>{g.capa}</p>
-        <div>
-          {g.items.map((it) => <button
-            key={it.id}
-            type="button"
-            aria-pressed={seccion === it.id}
-            onClick={() => setSeccion(it.id)}
-          >{it.nombre}</button>)}
-        </div>
-      </div>)}
-    </nav>
+    {activo ? <div className="b18-decision">
+      <p>Siguiente decisión · {activo.nombre}</p>
+      <strong>{activo.accion}</strong>
+    </div> : null}
 
-    <div className={est.panel} data-tono={TONO_SECCION[seccion]}>
-      {seccion === "cartera" ? <SeccionCartera panel={b18.cartera} /> : null}
-      {seccion === "recencia" ? <SeccionRecencia panel={b18.recencia} onVerFicha={onVerFicha} /> : null}
-      {seccion === "concentracion" ? <SeccionConcentracion panel={b18.concentracion} onVerFicha={onVerFicha} /> : null}
-      {seccion === "serie" ? <SeccionSerie panel={b18.serie} fmt={fmt} /> : null}
-      {seccion === "composicion" ? <SeccionComposicion panel={b18.composicion} /> : null}
-      {seccion === "cxc" ? <SeccionCxc panel={b18.cxc} /> : null}
-      {seccion === "cobertura" ? <SeccionCobertura panel={b18.cobertura} /> : null}
+    <div className={est.notasCentro}>
+      <p className={est.notaCentro}><b>Límite del snapshot</b>{mapa.procedencia.limite}</p>
+      <p className={est.notaCxc}>
+        <b>Cuentas por cobrar es otra capa</b>
+        {cxc.advertencia}
+        {cxc.estado === "pendiente" && cxc.pendiente ? ` ${cxc.pendiente.mensaje}` : ""}
+        {cxc.pendiente?.enlace ? <a href={cxc.pendiente.enlace.href}>{cxc.pendiente.enlace.texto} →</a> : null}
+      </p>
+    </div>
+
+    <dl className="b18-metadatos">
+      <div><dt>Fuente</dt><dd>{mapa.procedencia.fuente}</dd></div>
+      <div><dt>Período</dt><dd>{mapa.procedencia.periodo}</dd></div>
+      <div><dt>Corte</dt><dd>{mapa.procedencia.corte}</dd></div>
+      <div><dt>Moneda</dt><dd>{mapa.procedencia.moneda}</dd></div>
+      <div><dt>Capa</dt><dd>{mapa.procedencia.capa}</dd></div>
+      <div><dt>Cobertura</dt><dd>{mapa.procedencia.cobertura.valor.toFixed(2)}% {mapa.procedencia.cobertura.etiqueta}</dd></div>
+    </dl>
+  </article>;
+}
+
+// ── Raíz ───────────────────────────────────────────────────────────────────
+
+/**
+ * LA JERARQUÍA DE ESTA PANTALLA, EN UNA LÍNEA:
+ * riel interno · dos agentes a la izquierda · reporte ejecutivo al centro ·
+ * dos agentes a la derecha · B18 cerrado hasta que alguien lo pida.
+ *
+ * Es el mismo molde que /ventas/productos y /ventas: las clases `.b18-map*`
+ * son las del molde, y lo único que agrega este módulo es lo que el molde no
+ * tiene —la lectura ejecutiva, el bloque comparativo y las notas de capa—.
+ */
+export function MapaB18Clientes({ mapa, fmt, onVerFicha }: PropsMapaB18Clientes) {
+  const tarjetas = construirTarjetas(mapa);
+  const [activo, setActivo] = useState<AgenteClientesB18>(mapa.agentes[0]?.id ?? "recencia");
+  const [drilldown, setDrilldown] = useState<AgenteClientesB18 | null>(null);
+  // B18 arranca CERRADO. Sólo lo abre el botón del riel.
+  const [b18Abierto, setB18Abierto] = useState(false);
+  const [seccion, setSeccion] = useState<SeccionB18Clientes>("cartera");
+
+  const agenteActivo = mapa.agentes.find((a) => a.id === activo) ?? mapa.agentes[0] ?? null;
+  const abierto = drilldown ? mapa.agentes.find((a) => a.id === drilldown) ?? null : null;
+
+  const abrirAgente = (id: AgenteClientesB18) => { setActivo(id); setDrilldown(id); };
+
+  return <section className={`b18-map ${est.mapa}`} aria-label="Mapa comercial B18 de clientes">
+    <aside className="b18-map-lateral">
+      <div className="b18-map-marca">{agenteActivo?.iniciales ?? "CL"}</div>
+      <p>Clientes</p>
+      <div className="b18-map-lista">
+        {mapa.agentes.map((a) => <button
+          key={a.id}
+          type="button"
+          onClick={() => setActivo(a.id)}
+          aria-pressed={a.id === activo}
+        ><span>{a.iniciales}</span>{a.nombre}</button>)}
+      </div>
+      <div className={`b18-map-status ${est.estadoAgente}`}>
+        <span>Agent status</span>
+        <b>● {agenteActivo?.titulo ?? "Sin lectura"}</b>
+        <p>{agenteActivo?.senal ?? "El snapshot no trae pedidos confirmados."}</p>
+      </div>
+      <button
+        type="button"
+        className={`b18-map-b18 ${est.botonB18}`}
+        onClick={() => setB18Abierto(true)}
+        aria-label="Abrir B18, el dashboard integral de Clientes"
+        aria-expanded={b18Abierto}
+      >B<span>18</span></button>
+    </aside>
+
+    <div className="b18-map-canvas">
+      <header className="b18-map-header">
+        <div><p>Reporte general</p><h2>Cartera comercial de clientes</h2></div>
+        <span>Corte: {mapa.procedencia.corte}</span>
+      </header>
+
+      <div className="b18-map-grid">
+        {tarjetas.map((t) => <TarjetaAgente
+          key={t.agente.id}
+          tarjeta={t}
+          activa={t.agente.id === activo}
+          onAbrir={() => abrirAgente(t.agente.id)}
+        />)}
+        <ReporteCentral mapa={mapa} activo={agenteActivo} onAbrirAgente={abrirAgente} />
+      </div>
     </div>
 
     {abierto ? <DrilldownAgente
       agente={abierto}
-      onCerrar={() => setAgente(null)}
-      onVerFicha={onVerFicha ? (id) => { setAgente(null); onVerFicha(id); } : undefined}
+      color={COLOR_SLOT[abierto.slot]}
+      onCerrar={() => setDrilldown(null)}
+      onVerFicha={onVerFicha ? (id) => { setDrilldown(null); onVerFicha(id); } : undefined}
+    /> : null}
+
+    {b18Abierto ? <PanelB18
+      mapa={mapa}
+      fmt={fmt}
+      seccion={seccion}
+      onSeccion={setSeccion}
+      onCerrar={() => setB18Abierto(false)}
+      onVerFicha={onVerFicha}
     /> : null}
   </section>;
 }
