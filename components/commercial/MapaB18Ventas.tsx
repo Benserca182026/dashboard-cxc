@@ -199,8 +199,13 @@ function DrilldownAgente({ agente, mapa, onCerrar }: { agente: LecturaAgenteVent
 
       {pestana === "anual" ? <div className="b18-vt-panel">
         <Serie filas={agente.anual} color={agente.color} etiqueta={`Serie anual de ${agente.nombre}`} />
-        <Pico pico={agente.picoAnual} titulo="Pico anual" />
+        {/* Va PEGADO a las barras, antes del pico: el año en curso siempre se ve
+            más chico que el año anterior completo (todavía no termina), y el
+            KPI de cabecera compara días contra días, no año contra año — si
+            esta frase queda después del pico, alguien puede quedarse en la
+            contradicción visual sin llegar a leerla. */}
         <p className="b18-vt-nota">{agente.hallazgo}</p>
+        <Pico pico={agente.picoAnual} titulo="Pico anual" />
       </div> : null}
 
       {pestana === "mensual" ? <div className="b18-vt-panel">

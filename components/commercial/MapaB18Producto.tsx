@@ -2,6 +2,7 @@
 
 import { useMemo, useState, type CSSProperties } from "react";
 import type { AgenteProductoVentas, LecturaAgenteProducto } from "@/lib/agentes-producto-ventas";
+import { FacetaTablero, type FormaFaceta } from "@/components/commercial/FacetaTablero";
 
 type Rol = "detecta" | "explica" | "prioriza" | "recomienda";
 
@@ -99,6 +100,19 @@ function TarjetaRol({ item, lectura, insignia, activa, onSeleccionar }: { item: 
   </button>;
 }
 
+// Cada categoría es la misma clase de dato (composición de líneas por un
+// atributo del producto), pero con cardinalidad distinta: familia y tipo son
+// pocas opciones conocidas (ranking simple → barras); modelo es una cola
+// larga de nombres específicos y licencia es mayormente "sin señal" con
+// pocas identificadas (ambas responden "¿cuántas explican la mayoría?" →
+// pareto).
+const FORMAS: Record<AgenteProductoVentas, FormaFaceta> = {
+  familia: "pareto",
+  tipo: "barras",
+  modelo: "pareto",
+  licencia: "barras",
+};
+
 function DiagnosticoB18({ lecturas, corte, onCerrar, onAbrirAgente }: { lecturas: Record<AgenteProductoVentas, LecturaAgenteProducto>; corte: string; onCerrar: () => void; onAbrirAgente: (id: AgenteProductoVentas) => void }) {
   const categorias = Object.keys(lecturas) as AgenteProductoVentas[];
   const familias = lecturas.familia;
@@ -109,12 +123,46 @@ function DiagnosticoB18({ lecturas, corte, onCerrar, onAbrirAgente }: { lecturas
     <section className="b18-diagnostico b18-dashboard" role="dialog" aria-modal="true" aria-labelledby="diagnostico-b18-titulo">
       <header><div><p>Dashboard B18 · lectura integral</p><h2 id="diagnostico-b18-titulo">Clasificación comercial de productos</h2><small>Ventas confirmadas y composición de líneas · corte {corte}</small></div><button type="button" onClick={onCerrar} aria-label="Cerrar dashboard B18">×</button></header>
       <div className="b18-dashboard-kpis"><div><span>Familia líder</span><strong>{principalFamilia?.nombre ?? "Sin señal"}</strong><b>{pct(principalFamilia?.pct ?? 0)}</b></div><div><span>Pedidos con señal</span><strong>{(principalFamilia?.pedidos ?? 0).toLocaleString("es-GT")}</strong><b>familia líder</b></div><div><span>Concentración del mix</span><strong>{pct(topDosTipo)}</strong><b>top 2 tipos</b></div><div><span>Menor cobertura</span><strong>{pct(Math.min(...categorias.map((id) => lecturas[id].cobertura)))}</strong><b>requiere validación</b></div></div>
-      <div className="b18-dashboard-grid"><article className="b18-dashboard-mix"><div className="b18-dashboard-titulo"><span>Composición comercial</span><h3>¿Qué sostiene la venta?</h3></div><div className="b18-dashboard-mix-body"><div className="b18-dona-principal" style={{ "--b18-color": colores.detecta, "--b18-pct": `${Math.min(principalFamilia?.pct ?? 0, 100) * 3.6}deg` } as CSSProperties}><span>{(principalFamilia?.pct ?? 0).toFixed(0)}<small>%</small></span><em>{principalFamilia?.nombre ?? "Sin señal"}</em></div><div className="b18-dashboard-barras">{familias.filas.slice(0, 4).map((fila) => <div key={fila.nombre}><span>{fila.nombre}</span><b>{pct(fila.pct)}</b><i style={{ width: `${Math.max(fila.pct, 3)}%` }} /></div>)}</div></div></article><article className="b18-dashboard-cobertura"><div className="b18-dashboard-titulo"><span>Calidad de la lectura</span><h3>¿Dónde hay incertidumbre?</h3></div><div className="b18-dashboard-cobertura-lista">{categorias.map((id) => <div key={id}><span>{siglas[id]} · {nombres[id]}</span><b>{pct(lecturas[id].cobertura)}</b><i style={{ width: `${lecturas[id].cobertura}%` }} /></div>)}</div><p>La cobertura indica cuánto valor tiene clasificación inferida desde SKU/nombre.</p></article></div>
-      <section className="b18-dashboard-problemas" aria-label="Problemas encontrados"><div className="b18-dashboard-titulo"><span>Problemas encontrados</span><h3>Qué requiere revisión antes de decidir</h3></div><div>{categorias.map((id) => {
-        const lectura = lecturas[id];
-        const principal = lectura.filas[0];
-        return <button type="button" key={id} onClick={() => onAbrirAgente(id)}><span>{siglas[id]}</span><div><strong>{nombres[id]}</strong><p>{lectura.problema}</p></div><b>{pct(lectura.cobertura)}</b><em>Ver agente →</em></button>;
-      })}</div></section>
+      <section className="b18-dash-facetas" aria-label="Composición comercial">
+        <div className="b18-dashboard-titulo"><span>Composición comercial</span><h3>¿Qué sostiene la venta?</h3></div>
+        <div className="b18-dash-facetas-grid">{categorias.map((id) => {
+          const lectura = lecturas[id];
+          return <FacetaTablero
+            key={id}
+            sigla={siglas[id]}
+            nombre={nombres[id]}
+            pregunta={lectura.pregunta}
+            senal={lectura.senal}
+            forma={FORMAS[id]}
+            filas={lectura.filas.map((fila) => ({ nombre: fila.nombre, pct: fila.pct, valorTexto: pct(fila.pct) }))}
+          />;
+        })}</div>
+      </section>
+      <section className="b18-dash-medidores" aria-label="Calidad de la lectura">
+        <div className="b18-dashboard-titulo"><span>Calidad de la lectura</span><h3>¿Dónde hay incertidumbre?</h3></div>
+        <ul className="b18-dash-medidores-grid" role="list">{categorias.map((id) => {
+          const valor = Math.min(Math.max(lecturas[id].cobertura, 0), 100);
+          return <li key={id} title={`${nombres[id]}: ${pct(valor)} cobertura identificada`}>
+            <div className="b18-dash-medidor-cabecera"><span>{siglas[id]}</span><strong>{nombres[id]}</strong><b>{pct(valor)}</b></div>
+            <span className="b18-dash-medidor" role="meter" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(valor)} aria-label={`${nombres[id]}, ${pct(valor)}`}>
+              <i style={{ width: `${valor}%` }} />
+            </span>
+          </li>;
+        })}</ul>
+        <p className="b18-dash-nota">La cobertura indica cuánto valor tiene clasificación inferida desde SKU/nombre; no se compara entre categorías.</p>
+      </section>
+      <section className="b18-dash-problemas" aria-label="Problemas encontrados">
+        <div className="b18-dashboard-titulo"><span>Problemas encontrados</span><h3>Qué requiere revisión antes de decidir</h3></div>
+        <div className="b18-dash-problemas-grid">{categorias.map((id) => {
+          const lectura = lecturas[id];
+          return <button type="button" key={id} onClick={() => onAbrirAgente(id)} title={lectura.problema}>
+            <span className="b18-dash-problema-sigla">{siglas[id]}</span>
+            <strong>{nombres[id]}</strong>
+            <p>{lectura.problema}</p>
+            <em>Ver agente →</em>
+          </button>;
+        })}</div>
+      </section>
       <footer>Fuente: ventas + venta_lineas + productos · Clasificación inferida desde SKU/nombre · Moneda no agregable: segmentar por moneda.</footer>
     </section>
   </div>;
