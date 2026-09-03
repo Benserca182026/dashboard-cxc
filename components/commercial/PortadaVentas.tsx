@@ -87,7 +87,7 @@ export function PortadaVentas({ ventas, fmt, fuente, cartera }: { ventas: Analit
         <GraficoLinea puntos={ventas.tendencia} fmt={fmt} agente={agenteEnZona("ventas")} activo={zonaActiva === "ventas" || seleccionado?.zona === "ventas"} onActivar={() => activar("ventas")} />
         <GraficoBarras titulo="Clientes principales" zona="Clientes" filas={ventas.topClientes} fmt={fmt} agente={agenteEnZona("clientes")} activo={zonaActiva === "clientes" || seleccionado?.zona === "clientes"} onActivar={() => activar("clientes")} />
         <GraficoBarras titulo="Productos que mueven el mix" zona="Productos" filas={ventas.topProductos} fmt={fmt} agente={agenteEnZona("productos")} activo={zonaActiva === "productos" || seleccionado?.zona === "productos"} onActivar={() => activar("productos")} />
-        <ModuloCartera contexto={cartera} fmt={fmt} agente={agenteEnZona("cartera")} active={zonaActiva === "cartera" || seleccionado?.zona === "cartera"} onActivar={() => activar("cartera")} />
+        <ModuloCartera contexto={cartera} fmt={fmt} agente={agenteEnZona("cartera")} activo={zonaActiva === "cartera" || seleccionado?.zona === "cartera"} onActivar={() => activar("cartera")} />
       </div>
       <div className="agent-orbit-layer" aria-label="Agentes comerciales">{agentes.map((agente) => <AgenteOrbital key={agente.id} agente={agente} seleccionado={agente.id === seleccionado?.id} iluminado={zonaActiva === agente.zona || agente.id === seleccionado?.id} onSelect={() => { setSeleccionadoId(agente.id); setZonaActiva(agente.zona); }} />)}</div>
     </div>

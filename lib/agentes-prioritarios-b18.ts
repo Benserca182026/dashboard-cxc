@@ -409,10 +409,10 @@ export function construirPrioritariosB18(
     resumen: {
       subtitulo: "Score, gestión, concentración y antigüedad de la worklist priorizada",
       kpis: [
-        { etiqueta: "Cuentas priorizadas", valor: num(filas.length), nota: `${pctB18(coberturaScore)} del saldo en el Top 10` },
-        { etiqueta: "Saldo priorizado total", valor: fmt(saldoTotal), nota: `${pctB18(coberturaConcentracion)} en el Top 5 por saldo` },
+        { etiqueta: "Cuentas con saldo abierto", valor: num(filas.length), nota: `${pctB18(coberturaScore)} del saldo en el Top 10 — no es una selección, es el 100% con deuda` },
+        { etiqueta: "Saldo total con deuda abierta", valor: fmt(saldoTotal), nota: `${pctB18(coberturaConcentracion)} en el Top 5 por saldo` },
         { etiqueta: "Score líder (simulado)", valor: lider ? `${lider.score} pts` : "—", nota: lider?.cliente ?? "sin cuentas" },
-        { etiqueta: "Mora crítica 90+", valor: fmt(saldoCritico), nota: `${pctB18(coberturaAntiguedad)} del saldo priorizado` },
+        { etiqueta: "Saldo de clientes en mora crítica 90+", valor: fmt(saldoCritico), nota: `${pctB18(coberturaAntiguedad)} — por cliente, no por factura; no compara con Cuadro de mando` },
       ],
       tituloMix: "Score simulado del Top 10",
       preguntaMix: "¿Cómo se reparte el score entre las diez cuentas líderes?",

@@ -23,7 +23,7 @@ function VisualHallazgo({ hallazgo, fmt }: { hallazgo: Hallazgo; fmt: (n: number
   if (hallazgo.estado === "sin-dato") {
     return <div className="grid h-24 place-items-center rounded-2xl border border-dashed border-slate-300 bg-slate-50 text-center"><span className="text-2xl text-slate-400">?</span><span className="px-4 text-[9px] font-bold uppercase tracking-wider text-slate-500">dato faltante</span></div>;
   }
-  if (hallazgo.ranking && hallazgo.ranking.filas.length) {
+  if (hallazgo.estado === "hallazgo" && hallazgo.ranking && hallazgo.ranking.filas.length) {
     const filas = hallazgo.ranking.filas.slice(0, 4);
     return <div className="space-y-2">{filas.map((fila) => <div key={fila.id} className="group/bar"><div className="flex justify-between gap-2 text-[9px]"><span className="truncate font-semibold text-tinta">{fila.etiqueta}</span><span className="tabular-nums text-tintaSuave">{fila.pct.toFixed(1)}%</span></div><div className="mt-1 h-2 overflow-hidden rounded-full bg-slate-100"><span className="block h-full rounded-full bg-gradient-to-r from-[#536b91] to-[#8b7cf6]" style={{ width: `${Math.max(2, Math.min(100, fila.pct))}%` }} /></div></div>)}</div>;
   }
