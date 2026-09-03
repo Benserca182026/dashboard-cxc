@@ -189,7 +189,16 @@ function Comparativo({ c }: { c: ComparativoClientesB18 }) {
 
 // ── Sección 1 · Cartera ────────────────────────────────────────────────────
 
+/**
+ * Las 8 métricas de esta sección son cifras independientes (no hay categorías
+ * que comparar entre sí), así que no hay un gráfico de reparto honesto que
+ * dibujar acá. Lo que sí faltaba era JERARQUÍA: 8 tarjetas del mismo tamaño no
+ * dicen cuál es la cifra que manda. "Venta YTD" se separa como cifra fuerte
+ * (mismo patrón "hero" del resto del B18) y las otras 7 quedan como soporte.
+ */
 function SeccionCartera({ panel }: { panel: PropsMapaB18Clientes["mapa"]["b18"]["cartera"] }) {
+  const ventaYtd = panel.metricas.find((m) => m.etiqueta === "venta YTD");
+  const resto = panel.metricas.filter((m) => m.etiqueta !== "venta YTD");
   return <>
     <Encabezado
       rotulo="Venta confirmada"
@@ -197,7 +206,11 @@ function SeccionCartera({ panel }: { panel: PropsMapaB18Clientes["mapa"]["b18"][
       bajada="Tamaño de la base, actividad del año y ticket. Todo sobre pedidos en estado confirmado."
       tono="venta"
     />
-    <Metricas items={panel.metricas} tono="venta" />
+    {ventaYtd ? <div className="b18-dash-hero" style={{ marginBottom: 14 }}>
+      <strong>{ventaYtd.valor}</strong>
+      <span>venta confirmada del año (YTD)</span>
+    </div> : null}
+    <Metricas items={resto} tono="venta" />
     <Procedencia p={panel.procedencia} tono="venta" />
   </>;
 }
