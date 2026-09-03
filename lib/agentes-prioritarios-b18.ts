@@ -177,6 +177,7 @@ export function construirPrioritariosB18(
       : "Todas las cuentas priorizadas tienen una gestión registrada",
     pregunta: "¿A quién ya se dio seguimiento dentro de los priorizados?",
     filas: filasGestion,
+    forma: "apilada",
     cobertura: coberturaGestion,
     coberturaEtiqueta: "del saldo priorizado tiene un responsable derivado de su última gestión registrada",
     metricas: [
@@ -260,6 +261,7 @@ export function construirPrioritariosB18(
     senal: `Top 5 por saldo concentra ${pctB18(coberturaConcentracion)} del saldo priorizado`,
     pregunta: "¿Dónde se concentra el saldo dentro de los priorizados?",
     filas: filasConcentracion,
+    forma: "pareto",
     cobertura: coberturaConcentracion,
     coberturaEtiqueta: "del saldo priorizado total está explicado por las 5 cuentas de mayor saldo de este grupo",
     metricas: [
@@ -326,6 +328,18 @@ export function construirPrioritariosB18(
     [...buckets.entries()].map(([nombre, valor]) => ({ nombre, valor, valorTexto: fmt(valor) }))
   );
   const bucketLider = filasAntiguedad[0];
+  // Para el tablero: tramos en orden cronológico (B18-2); el ranking sigue
+  // alimentando el KPI de Detecta. El Map se llena por orden de aparición
+  // de clientes, así que el orden se fija acá explícitamente.
+  const ORDEN_TRAMOS = ["Al día o sin fecha (0)", "1 a 30 días", "31 a 60 días", "61 a 90 días", "Más de 90 días"];
+  const filasAntiguedadCronologicas = repartir(
+    ORDEN_TRAMOS.filter((nombre) => buckets.has(nombre)).map((nombre) => ({
+      nombre,
+      valor: buckets.get(nombre) ?? 0,
+      valorTexto: fmt(buckets.get(nombre) ?? 0),
+    })),
+    { ordenar: false }
+  );
   const moraCritica = filas.filter((f) => f.dias > 90);
   const saldoCritico = moraCritica.reduce((s, f) => s + f.saldo, 0);
   const coberturaAntiguedad = saldoTotal > 0 ? clamp((saldoCritico / saldoTotal) * 100) : 0;
@@ -351,7 +365,8 @@ export function construirPrioritariosB18(
     nombre: "Antigüedad",
     senal: `${bucketLider?.nombre ?? "Sin señal"} concentra ${pctB18(bucketLider?.pct ?? 0)} del saldo priorizado`,
     pregunta: "¿Qué tan atrasadas están las cuentas priorizadas?",
-    filas: filasAntiguedad,
+    filas: filasAntiguedadCronologicas,
+    forma: "apilada",
     cobertura: coberturaAntiguedad,
     coberturaEtiqueta: "del saldo priorizado ya superó los 90 días de atraso (mora crítica)",
     metricas: [

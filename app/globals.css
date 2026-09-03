@@ -807,3 +807,77 @@ div.b18-vt-aviso-identidad li { color:#4a7059; }
    (dispersión de ticket, mediana sobre promedio): se deja envolver en vez de
    recortarse a la mitad. */
 .b18-map-ventas .b18-vt-cabecera small { letter-spacing:.05em; line-height:1.3; white-space:normal; }
+
+/* ── Dashboard B18 integral · versión gráfica (comparte cabecera/KPIs/footer
+   con .b18-dashboard; estas clases son nuevas y no tocan las que usan
+   MapaB18Producto/Ventas/Clientes). Barras ≤24px, punta redondeada 4px y
+   base recta; texto siempre en tinta; un solo tono para magnitud. ─────── */
+.b18-dash-facetas, .b18-dash-medidores, .b18-dash-problemas { margin-top:16px; }
+.b18-dash-facetas-grid { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:12px; margin-top:12px; }
+.b18-dash-faceta { margin:0; min-width:0; border:1px solid #e2eaf9; border-radius:18px; padding:14px; background:rgba(255,255,255,.9); }
+.b18-dash-faceta figcaption { display:grid; grid-template-columns:auto minmax(0,1fr); gap:2px 8px; align-items:center; margin-bottom:10px; }
+.b18-dash-faceta figcaption span { grid-row:1 / span 2; display:grid; width:28px; height:28px; place-items:center; border-radius:9px; background:#e8f0ff; color:#3f78ec; font-size:9px; font-weight:950; }
+.b18-dash-faceta figcaption strong { color:#17336f; font-size:12px; font-weight:950; letter-spacing:-.02em; }
+.b18-dash-faceta figcaption em { overflow:hidden; color:#7a8dad; font-size:9.5px; font-style:normal; font-weight:700; line-height:1.25; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; }
+.b18-dash-barras { display:grid; gap:7px; margin:0; padding:0; list-style:none; border-left:1px solid #c9d6ee; padding-left:8px; }
+.b18-dash-barras li { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:2px 8px; align-items:center; }
+.b18-dash-barra-nombre { grid-column:1 / -1; overflow:hidden; color:#62799f; font-size:10px; font-weight:800; text-overflow:ellipsis; white-space:nowrap; }
+.b18-dash-barra-pista { display:block; min-width:0; }
+.b18-dash-barra-pista i { display:block; height:14px; max-width:100%; border-radius:0 4px 4px 0; background:#1a7fe6; }
+.b18-dash-barra-valor { color:#17336f; font-size:11px; font-weight:900; white-space:nowrap; font-variant-numeric:tabular-nums; }
+.b18-dash-vacio { margin:0; color:#8a9abd; font-size:10px; font-weight:700; }
+.b18-dash-medidores-grid { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:12px; margin:12px 0 0; padding:0; list-style:none; }
+.b18-dash-medidores-grid li { min-width:0; border:1px solid #e2eaf9; border-radius:16px; padding:12px 14px; background:rgba(255,255,255,.9); }
+.b18-dash-medidor-cabecera { display:flex; align-items:center; gap:8px; margin-bottom:8px; }
+.b18-dash-medidor-cabecera span { display:grid; width:24px; height:24px; flex:none; place-items:center; border-radius:8px; background:#e8f0ff; color:#3f78ec; font-size:8px; font-weight:950; }
+.b18-dash-medidor-cabecera strong { min-width:0; overflow:hidden; color:#17336f; font-size:11px; font-weight:900; text-overflow:ellipsis; white-space:nowrap; }
+.b18-dash-medidor-cabecera b { margin-left:auto; color:#17336f; font-size:14px; font-weight:950; letter-spacing:-.03em; }
+.b18-dash-medidor { display:block; height:10px; overflow:hidden; border-radius:99px; background:#e3eefc; }
+.b18-dash-medidor i { display:block; height:100%; border-radius:99px; background:#1a7fe6; }
+.b18-dash-medidores-grid small { display:block; margin-top:7px; color:#7a8dad; font-size:9px; font-weight:700; line-height:1.3; }
+.b18-dash-nota { margin:12px 0 0; color:#7588aa; font-size:10px; font-weight:750; line-height:1.35; }
+.b18-dash-problemas-grid { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:12px; margin-top:12px; }
+.b18-dash-problemas-grid button { display:grid; min-width:0; grid-template-columns:auto minmax(0,1fr); gap:6px 10px; align-items:start; border:1px solid #e2eaf9; border-radius:16px; padding:12px 14px; background:rgba(255,255,255,.9); color:#183775; font-family:inherit; text-align:left; cursor:pointer; }
+.b18-dash-problemas-grid button:focus-visible { outline:2px solid #1a7fe6; outline-offset:2px; }
+.b18-dash-problema-sigla { grid-row:1 / span 3; display:grid; width:28px; height:28px; place-items:center; border-radius:9px; background:#e8f0ff; color:#3f78ec; font-size:9px; font-weight:950; }
+.b18-dash-problemas-grid strong { color:#17336f; font-size:12px; font-weight:950; }
+.b18-dash-problemas-grid p { margin:0; overflow:hidden; color:#62799f; font-size:10px; font-weight:700; line-height:1.35; display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; }
+.b18-dash-problemas-grid em { color:#3978e8; font-size:10px; font-style:normal; font-weight:900; }
+@media (max-width:1100px) { .b18-dash-facetas-grid, .b18-dash-medidores-grid, .b18-dash-problemas-grid { grid-template-columns:repeat(2,minmax(0,1fr)); } }
+@media (max-width:640px) { .b18-dash-facetas-grid, .b18-dash-medidores-grid, .b18-dash-problemas-grid { grid-template-columns:1fr; } }
+
+/* ── Tablero B18: formas por tipo de dato (apilada, columnas/pareto, dumbbell, hero) ── */
+.b18-dash-leyenda { display:flex; flex-wrap:wrap; gap:6px 12px; margin:0 0 8px; color:#62799f; font-size:9px; font-weight:800; }
+.b18-dash-leyenda span { display:inline-flex; align-items:center; gap:5px; }
+.b18-dash-leyenda i { display:inline-block; width:10px; height:10px; border-radius:3px; }
+.b18-dash-leyenda .b18-dash-leyenda-linea { width:14px; height:0; border-top:2px solid #17336f; border-radius:0; }
+.b18-dash-apilada { display:flex; gap:2px; height:22px; overflow:hidden; border-radius:6px; background:#ffffff; }
+.b18-dash-apilada i { display:block; min-width:2px; height:100%; }
+.b18-dash-apilada i:first-child { border-radius:6px 0 0 6px; }
+.b18-dash-apilada i:last-child { border-radius:0 6px 6px 0; }
+.b18-dash-apilada-leyenda { display:grid; gap:5px; margin:10px 0 0; padding:0; list-style:none; }
+.b18-dash-apilada-leyenda li { display:grid; grid-template-columns:10px minmax(0,1fr) auto auto; gap:8px; align-items:center; font-size:10px; }
+.b18-dash-apilada-leyenda i { display:block; width:10px; height:10px; border-radius:3px; }
+.b18-dash-apilada-leyenda span { overflow:hidden; color:#62799f; font-weight:800; text-overflow:ellipsis; white-space:nowrap; }
+.b18-dash-apilada-leyenda b { color:#17336f; font-weight:900; font-variant-numeric:tabular-nums; }
+.b18-dash-apilada-leyenda em { color:#7a8dad; font-style:normal; font-weight:800; font-variant-numeric:tabular-nums; }
+.b18-dash-svg { display:block; width:100%; height:150px; overflow:visible; }
+.b18-dash-svg-base { stroke:#c9d6ee; stroke-width:1px; vector-effect:non-scaling-stroke; }
+.b18-dash-svg-barra { fill:#1a7fe6; }
+.b18-dash-svg-linea { fill:none; stroke:#17336f; stroke-width:2px; stroke-linejoin:round; stroke-linecap:round; vector-effect:non-scaling-stroke; }
+.b18-dash-svg-marcador { fill:#17336f; stroke:#ffffff; stroke-width:2px; vector-effect:non-scaling-stroke; }
+.b18-dash-svg-eje { fill:#7a8dad; font-size:3.6px; font-weight:800; }
+.b18-dash-svg-valor { fill:#17336f; font-size:3.9px; font-weight:900; }
+.b18-dash-dumbbell { display:grid; gap:9px; margin:0; padding:0; list-style:none; }
+.b18-dash-dumbbell li { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:3px 8px; align-items:center; }
+.b18-dash-dumbbell-pista { position:relative; display:block; height:14px; }
+.b18-dash-dumbbell-pista::before { content:""; position:absolute; left:0; right:0; top:50%; border-top:1px solid #e3eefc; }
+.b18-dash-dumbbell-linea { position:absolute; top:50%; height:2px; margin-top:-1px; background:#c9d6ee; }
+.b18-dash-dumbbell-punto { position:absolute; top:50%; width:10px; height:10px; margin:-5px 0 0 -5px; border-radius:50%; box-shadow:0 0 0 2px #ffffff; }
+.b18-dash-faceta-hero .b18-dash-hero { display:grid; gap:6px; padding-top:4px; }
+.b18-dash-hero strong { color:#17336f; font-size:34px; font-weight:950; letter-spacing:-.04em; line-height:1; }
+.b18-dash-hero span { color:#62799f; font-size:10px; font-weight:850; }
+.b18-dash-hero .b18-dash-medidor { display:block; height:10px; margin-top:4px; }
+.b18-dash-hero .b18-dash-medidor b { display:block; height:100%; border-radius:99px; background:#1a7fe6; }
+.b18-dash-hero small { color:#7a8dad; font-size:9px; font-weight:700; }
+.b18-dash-hero p { margin:6px 0 0; color:#62799f; font-size:10px; font-weight:700; line-height:1.35; }

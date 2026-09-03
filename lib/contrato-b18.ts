@@ -73,6 +73,40 @@ export type MetricaB18 = { valor: string; etiqueta: string };
 /** Una línea del pie de procedencia: Fuente, Capa, Corte, Moneda, Cobertura... */
 export type MetadatoB18 = { termino: string; valor: string };
 
+/**
+ * FORMA del gráfico de esta categoría en el Dashboard B18 integral. La forma
+ * la elige el TRABAJO del dato, no el gusto:
+ *  - "barras"   ranking: quién pesa más (líder resaltado, resto en gris).
+ *  - "apilada"  tramos ordenados que suman 100% (antigüedad, recencia) —
+ *               se dibujan en el orden dado, nunca por tamaño.
+ *  - "columnas" serie en el tiempo (años, meses): columnas en orden + línea.
+ *  - "pareto"   pocos explican mucho: barras + acumulado.
+ *  - "dumbbell" dos poblaciones por fila (asignado vs. facturado, este año
+ *               vs. anterior) — requiere `pares`.
+ *  - "hero"     una sola cifra fuerte + medidor — requiere `hero`, si no cae
+ *               a la primera tarjeta.
+ * Si falta, se usa "barras".
+ */
+export type FormaTableroB18 = "barras" | "apilada" | "columnas" | "pareto" | "dumbbell" | "hero";
+
+/** Una fila de comparación de dos poblaciones (forma "dumbbell"). */
+export type ParB18 = {
+  nombre: string;
+  a: number;
+  b: number;
+  aTexto: string;
+  bTexto: string;
+};
+
+/** La cifra única de una categoría de forma "hero". */
+export type HeroB18 = {
+  valor: string;
+  etiqueta: string;
+  /** 0-100, opcional: dibuja un medidor debajo de la cifra. */
+  medidorPct?: number;
+  medidorEtiqueta?: string;
+};
+
 /** Un botón del riel, con todo lo que la pantalla muestra cuando está activo. */
 export type CategoriaB18 = {
   id: string;
@@ -85,6 +119,14 @@ export type CategoriaB18 = {
   pregunta: string;
   /** El reparto que dibujan la dona y las barras del centro. */
   filas: FilaB18[];
+  /** Forma del gráfico en el Dashboard B18 integral (ver FormaTableroB18). */
+  forma?: FormaTableroB18;
+  /** Rótulos de las dos poblaciones de un "dumbbell" (ej. "Asignado" / "Facturado"). */
+  paresEtiquetas?: [string, string];
+  /** Filas de comparación para la forma "dumbbell". */
+  pares?: ParB18[];
+  /** Cifra única para la forma "hero". */
+  hero?: HeroB18;
   /** 0-100. Cuánto del total tiene lectura identificada. */
   cobertura: number;
   /** Qué significa "cobertura" AQUÍ — no es lo mismo en cartera que en ventas. */
@@ -128,16 +170,21 @@ export function pctB18(valor: number): string {
   return `${valor.toFixed(2)}%`;
 }
 
-/** Reparto → participación, sin dividir entre cero y sin inventar el resto. */
+/**
+ * Reparto → participación, sin dividir entre cero y sin inventar el resto.
+ * Por defecto ordena de mayor a menor (ranking). Para tramos que ya vienen
+ * en un orden con sentido (antigüedad, meses, años) pasá
+ * `{ ordenar: false }` y se respeta el orden de entrada — B18-2.
+ */
 export function repartir(
-  filas: { nombre: string; valor: number; valorTexto?: string }[]
+  filas: { nombre: string; valor: number; valorTexto?: string }[],
+  opciones: { ordenar?: boolean } = {}
 ): FilaB18[] {
   const total = filas.reduce((suma, fila) => suma + Math.max(fila.valor, 0), 0);
-  return filas
-    .map((fila) => ({
-      nombre: fila.nombre,
-      pct: total > 0 ? Math.round((Math.max(fila.valor, 0) / total) * 10000) / 100 : 0,
-      valorTexto: fila.valorTexto,
-    }))
-    .sort((a, b) => b.pct - a.pct);
+  const repartidas = filas.map((fila) => ({
+    nombre: fila.nombre,
+    pct: total > 0 ? Math.round((Math.max(fila.valor, 0) / total) * 10000) / 100 : 0,
+    valorTexto: fila.valorTexto,
+  }));
+  return opciones.ordenar === false ? repartidas : repartidas.sort((a, b) => b.pct - a.pct);
 }

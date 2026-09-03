@@ -253,6 +253,7 @@ export function construirInventarioB18(
     senal: `${liderRotacion?.nombre ?? "Sin clase"} agrupa ${pctB18(liderRotacion?.pct ?? 0)} de los productos con salida valorizada`,
     pregunta: "¿Qué tan concentrada está la salida entre pocos productos?",
     filas: filasRotacion,
+    forma: "apilada",
     cobertura: coberturaRotacion,
     coberturaEtiqueta: "de los productos con movimiento tiene salida valorizada y clasificación ABC",
     metricas: [

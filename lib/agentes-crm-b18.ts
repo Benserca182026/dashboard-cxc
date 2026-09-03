@@ -114,6 +114,7 @@ const PIPELINE: CategoriaB18 = {
   senal: `crm.lead tiene ${CRM_LEADS} registros — el módulo está instalado y vacío`,
   pregunta: "¿Cuánto negocio hay en curso y en qué etapa está?",
   filas: FILAS_SIN_FUENTE,
+  forma: "hero",
   cobertura: 0,
   coberturaEtiqueta: "oportunidades registradas en crm.lead — hay cero, así que no hay universo que cubrir",
   metricas: [
@@ -153,6 +154,7 @@ const HISTORIAL: CategoriaB18 = {
   senal: "Sin actividad de CRM que cruzar con el historial de compra",
   pregunta: "¿Con qué frecuencia se contacta a cada cliente y qué pasó después?",
   filas: FILAS_SIN_FUENTE,
+  forma: "hero",
   cobertura: 0,
   coberturaEtiqueta:
     "clientes con al menos un contacto comercial registrado en CRM — hay cero registros de contacto",
@@ -194,6 +196,7 @@ const CONVERSION: CategoriaB18 = {
   senal: "Sin oportunidades ganadas ni perdidas: no hay tasa que calcular",
   pregunta: "¿Qué proporción del negocio propuesto se termina cerrando?",
   filas: FILAS_SIN_FUENTE,
+  forma: "hero",
   cobertura: 0,
   coberturaEtiqueta:
     "oportunidades cerradas con desenlace conocido — no hay ninguna, ni ganada ni perdida",
@@ -235,6 +238,7 @@ const RIESGO: CategoriaB18 = {
   senal: "Sin señal de CRM: el riesgo comercial sólo se puede inferir de la compra",
   pregunta: "¿Qué cuentas están en riesgo de perderse y cuáles tienen espacio para crecer?",
   filas: FILAS_SIN_FUENTE,
+  forma: "hero",
   cobertura: 0,
   coberturaEtiqueta:
     "clientes con señal de riesgo registrada en CRM — no existe ninguna señal declarada por una persona",

@@ -184,6 +184,8 @@ export function construirDetalleVentaB18(dataset: Dataset, fmt: (monto: number) 
               : "Indagar por qué el pedido quedó bajo el promedio histórico antes de cerrar el ciclo de venta.",
         },
       ],
+      // Pareto: qué SKU explica la mayor parte de la composición del pedido.
+      forma: "pareto",
       metadatos: [
         { termino: "Fuente", valor: `${fuenteTexto} · pedido ${venta.id_venta}` },
         { termino: "Capa", valor: "Total confirmado de pedido (IVA y descuento incluidos) vs. composición de líneas a precio de lista — magnitudes distintas, nunca se suman" },

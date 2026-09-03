@@ -1915,6 +1915,114 @@ tarjeta como en el modal de drill-down (misma fuente,
 
 ---
 
+## 8. Dashboard B18 integral — versión gráfica (molde compartido)
+
+Alcance: **sólo lo que se abre al apretar el botón B18** (`DashboardB18`
+dentro de `components/commercial/MoldeB18.tsx`). El riel, las 4 tarjetas,
+el panel central y los drill-downs no se tocaron. Como el componente es
+compartido, el cambio aparece en las 9 páginas que usan el molde
+(Cuadro de mando, Aging, Prioritarios, Detalle de venta, Vendedores,
+Empresa y región, CRM, Canales, Inventario). Las 3 páginas con componente
+propio (`MapaB18Producto`, `MapaB18Ventas`, `MapaB18Clientes`) siguen con
+la versión anterior hasta replicarles el mismo cambio.
+
+### 🟡 B18-18 — El Dashboard B18 integral era texto con dos gráficos; ahora es un tablero con una forma por tipo de dato
+
+**Qué había (versión original):** 4 tarjetas de número (correctas), **una**
+dona del reparto de la primera categoría solamente, 4-5 barras finas de un
+solo reparto, la cobertura como barras finas, "Problemas encontrados" como
+4 párrafos completos y un párrafo de cierre. Dos tipos de gráfico en total,
+y el reparto de las otras 3 categorías nunca se veía en este panel (era
+`categorias[0]` fijo).
+
+**Primera vuelta (2026-09-03, corregida después):** se reemplazó todo por
+un solo tipo de gráfico — 4 barras horizontales por página, siempre. Mejor
+que la dona fija, pero el usuario señaló dos problemas reales viendo el
+resultado en pantalla: (a) 3 páginas con componente propio nunca se
+tocaron (`MapaB18Producto`, `MapaB18Ventas`, `MapaB18Clientes` — siguen
+pendientes, ver abajo); (b) dentro de las 9 páginas del molde, categorías
+con naturalezas de dato distintas (ranking, serie de tiempo, tramos que
+suman 100%, concentración, comparación de dos poblaciones) se dibujaban
+todas igual, así que "todos los dashboards se parecían".
+
+**Qué hay ahora:** cada categoría declara su propia forma
+(`forma?: FormaTableroB18` en `CategoriaB18`, `lib/contrato-b18.ts`) y el
+tablero la respeta. Seis formas, elegidas por el trabajo que hace el dato,
+no por preferencia visual:
+
+| Forma | Cuándo se usa | Cómo se ve | Categorías que la usan |
+|---|---|---|---|
+| **barras** (default) | Ranking — "¿quién/qué encabeza?" | Barras horizontales, el líder resaltado en azul sólido, el resto en gris de contexto | Score (Prioritarios), Cobertura por cuenta (Vendedores — Top-cuentas), y cualquier categoría sin `forma` explícita |
+| **apilada** | Tramos que sí suman 100%, en su orden natural (no por tamaño) | Una barra segmentada + leyenda con % y valor por tramo | Cartera, Cobranza (Cuadro de mando); Antigüedad, Exclusiones, Gestión (Aging); Gestión, Antigüedad (Prioritarios); Rotación (Inventario); Cobertura (Vendedores); Calidad del dato geográfico (Empresa y región) |
+| **columnas** | Serie de tiempo | Columnas verticales + línea de valores encima, un año por columna | Ventas (Cuadro de mando) |
+| **pareto** | Concentración — "¿pocos explican la mayoría?" | Barras ordenadas de mayor a menor + línea de % acumulado | Clientes (Cuadro de mando); Concentración (Aging, Prioritarios, Empresa y región); el SKU dominante por pedido (Detalle de venta) |
+| **dumbbell** | Comparar dos poblaciones por la misma unidad (ej. cartera asignada vs. facturado, por vendedor) | Dos puntos unidos por una línea, uno por fila | Brecha cartera/facturado (Vendedores) |
+| **hero** | Una sola cifra fuerte, sin desglose confiable | Cifra grande + medidor opcional | Canales, CRM (las 4 categorías), Huérfanos (Vendedores) — todas corren sobre datos "sin fuente" u homogéneos donde desglosar inventaría estructura que no existe |
+
+`repartir()` ahora acepta `{ ordenar?: boolean }`; con `ordenar: false`
+conserva el orden de entrada en vez de ordenar por tamaño — así los tramos
+de antigüedad/aging se leen cronológicamente (Al día → 90+) en vez de por
+magnitud, lo que además corrige B18-2 (documentado en la sección de
+antigüedad) para las categorías que pasaron a forma `apilada`.
+
+Reglas de la guía de visualización aplicadas en las seis formas: barras
+≤24px con punta redondeada; **un solo tono azul** para toda magnitud (no
+es identidad, no es polaridad — la única excepción es el resaltado del
+líder en `barras`, que es énfasis dentro de la misma serie, no una
+segunda categoría de color); texto siempre en tinta, nunca dentro de la
+barra; valor real siempre visible junto a cada marca; sin leyenda cuando
+hay una sola serie (el título de la faceta ya la nombra); tooltip nativo
+(`title`) — informa, no abre nada. **La cobertura no se colorea por
+severidad**: cada categoría define qué significa SU cobertura y ya está
+documentado que no son comparables entre sí.
+
+**Dónde:** `lib/contrato-b18.ts` (`FormaTableroB18`, `ParB18`, `HeroB18`,
+`repartir()`); `components/commercial/MoldeB18.tsx` (componente nuevo
+`FacetaTablero`, usado por `DashboardB18`); clases `.b18-dash-*` en
+`app/globals.css`; el campo `forma`/`pares`/`hero` se agregó por categoría
+en los 9 `lib/agentes-*-b18.ts` del molde. Las clases anteriores
+`.b18-dashboard-mix/-barras/-cobertura` se dejaron intactas porque las
+siguen usando los 3 componentes propios.
+
+**✅ Verificado con clic real — 2026-09-03:** `npx tsc --noEmit -p
+tsconfig.json` sin errores en todo el proyecto tras el lote completo.
+Abierto el B18 con Playwright (Chromium real, no snapshot) contra datos
+reales en 5 páginas, cubriendo las 6 formas:
+
+| Página | Formas visibles | scrollWidth | Errores JS |
+|---|---|---|---|
+| `/` (Cuadro de mando) | apilada ×2 (Cartera, Cobranza), pareto (Clientes), columnas (Ventas) | = 1440px, sin scroll horizontal | ninguno |
+| `/aging` | apilada ×3 (Antigüedad, Exclusiones, Gestión), pareto (Concentración) | = 1440px, sin scroll horizontal | ninguno |
+| `/prioritarios` | barras (Score, líder resaltado), apilada ×2 (Gestión, Antigüedad), pareto (Concentración) | = 1440px, sin scroll horizontal | ninguno |
+| `/ventas/vendedores` | apilada (Cobertura), hero (Huérfanos), **dumbbell** (Brecha cartera/facturado), barras (Top-cuentas) | = 1440px, sin scroll horizontal | ninguno |
+| `/crm` | hero ×4 (Pipeline, Historial, Conversión, Riesgo) | = 1440px, sin scroll horizontal | ninguno |
+
+Los valores mostrados en cada faceta coinciden con los `filas`/`pares`/
+`hero` de las secciones 1, 2 y 3 de este documento (mismos `Q` y `%`, no
+se recalculó nada al cambiar de forma). No se re-verificaron por captura
+individual `/ventas/canales`, `/inventario`, `/ventas/empresa-region` ni
+`/ventas/detalle`, porque comparten exactamente los mismos componentes
+(`FacetaTablero`) y formas ya probadas en las 5 páginas de arriba — el
+riesgo restante es de dato, no de forma nueva.
+
+**Nota de entorno (no es un bug de este cambio):** durante la
+verificación, la carga de datos reales vía Supabase se colgó
+repetidamente (>180s) en Chromium para `/`, `/aging` y `/prioritarios`
+específicamente — un problema de red/IPv6 de esta máquina (confirmado
+forzando resolución IPv4 en Node: la misma carga que se colgaba bajó a
+18s). No es causado por estos cambios: `lib/datosReales.ts` no se tocó,
+las páginas que no dependen de ese fetch en vivo (Vendedores, CRM) nunca
+tuvieron el problema, y el mismo fetch en vivo terminó cargando bien una
+vez con más paciencia. Queda anotado por si vuelve a pasar en un deploy o
+en otra máquina.
+
+**Pendiente (fuera de este cambio):** replicar el mismo tablero
+(`FacetaTablero` + formas variadas) en `MapaB18Producto.tsx`,
+`MapaB18Ventas.tsx` y `MapaB18Clientes.tsx` — las 3 páginas con componente
+propio, señaladas explícitamente por el usuario como no tocadas todavía.
+
+---
+
 ## Resumen de arreglos, por prioridad
 
 | # | Hallazgo | Alcance | Prioridad |
@@ -1936,8 +2044,9 @@ tarjeta como en el modal de drill-down (misma fuente,
 | B18-15 | "Pagada" (único motivo de exclusión presente) mostraba 0.00% del saldo excluido — el reparto usaba saldo, y una factura pagada tiene saldo Q0 por definición, en vez de contar facturas | `agentes-aging-b18.ts` (categoría EX) | Media — **✅ corregido 2026-09-03**, verificado con clic real en `/aging` |
 | B18-16 | "Corte: 2026-08-19" en Detalle de venta no decía si era la fecha del snapshot de Odoo (como en `/`, `/aging`, `/prioritarios`) o la fecha de la última venta confirmada real — son 2 conceptos legítimos y distintos (5 días de diferencia hoy) sin ninguna aclaración en el rótulo | `agentes-detalle-venta-b18.ts` (campo `corte`) | Media — **✅ corregido 2026-09-03**, verificado con clic real en `/ventas/detalle` |
 | B18-17 | "Corte: 2026-08-19" en Clientes tenía la misma ambigüedad que B18-16, en 4 lugares del mismo componente (encabezado principal, panel B18 integral, y dos bloques de procedencia) | `components/commercial/MapaB18Clientes.tsx` (4 spots) | Media — **✅ corregido 2026-09-03**, verificado con clic real en `/ventas/clientes` |
+| B18-18 | El Dashboard B18 integral era texto con dos gráficos (una dona de la primera categoría + barras finas); ahora cada categoría dibuja la forma que corresponde a su dato — barras, apilada, columnas, pareto, dumbbell o hero, ver detalle en la sección 8 — en vez de un único tipo de gráfico repetido en todas | `lib/contrato-b18.ts` (`FormaTableroB18`) + `MoldeB18.tsx` (`FacetaTablero`) + `.b18-dash-*` en `app/globals.css` + campo `forma` en los 9 `lib/agentes-*-b18.ts` del molde; pendiente replicar en los 3 componentes propios | Media — **✅ corregido 2026-09-03**, verificado con clic real (Chromium + datos reales) en `/`, `/aging`, `/prioritarios`, `/ventas/vendedores` y `/crm`, cubriendo las 6 formas |
 
-Salvo B18-1, B18-14, B18-15, B18-16 y B18-17 (ya corregidos y
+Salvo B18-1, B18-14, B18-15, B18-16, B18-17 y B18-18 (ya corregidos y
 verificados con clic real), nada más de esto se ha corregido todavía.
 Este archivo es el inventario, no el changelog — se actualiza a
 "corregido" recién cuando se verifique en pantalla, con clic real,

@@ -86,6 +86,17 @@ export function construirCuadroDeMando(
     }))
   );
   const bucketLider = filasCartera[0];
+  // Para el tablero: los mismos tramos en orden cronológico (al día → 90+),
+  // sin reordenar por tamaño — B18-2. El ranking de arriba sigue alimentando
+  // el KPI de Detecta (bucketLider) sin cambios.
+  const filasCarteraCronologicas = repartir(
+    BUCKETS.map((bucket) => ({
+      nombre: ETIQUETA_BUCKET[bucket] ?? bucket,
+      valor: aging.totalesPorBucket[bucket],
+      valorTexto: fmt(aging.totalesPorBucket[bucket]),
+    })),
+    { ordenar: false }
+  );
   const coberturaCartera = carteraTotal > 0 ? clamp((aging.totalClasificado / carteraTotal) * 100) : 0;
   const facturasVencidas = aging.clasificadas.filter((fila) => fila.bucket !== "actual").length;
   // Bucket líder por MONTO — mismo criterio que ya usa Detecta, pero
@@ -119,7 +130,8 @@ export function construirCuadroDeMando(
     nombre: "Cartera",
     senal: `${bucketLider?.nombre ?? "Sin señal"} · ${pctB18(bucketLider?.pct ?? 0)} de la cartera clasificada`,
     pregunta: "¿Dónde está parada la deuda abierta?",
-    filas: filasCartera,
+    filas: filasCarteraCronologicas,
+    forma: "apilada",
     cobertura: coberturaCartera,
     coberturaEtiqueta: "de la deuda abierta es clasificable por antigüedad",
     metricas: [
@@ -183,7 +195,7 @@ export function construirCuadroDeMando(
     { nombre: "Vencido 1 a 90", valor: vencidoTemprano, valorTexto: fmt(vencidoTemprano) },
     { nombre: "Mora 90 a 180", valor: mora90a180, valorTexto: fmt(mora90a180) },
     { nombre: "Mora +180", valor: ejecutiva.totalMora180, valorTexto: fmt(ejecutiva.totalMora180) },
-  ]);
+  ], { ordenar: false }); // orden cronológico, no por tamaño — B18-2
   const pctCritica = ejecutiva.totalVencido > 0
     ? clamp((ejecutiva.totalMoraCritica / ejecutiva.totalVencido) * 100) : 0;
   const coberturaCobranza = ejecutiva.totalVencido > 0
@@ -219,6 +231,7 @@ export function construirCuadroDeMando(
     senal: `${pctB18(pctVencido)} de la cartera clasificada está vencida`,
     pregunta: "¿Cuánto de lo vencido todavía se puede trabajar?",
     filas: filasCobranza,
+    forma: "apilada",
     cobertura: coberturaCobranza,
     coberturaEtiqueta: "del vencido aún no cruzó a mora crítica",
     metricas: [
@@ -304,6 +317,7 @@ export function construirCuadroDeMando(
     senal: `Top 5 concentra ${pctB18(concentracionTop5)} del vencido`,
     pregunta: "¿Quién concentra la deuda vencida?",
     filas: filasClientes,
+    forma: "pareto",
     cobertura: concentracionTop5,
     coberturaEtiqueta: "del vencido explicado por el Top 5",
     metricas: [
@@ -362,7 +376,8 @@ export function construirCuadroDeMando(
       nombre: anio.parcial ? `${anio.anio} (parcial)` : anio.anio,
       valor: anio.valor,
       valorTexto: fmt(anio.valor),
-    }))
+    })),
+    { ordenar: false } // serie en el tiempo: los años se leen en orden, no por tamaño
   );
   const anioActual = serie.anios.at(-1) ?? null;
   const pedidosOtraMoneda = anioActual?.pedidosOtraMoneda ?? 0;
@@ -391,6 +406,7 @@ export function construirCuadroDeMando(
       : `${firmado(variacion)} comparable contra la misma ventana`,
     pregunta: "¿La venta confirmada crece contra su propia ventana?",
     filas: filasVentas,
+    forma: "columnas",
     cobertura: coberturaVentas,
     coberturaEtiqueta: "de los pedidos del año está en quetzales",
     metricas: [

@@ -294,6 +294,7 @@ const REGION: CategoriaB18 = {
  */
 const CONCENTRACION: CategoriaB18 = {
   id: "concentracion",
+  forma: "pareto",
   sigla: "CN",
   nombre: "Concentración territorial",
   senal: `${COLA.length} departamentos aportan menos del 1% cada uno`,
@@ -391,6 +392,7 @@ const CONCENTRACION: CategoriaB18 = {
  */
 const COBERTURA_GEO: CategoriaB18 = {
   id: "cobertura-geografica",
+  forma: "apilada",
   sigla: "CG",
   nombre: "Calidad del dato geográfico",
   senal: `Departamento en ${CLIENTES_CON_REGION} de ${CLIENTES_TOTAL} clientes; ciudad en ${CLIENTES_CON_CIUDAD}`,

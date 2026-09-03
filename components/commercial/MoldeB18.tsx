@@ -157,12 +157,140 @@ function Drilldown({ tarjeta, categoria, onCerrar }: {
   </div>;
 }
 
+/* Escalera ordinal de un solo tono (claro → oscuro) para tramos ordenados.
+   Empieza en el paso 250 de la rampa para que el más claro siga leyéndose
+   sobre blanco. */
+const RAMPA_ORDINAL = ["#86b6ef", "#5598e7", "#2a78d6", "#1c5cab", "#104281", "#0d366b"];
+const AZUL_MARCA = "#1a7fe6";
+const GRIS_CONTEXTO = "#b9cbea";
+
+function FacetaTablero({ cat }: { cat: CategoriaB18 }) {
+  const forma = cat.forma ?? "barras";
+  const filas = cat.filas.slice(0, forma === "apilada" ? 6 : 5);
+  const maximo = Math.max(...filas.map((f) => f.pct), 1);
+  const cabecera = <figcaption><span>{cat.sigla}</span><strong>{cat.nombre}</strong><em>{cat.pregunta}</em></figcaption>;
+
+  // ── hero: una cifra fuerte + medidor ────────────────────────────────────
+  if (forma === "hero") {
+    const hero = cat.hero ?? (cat.tarjetas[0]
+      ? { valor: cat.tarjetas[0].kpiTexto, etiqueta: cat.tarjetas[0].etiqueta, medidorPct: cat.tarjetas[0].donaPct }
+      : null);
+    return <figure className="b18-dash-faceta b18-dash-faceta-hero">
+      {cabecera}
+      {hero
+        ? <div className="b18-dash-hero">
+            <strong>{hero.valor}</strong>
+            <span>{hero.etiqueta}</span>
+            {typeof hero.medidorPct === "number" && <>
+              <i className="b18-dash-medidor" role="meter" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(Math.min(Math.max(hero.medidorPct, 0), 100))} aria-label={hero.medidorEtiqueta ?? hero.etiqueta}>
+                <b style={{ width: `${Math.min(Math.max(hero.medidorPct, 0), 100)}%` }} />
+              </i>
+              {hero.medidorEtiqueta && <small>{hero.medidorEtiqueta}</small>}
+            </>}
+            <p>{cat.senal}</p>
+          </div>
+        : <p className="b18-dash-vacio">Sin cifra disponible</p>}
+    </figure>;
+  }
+
+  // ── dumbbell: dos poblaciones por fila ───────────────────────────────────
+  if (forma === "dumbbell" && cat.pares && cat.pares.length > 0) {
+    const pares = cat.pares.slice(0, 5);
+    const tope = Math.max(...pares.flatMap((p) => [p.a, p.b]), 1);
+    const [etA, etB] = cat.paresEtiquetas ?? ["A", "B"];
+    return <figure className="b18-dash-faceta">
+      {cabecera}
+      <div className="b18-dash-leyenda" aria-label="Leyenda"><span><i style={{ background: GRIS_CONTEXTO }} />{etA}</span><span><i style={{ background: AZUL_MARCA }} />{etB}</span></div>
+      <ul className="b18-dash-dumbbell" role="list">
+        {pares.map((p) => {
+          const xa = (p.a / tope) * 100, xb = (p.b / tope) * 100;
+          return <li key={p.nombre} title={`${p.nombre}: ${etA} ${p.aTexto} · ${etB} ${p.bTexto}`}>
+            <span className="b18-dash-barra-nombre">{p.nombre}</span>
+            <span className="b18-dash-dumbbell-pista">
+              <i className="b18-dash-dumbbell-linea" style={{ left: `${Math.min(xa, xb)}%`, width: `${Math.abs(xb - xa)}%` }} />
+              <i className="b18-dash-dumbbell-punto" style={{ left: `${xa}%`, background: GRIS_CONTEXTO }} />
+              <i className="b18-dash-dumbbell-punto" style={{ left: `${xb}%`, background: AZUL_MARCA }} />
+            </span>
+            <b className="b18-dash-barra-valor">{p.aTexto} → {p.bTexto}</b>
+          </li>;
+        })}
+      </ul>
+    </figure>;
+  }
+
+  if (filas.length === 0) {
+    return <figure className="b18-dash-faceta">{cabecera}<p className="b18-dash-vacio">Sin reparto disponible</p></figure>;
+  }
+
+  // ── apilada: tramos ordenados que suman 100% ─────────────────────────────
+  if (forma === "apilada") {
+    const suma = filas.reduce((s, f) => s + f.pct, 0) || 1;
+    return <figure className="b18-dash-faceta">
+      {cabecera}
+      <div className="b18-dash-apilada" role="img" aria-label={filas.map((f) => `${f.nombre} ${pctB18(f.pct)}`).join(", ")}>
+        {filas.map((f, i) => <i key={f.nombre} title={`${f.nombre}: ${f.valorTexto ?? pctB18(f.pct)} · ${pctB18(f.pct)}`} style={{ flexGrow: Math.max(f.pct / suma, 0.01), background: RAMPA_ORDINAL[Math.min(i, RAMPA_ORDINAL.length - 1)] }} />)}
+      </div>
+      <ul className="b18-dash-apilada-leyenda" role="list">
+        {filas.map((f, i) => <li key={f.nombre}>
+          <i style={{ background: RAMPA_ORDINAL[Math.min(i, RAMPA_ORDINAL.length - 1)] }} />
+          <span>{f.nombre}</span>
+          <b>{f.valorTexto ?? pctB18(f.pct)}</b>
+          <em>{pctB18(f.pct)}</em>
+        </li>)}
+      </ul>
+    </figure>;
+  }
+
+  // ── columnas / pareto: SVG en orden de entrada ───────────────────────────
+  if (forma === "columnas" || forma === "pareto") {
+    const n = filas.length;
+    const ancho = 100, alto = 60, base = 46, techo = 8;
+    const paso = ancho / n, w = paso * 0.56;
+    const altura = (pct: number) => ((pct / maximo) * (base - techo));
+    let acumulado = 0;
+    const puntos = filas.map((f, i) => {
+      acumulado += f.pct;
+      const x = paso * i + paso / 2;
+      return { x, yBarra: base - altura(f.pct), yAcum: base - (Math.min(acumulado, 100) / 100) * (base - techo), acum: acumulado, f };
+    });
+    const linea = (forma === "pareto" ? puntos.map((p) => `${p.x},${p.yAcum}`) : puntos.map((p) => `${p.x},${p.yBarra}`)).join(" ");
+    return <figure className="b18-dash-faceta">
+      {cabecera}
+      {forma === "pareto" && <div className="b18-dash-leyenda" aria-label="Leyenda"><span><i style={{ background: AZUL_MARCA }} />participación</span><span><i className="b18-dash-leyenda-linea" />acumulado</span></div>}
+      <svg className="b18-dash-svg" viewBox={`0 0 ${ancho} ${alto}`} preserveAspectRatio="none" role="img" aria-label={filas.map((f) => `${f.nombre} ${f.valorTexto ?? pctB18(f.pct)}`).join(", ")}>
+        <line x1="0" y1={base} x2={ancho} y2={base} className="b18-dash-svg-base" />
+        {puntos.map((p) => <g key={p.f.nombre}>
+          <title>{`${p.f.nombre}: ${p.f.valorTexto ?? pctB18(p.f.pct)} · ${pctB18(p.f.pct)}${forma === "pareto" ? ` · acumulado ${pctB18(p.acum)}` : ""}`}</title>
+          <rect x={p.x - w / 2} y={p.yBarra} width={w} height={base - p.yBarra} rx="1.2" className="b18-dash-svg-barra" style={{ fill: forma === "pareto" && p === puntos[0] ? AZUL_MARCA : forma === "pareto" ? GRIS_CONTEXTO : AZUL_MARCA }} />
+          <text x={p.x} y={base + 6} textAnchor="middle" className="b18-dash-svg-eje">{p.f.nombre.length > 9 ? `${p.f.nombre.slice(0, 8)}…` : p.f.nombre}</text>
+        </g>)}
+        <polyline points={linea} className="b18-dash-svg-linea" />
+        {puntos.map((p) => <circle key={`m-${p.f.nombre}`} cx={p.x} cy={forma === "pareto" ? p.yAcum : p.yBarra} r="1.6" className="b18-dash-svg-marcador" />)}
+        {(forma === "pareto" ? [puntos[puntos.length - 1]] : puntos).map((p) => <text key={`v-${p.f.nombre}`} x={p.x} y={(forma === "pareto" ? p.yAcum : p.yBarra) - 2.2} textAnchor={forma === "pareto" ? "end" : "middle"} className="b18-dash-svg-valor">{forma === "pareto" ? pctB18(p.acum) : (p.f.valorTexto ?? pctB18(p.f.pct))}</text>)}
+      </svg>
+    </figure>;
+  }
+
+  // ── barras (ranking con énfasis): líder en azul, contexto en gris ────────
+  return <figure className="b18-dash-faceta">
+    {cabecera}
+    <ul className="b18-dash-barras" role="list">
+      {filas.map((fila, i) => {
+        const valor = fila.valorTexto ?? pctB18(fila.pct);
+        return <li key={fila.nombre} title={`${fila.nombre}: ${valor} · ${pctB18(fila.pct)}`}>
+          <span className="b18-dash-barra-nombre">{fila.nombre}</span>
+          <span className="b18-dash-barra-pista"><i style={{ width: `${Math.max((fila.pct / maximo) * 100, 2)}%`, background: i === 0 ? AZUL_MARCA : GRIS_CONTEXTO }} /></span>
+          <b className="b18-dash-barra-valor">{valor}</b>
+        </li>;
+      })}
+    </ul>
+  </figure>;
+}
+
 function DashboardB18({ contrato, onCerrar, onAbrirCategoria }: {
   contrato: ContratoB18; onCerrar: () => void; onAbrirCategoria: (id: string) => void;
 }) {
   const { resumen, categorias, corte } = contrato;
-  const primera = categorias[0];
-  const principal = primera?.filas[0];
 
   return <div className="b18-diagnostico-velo" role="presentation" onPointerDown={(e) => e.target === e.currentTarget && onCerrar()}>
     <section className="b18-diagnostico b18-dashboard" role="dialog" aria-modal="true" aria-labelledby="b18-dashboard-titulo">
@@ -181,42 +309,44 @@ function DashboardB18({ contrato, onCerrar, onAbrirCategoria }: {
         </div>)}
       </div>
 
-      <div className="b18-dashboard-grid">
-        <article className="b18-dashboard-mix">
-          <div className="b18-dashboard-titulo"><span>{resumen.tituloMix}</span><h3>{resumen.preguntaMix}</h3></div>
-          <div className="b18-dashboard-mix-body">
-            <div className="b18-dona-principal" style={{ "--b18-color": COLORES_B18.detecta, "--b18-pct": `${Math.min(principal?.pct ?? 0, 100) * 3.6}deg` } as CSSProperties}>
-              <span>{(principal?.pct ?? 0).toFixed(0)}<small>%</small></span>
-              <em>{principal?.nombre ?? "Sin señal"}</em>
-            </div>
-            <div className="b18-dashboard-barras">
-              {(primera?.filas ?? []).slice(0, 5).map((fila) => <div key={fila.nombre}>
-                <span>{fila.nombre}</span><b>{fila.valorTexto ?? pctB18(fila.pct)}</b>
-                <i style={{ width: `${Math.max(fila.pct, 3)}%` }} />
-              </div>)}
-            </div>
-          </div>
-        </article>
+      {/* Un gráfico de barras por categoría (small multiples): la misma
+          pregunta —"cómo se reparte"— contestada para las 4, no sólo para la
+          primera. Un solo tono (comparar magnitud), valor real al final de
+          cada barra, texto siempre en tinta, nunca en el color de la barra. */}
+      <section className="b18-dash-facetas" aria-label={resumen.tituloMix}>
+        <div className="b18-dashboard-titulo"><span>{resumen.tituloMix}</span><h3>{resumen.preguntaMix}</h3></div>
+        <div className="b18-dash-facetas-grid">
+          {categorias.map((cat) => <FacetaTablero key={cat.id} cat={cat} />)}
+        </div>
+      </section>
 
-        <article className="b18-dashboard-cobertura">
-          <div className="b18-dashboard-titulo"><span>{resumen.tituloCobertura}</span><h3>{resumen.preguntaCobertura}</h3></div>
-          <div className="b18-dashboard-cobertura-lista">
-            {categorias.map((cat) => <div key={cat.id}>
-              <span>{cat.sigla} · {cat.nombre}</span><b>{pctB18(cat.cobertura)}</b>
-              <i style={{ width: `${Math.min(Math.max(cat.cobertura, 0), 100)}%` }} />
-            </div>)}
-          </div>
-          <p>{resumen.notaCobertura}</p>
-        </article>
-      </div>
+      {/* Cobertura como medidor: una razón contra el 100%, pista clara del
+          mismo tono. Cada categoría declara qué significa SU cobertura; por
+          eso no se colorea por severidad —no son comparables entre sí. */}
+      <section className="b18-dash-medidores" aria-label={resumen.tituloCobertura}>
+        <div className="b18-dashboard-titulo"><span>{resumen.tituloCobertura}</span><h3>{resumen.preguntaCobertura}</h3></div>
+        <ul className="b18-dash-medidores-grid" role="list">
+          {categorias.map((cat) => {
+            const valor = Math.min(Math.max(cat.cobertura, 0), 100);
+            return <li key={cat.id} title={`${cat.nombre}: ${pctB18(valor)} ${cat.coberturaEtiqueta}`}>
+              <div className="b18-dash-medidor-cabecera"><span>{cat.sigla}</span><strong>{cat.nombre}</strong><b>{pctB18(valor)}</b></div>
+              <span className="b18-dash-medidor" role="meter" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(valor)} aria-label={`${cat.nombre}, ${pctB18(valor)}`}>
+                <i style={{ width: `${valor}%` }} />
+              </span>
+              <small>{cat.coberturaEtiqueta}</small>
+            </li>;
+          })}
+        </ul>
+        <p className="b18-dash-nota">{resumen.notaCobertura}</p>
+      </section>
 
-      <section className="b18-dashboard-problemas" aria-label="Problemas encontrados">
+      <section className="b18-dash-problemas" aria-label="Problemas encontrados">
         <div className="b18-dashboard-titulo"><span>Problemas encontrados</span><h3>Qué requiere revisión antes de decidir</h3></div>
-        <div>
-          {categorias.map((cat) => <button type="button" key={cat.id} onClick={() => onAbrirCategoria(cat.id)}>
-            <span>{cat.sigla}</span>
-            <div><strong>{cat.nombre}</strong><p>{cat.problema}</p></div>
-            <b>{pctB18(cat.cobertura)}</b>
+        <div className="b18-dash-problemas-grid">
+          {categorias.map((cat) => <button type="button" key={cat.id} onClick={() => onAbrirCategoria(cat.id)} title={cat.problema}>
+            <span className="b18-dash-problema-sigla">{cat.sigla}</span>
+            <strong>{cat.nombre}</strong>
+            <p>{cat.problema}</p>
             <em>Ver agente →</em>
           </button>)}
         </div>

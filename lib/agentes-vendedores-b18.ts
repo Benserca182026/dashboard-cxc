@@ -142,6 +142,7 @@ const porClienteMenor = VENTA_POR_CLIENTE_CARTERA[3];
 
 const COBERTURA: CategoriaB18 = {
   id: "cobertura",
+  forma: "apilada",
   sigla: "CO",
   nombre: "Cobertura de cartera",
   senal: `${CLIENTES_SIN_CARTERA} de ${CLIENTES_TOTAL} clientes no tienen responsable asignado`,
@@ -243,6 +244,20 @@ const pctSinDuenio = pct(SIN_DUENIO_VENTA, VENTA_TOTAL_GTQ);
 
 const BRECHA: CategoriaB18 = {
   id: "brecha",
+  // Dos poblaciones por vendedor: la venta de los clientes que ATIENDE
+  // (cartera asignada) contra la venta que ÉL registró (facturado por). Son
+  // dos lecturas distintas del mismo dinero y nunca se suman; el dumbbell las
+  // pone lado a lado por persona, que es justo la brecha que esta categoría
+  // describe. Se cruzan por usuarioId; "Sin responsable" y "Sin usuario" no
+  // son la misma persona, así que quedan fuera del par.
+  forma: "dumbbell",
+  paresEtiquetas: ["Atendido (cartera)", "Facturado por"],
+  pares: CARTERA_ASIGNADA
+    .filter((f) => f.usuarioId !== null)
+    .map((f) => {
+      const facturado = FACTURADO_POR.find((x) => x.usuarioId === f.usuarioId)?.venta ?? 0;
+      return { nombre: f.vendedor, a: f.venta, b: facturado, aTexto: q(f.venta), bTexto: q(facturado) };
+    }),
   sigla: "BR",
   nombre: "Brecha atendido / facturado",
   senal: `${q(SIN_DUENIO_VENTA)} de venta viene de clientes sin responsable`,
@@ -363,6 +378,7 @@ const BRECHA: CategoriaB18 = {
 
 const HUERFANOS: CategoriaB18 = {
   id: "huerfanos",
+  forma: "hero",
   sigla: "HU",
   nombre: "Cartera del vendedor de baja",
   senal: `${KEVIN_HUERFANOS} clientes quedaron sin responsable cuando se borró un usuario`,

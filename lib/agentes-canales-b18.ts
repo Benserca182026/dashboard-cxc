@@ -119,6 +119,7 @@ function categoriaSinFuente(args: {
     senal: SENAL_SIN_FUENTE,
     pregunta: args.pregunta,
     filas: FILAS_SIN_FUENTE,
+    forma: "hero",
     cobertura: 0,
     coberturaEtiqueta: COBERTURA_ETIQUETA,
     metricas: [

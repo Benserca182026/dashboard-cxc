@@ -65,6 +65,16 @@ export function construirAgingB18(
     }))
   );
   const bucketLider = filasAntiguedad[0];
+  // Para el tablero: mismos tramos en orden cronológico (B18-2). El ranking
+  // sigue alimentando el KPI de Detecta.
+  const filasAntiguedadCronologicas = repartir(
+    BUCKETS.map((bucket) => ({
+      nombre: BUCKET_INFO[bucket].etiqueta,
+      valor: aging.totalesPorBucket[bucket],
+      valorTexto: fmt(aging.totalesPorBucket[bucket]),
+    })),
+    { ordenar: false }
+  );
   const coberturaAntiguedad = carteraTotal > 0 ? clamp((aging.totalClasificado / carteraTotal) * 100) : 0;
   const facturasVencidasAN = aging.clasificadas.filter((fila) => fila.bucket !== "actual").length;
   const pctFacturasVencidasAN = aging.clasificadas.length > 0
@@ -98,7 +108,8 @@ export function construirAgingB18(
     nombre: "Antigüedad",
     senal: `${bucketLider?.nombre ?? "Sin señal"} · ${pctB18(bucketLider?.pct ?? 0)} de la cartera clasificada`,
     pregunta: "¿Dónde está parada la deuda abierta por tramo?",
-    filas: filasAntiguedad,
+    filas: filasAntiguedadCronologicas,
+    forma: "apilada",
     cobertura: coberturaAntiguedad,
     coberturaEtiqueta: "de la cartera abierta tiene fecha de vencimiento y puede clasificarse por tramo",
     metricas: [
@@ -199,6 +210,7 @@ export function construirAgingB18(
     senal: `Top 10 concentra ${pctB18(coberturaConcentracion)} del vencido`,
     pregunta: "¿Quién concentra la deuda vencida?",
     filas: filasConcentracion,
+    forma: "pareto",
     cobertura: coberturaConcentracion,
     coberturaEtiqueta: "del saldo vencido está explicado por los 10 clientes con mayor deuda",
     metricas: [
@@ -287,6 +299,7 @@ export function construirAgingB18(
     senal: `${num(aging.excluidas.length)} factura(s) fuera del aging`,
     pregunta: "¿Qué se quedó fuera del aging y por qué?",
     filas: filasExclusiones,
+    forma: "apilada",
     cobertura: coberturaExclusiones,
     coberturaEtiqueta: "de las facturas del dataset permanece dentro del aging (no fue excluida)",
     metricas: [
@@ -383,7 +396,7 @@ export function construirAgingB18(
     { nombre: "Con gestión, sin promesa", valor: conGestionSinPromesa, valorTexto: `${num(conGestionSinPromesa)} cliente(s)` },
     { nombre: "Con promesa, sin pago posterior", valor: conPromesaSinPago, valorTexto: `${num(conPromesaSinPago)} cliente(s)` },
     { nombre: "Con pago posterior a la promesa", valor: pagoTotal, valorTexto: `${num(pagoTotal)} cliente(s)` },
-  ]);
+  ], { ordenar: false }); // etapas del embudo en su orden, no por tamaño
   const coberturaGestion = vencidoTotal > 0 ? clamp((contactadoTotal / vencidoTotal) * 100) : 0;
 
   const gestion: CategoriaB18 = {
@@ -393,6 +406,7 @@ export function construirAgingB18(
     senal: `${pctB18(coberturaGestion)} de los clientes vencidos tiene gestión registrada`,
     pregunta: "¿Qué saldo vencido tiene seguimiento y cuál no?",
     filas: filasGestion,
+    forma: "apilada",
     cobertura: coberturaGestion,
     coberturaEtiqueta: "de los clientes con saldo vencido tiene al menos una gestión registrada",
     metricas: [
