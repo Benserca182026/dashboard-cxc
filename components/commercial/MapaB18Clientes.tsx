@@ -58,7 +58,11 @@ function Procedencia({ p, tono }: { p: ProcedenciaClientes; tono: string }) {
     <div className={est.procCapa}><dt>Capa</dt><dd>{p.capa}</dd></div>
     <div><dt>Fuente</dt><dd>{p.fuente}</dd></div>
     <div><dt>Período</dt><dd>{p.periodo}</dd></div>
-    <div><dt>Corte</dt><dd>{p.corte}</dd></div>
+    {/* "Corte" a secas es ambiguo en esta página: no es el snapshot de Odoo
+        (2026-08-24, el que usan Cuadro de mando/Aging/Prioritarios), es la
+        fecha de la ÚLTIMA VENTA CONFIRMADA (2026-08-19) — dos conceptos
+        legítimamente distintos que un rótulo pelado no distingue. */}
+    <div><dt>Última venta</dt><dd>{p.corte}</dd></div>
     <div><dt>Moneda</dt><dd>{p.moneda}</dd></div>
     <div><dt>Cobertura</dt><dd><b>{p.cobertura.valor.toFixed(2)}%</b> {p.cobertura.etiqueta}</dd></div>
     <div className={est.procLimite}><dt>Límite</dt><dd>{p.limite}</dd></div>
@@ -631,7 +635,7 @@ function PanelB18({ mapa, fmt, seccion, onSeccion, onCerrar, onVerFicha }: {
         <div className={est.cabeceraDerecha}>
           <div className={est.declaracion}>
             <strong>{mapa.procedencia.capa}</strong>
-            <span>{mapa.procedencia.moneda} · período {mapa.procedencia.periodo} · corte {mapa.procedencia.corte}</span>
+            <span>{mapa.procedencia.moneda} · período {mapa.procedencia.periodo} · última venta registrada {mapa.procedencia.corte}</span>
           </div>
           <button type="button" className={est.cerrarPanel} onClick={onCerrar} aria-label="Cerrar B18 y volver al mapa">×</button>
         </div>
@@ -983,7 +987,7 @@ function ReporteCentral({ mapa, activo, onAbrirAgente }: {
     <dl className="b18-metadatos">
       <div><dt>Fuente</dt><dd>{mapa.procedencia.fuente}</dd></div>
       <div><dt>Período</dt><dd>{mapa.procedencia.periodo}</dd></div>
-      <div><dt>Corte</dt><dd>{mapa.procedencia.corte}</dd></div>
+      <div><dt>Última venta</dt><dd>{mapa.procedencia.corte}</dd></div>
       <div><dt>Moneda</dt><dd>{mapa.procedencia.moneda}</dd></div>
       <div><dt>Capa</dt><dd>{mapa.procedencia.capa}</dd></div>
       <div><dt>Cobertura</dt><dd>{mapa.procedencia.cobertura.valor.toFixed(2)}% {mapa.procedencia.cobertura.etiqueta}</dd></div>
@@ -1044,7 +1048,13 @@ export function MapaB18Clientes({ mapa, fmt, onVerFicha }: PropsMapaB18Clientes)
     <div className="b18-map-canvas">
       <header className="b18-map-header">
         <div><p>Reporte general</p><h2>Cartera comercial de clientes</h2></div>
-        <span>Corte: {mapa.procedencia.corte}</span>
+        {/* "Corte: 2026-08-19" a secas se confunde con el corte de snapshot
+            (2026-08-24) que usan Cuadro de mando/Aging/Prioritarios
+            (FECHA_CORTE_DATOS_REALES, lib/datosReales.ts). Acá el corte es
+            OTRO concepto, legítimo pero distinto: la fecha de la última venta
+            confirmada del dataset (`lib/lecturas-clientes-reales.ts:342`,
+            `movimientos.at(-1).dia`). El rótulo lo dice explícito. */}
+        <span>Última venta registrada: {mapa.procedencia.corte}</span>
       </header>
 
       <div className="b18-map-grid">

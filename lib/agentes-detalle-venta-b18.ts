@@ -33,6 +33,7 @@ import type { Dataset } from "@/lib/types";
 
 const clamp = (valor: number) => Math.min(Math.max(Number.isFinite(valor) ? valor : 0, 0), 100);
 const num = (valor: number) => valor.toLocaleString("es-GT");
+const firmado = (valor: number) => `${valor >= 0 ? "+" : ""}${valor.toFixed(2)}%`;
 
 export function construirDetalleVentaB18(dataset: Dataset, fmt: (monto: number) => string): ContratoB18 {
   const lectura = leerVentasReales(dataset);
@@ -61,7 +62,30 @@ export function construirDetalleVentaB18(dataset: Dataset, fmt: (monto: number) 
       }))
     );
 
-    const pesoDelPedido = clienteFila && clienteFila.valor > 0 ? clamp((totalConfirmado / clienteFila.valor) * 100) : 0;
+    // "Vs. ticket promedio" se calcula contra los OTROS pedidos del cliente,
+    // no contra el promedio de TODOS sus pedidos: `clienteFila.ticket` incluye
+    // este mismo pedido en su propio promedio, lo que sesga la comparación
+    // hacia 0 (más fuerte cuanto menos historial tiene el cliente — verificado
+    // con query real: para un cliente con solo 4 pedidos, el sesgo cambia el
+    // resultado de -33.12% a -39.77%). Restar este pedido del acumulado antes
+    // de promediar da la comparación honesta: "¿este pedido es distinto de lo
+    // que este cliente pide normalmente, sin contar este pedido?"
+    const otrosPedidosCliente = clienteFila ? clienteFila.pedidos - 1 : 0;
+    const ticketOtrosPedidos = clienteFila && otrosPedidosCliente > 0
+      ? (clienteFila.valor - totalConfirmado) / otrosPedidosCliente
+      : null;
+    const vsTicketOtrosPedidos = ticketOtrosPedidos && ticketOtrosPedidos > 0
+      ? ((totalConfirmado - ticketOtrosPedidos) / ticketOtrosPedidos) * 100
+      : null;
+    // Recencia: días desde el pedido confirmado inmediatamente anterior de
+    // este mismo cliente (0 si puso más de un pedido el mismo día). `null`
+    // cuando este es el primer pedido confirmado del cliente en el dataset.
+    const historialCliente = lectura.ventas.filter((v) => v.id_cliente === venta.id_cliente);
+    const idxEnHistorial = historialCliente.findIndex((v) => v.id_venta === venta.id_venta);
+    const pedidoAnterior = idxEnHistorial > 0 ? historialCliente[idxEnHistorial - 1] : null;
+    const diasDesdePedidoAnterior = pedidoAnterior
+      ? Math.round((new Date(venta.fecha_venta).getTime() - new Date(pedidoAnterior.fecha_venta).getTime()) / 86400000)
+      : null;
 
     const problema = lineasSinProducto > 0
       ? `${num(lineasSinProducto)} de ${num(lineasCrudas)} línea(s) de este pedido no resolvieron a un producto del catálogo y quedan fuera de la composición.`
@@ -100,10 +124,17 @@ export function construirDetalleVentaB18(dataset: Dataset, fmt: (monto: number) 
         {
           id: "explica",
           grafica: "barras",
-          kpiTexto: `${num(lineasResueltas)} línea${lineasResueltas === 1 ? "" : "s"}`,
-          etiqueta: "SKU en el pedido",
+          // KPI viejo: conteo suelto de líneas ("5 líneas") -- no dice si el
+          // pedido está concentrado en un SKU o repartido entre muchos. El
+          // % del SKU líder (ya calculado en `filas[0]`, repartir() ordena
+          // desc por pct) responde eso de un vistazo: p. ej. WALMART
+          // VTA-S03700 tiene 43.51% en un solo SKU (riesgo de quiebre de
+          // stock si ese producto falla) mientras CEMACO VTA-S03694, con
+          // 28 líneas, tiene apenas 14.99% en su líder (pedido diversificado).
+          kpiTexto: lineasResueltas > 0 ? pctB18(filas[0]?.pct ?? 0) : "Sin dato",
+          etiqueta: "del pedido en un solo SKU",
           resumen: lineasResueltas > 0
-            ? `Encabeza ${filas[0]?.nombre ?? "sin señal"} con ${pctB18(filas[0]?.pct ?? 0)} del pedido.`
+            ? `${filas[0]?.nombre ?? "sin señal"} explica ${pctB18(filas[0]?.pct ?? 0)} del pedido, entre ${num(lineasResueltas)} línea${lineasResueltas === 1 ? "" : "s"} en total.`
             : "Este pedido no tiene líneas con producto identificado.",
           problema: lineasSinProducto > 0
             ? `${num(lineasSinProducto)} línea(s) no resolvieron a un producto del catálogo.`
@@ -121,15 +152,36 @@ export function construirDetalleVentaB18(dataset: Dataset, fmt: (monto: number) 
         },
         {
           id: "recomienda",
-          grafica: "cobertura",
-          donaPct: pesoDelPedido,
-          kpiTexto: clienteFila ? pctB18(pesoDelPedido) : "Sin dato",
-          etiqueta: "de su historial acumulado",
+          // KPI viejo: "% del historial acumulado del cliente" -- para un
+          // cliente con 146 pedidos (WALMART) cualquier pedido individual da
+          // ~0.8%, sin importar si fue grande o chico para ESE cliente: el
+          // número se achica solo con la antigüedad de la cuenta, no dice
+          // nada del pedido de hoy. La comparación contra el ticket promedio
+          // de sus OTROS pedidos sí es comparable entre un cliente nuevo y
+          // uno de siempre, y es la pregunta que un vendedor realmente hace:
+          // "¿este pedido es más grande o más chico de lo normal para este
+          // cliente?". Sin `donaPct` propio (como Explica/Prioriza): la dona
+          // cae a `categoria.cobertura` (B18-1), no a un valor sin relación.
+          grafica: "barras",
+          kpiTexto: vsTicketOtrosPedidos !== null ? firmado(vsTicketOtrosPedidos) : "Sin dato",
+          etiqueta: vsTicketOtrosPedidos !== null ? "vs. su ticket promedio histórico" : "sin pedidos previos para comparar",
           resumen: clienteFila
-            ? `${clienteNombre} acumula ${fmt(clienteFila.valor)} en ${num(clienteFila.pedidos)} pedidos confirmados.`
+            ? `${clienteNombre} acumula ${fmt(clienteFila.valor)} en ${num(clienteFila.pedidos)} pedidos confirmados` +
+              (ticketOtrosPedidos !== null ? ` (ticket promedio de los otros ${num(otrosPedidosCliente)}: ${fmt(ticketOtrosPedidos)}).` : ".") +
+              (diasDesdePedidoAnterior !== null
+                ? ` Su pedido anterior fue hace ${num(diasDesdePedidoAnterior)} día${diasDesdePedidoAnterior === 1 ? "" : "s"}.`
+                : " Es el primer pedido confirmado de este cliente en el dataset.")
             : `${clienteNombre} no tiene historial acumulado disponible.`,
-          problema: "Este contexto ordena la conversación comercial; no autoriza crear un pedido nuevo por sí solo.",
-          accion: "Preparar la conversación con el historial del cliente antes de negociar el siguiente pedido.",
+          problema: vsTicketOtrosPedidos === null
+            ? "Este es el único pedido confirmado de este cliente en el dataset: no hay ticket promedio previo con el que compararlo."
+            : vsTicketOtrosPedidos >= 0
+              ? `Este pedido quedó ${firmado(vsTicketOtrosPedidos)} sobre el ticket promedio de los otros pedidos de este cliente.`
+              : `Este pedido quedó ${firmado(vsTicketOtrosPedidos)} bajo el ticket promedio de los otros pedidos de este cliente.`,
+          accion: vsTicketOtrosPedidos === null
+            ? "No hay pedidos previos de este cliente con qué comparar: tratar este pedido como línea base."
+            : vsTicketOtrosPedidos >= 0
+              ? "Aprovechar la conversación: el pedido superó el promedio histórico de este cliente."
+              : "Indagar por qué el pedido quedó bajo el promedio histórico antes de cerrar el ciclo de venta.",
         },
       ],
       metadatos: [
@@ -156,7 +208,12 @@ export function construirDetalleVentaB18(dataset: Dataset, fmt: (monto: number) 
     eyebrow: "VENTAS · DETALLE DE PEDIDO",
     titulo: "Detalle de venta",
     rotuloRiel: "Pedidos",
-    corte: lectura.hasta ?? "sin pedidos confirmados",
+    // B18-16: "Corte: 2026-08-19" a secas es ambiguo -- Cuadro de mando/Aging/
+    // Prioritarios muestran ahí `FECHA_CORTE_DATOS_REALES` (fecha en que se
+    // extrajo el snapshot de Odoo), mientras que acá `lectura.hasta` es la
+    // fecha del ÚLTIMO PEDIDO CONFIRMADO real -- un concepto legítimamente
+    // distinto, pero indistinguible con el mismo rótulo "Corte:" pelado.
+    corte: lectura.hasta ? `última venta confirmada — ${lectura.hasta}` : "sin pedidos confirmados",
     categorias,
     resumen: {
       subtitulo: `Últimos ${categorias.length} pedidos confirmados`,

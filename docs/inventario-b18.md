@@ -1566,9 +1566,352 @@ alguien en el futuro propone un KPI que dependa de "precio de catálogo"
 sin verificarlo primero con query, se va a encontrar con que ese campo
 no tiene ningún dato real detrás.
 
+### 🟡 B18-16 — "Corte: 2026-08-19" no decía si era la fecha del snapshot o la última venta
+
+**Dónde:** `lib/agentes-detalle-venta-b18.ts`, donde se arma
+`corte: lectura.hasta` para el contrato, renderizado por
+`components/commercial/MoldeB18.tsx:264` (`<span>Corte: {contrato.corte}</span>`)
+y `:173` (`corte {corte}` del subtítulo del dashboard B18).
+
+**Qué comprobé:** Cuadro de mando, Aging y Prioritarios (secciones 1-3
+de este documento) muestran en ese mismo rótulo `FECHA_CORTE_DATOS_REALES`
+(`lib/datosReales.ts:109`) = **"2026-08-24"** — la fecha en que se
+extrajo el snapshot de Odoo hacia Supabase. Detalle de venta, en cambio,
+muestra `lectura.hasta` (`lib/lecturas-ventas-reales.ts:84`) =
+**"2026-08-19"** — la fecha del último pedido confirmado (`estado_odoo
+=== "sale"`) real en el dataset. Verificado con query real
+(`scripts/ejecutar-detalle-venta.ts`): son, en efecto, dos fechas
+distintas separadas por 5 días en el corte actual, cada una correcta
+para lo que mide (la extracción es posterior a la última venta
+confirmada, algo esperable). No es un error de dato — es una diferencia
+legítima de concepto (fecha de extracción vs. fecha de la última
+transacción real) que el rótulo simple "Corte:" no distinguía.
+
+**Impacto:** alguien que compare el "Corte: 2026-08-24" de `/` contra el
+"Corte: 2026-08-19" de `/ventas/detalle` puede leerlo como una
+inconsistencia de datos entre pantallas del mismo tablero (mismo tipo de
+riesgo de confianza que ya documentan B18-4 y B18-11, aunque acá la
+magnitud es de días, no de casi Q200,000).
+
+**✅ Corregido — 2026-09-03.** El `corte` que arma
+`construirDetalleVentaB18()` ahora es
+`` lectura.hasta ? `última venta confirmada — ${lectura.hasta}` : "sin pedidos confirmados" ``
+en vez de la fecha pelada. No se tocó `MoldeB18.tsx` (molde compartido
+por 5 páginas): la aclaración va en el STRING que arma esta página, no
+en la plantilla `<span>Corte: {contrato.corte}</span>`. **Verificado con
+clic real** (Playwright para Python, mismo Chromium de `ms-playwright`,
+sobre `/ventas/detalle`): el encabezado del riel ahora muestra "Corte:
+última venta confirmada — 2026-08-19" y el subtítulo del Dashboard B18
+integral muestra "Últimos 10 pedidos confirmados · corte última venta
+confirmada — 2026-08-19", en las 3 categorías de pedido revisadas.
+
+**Prioridad:** media.
+
+### Rediseño de KPIs — 2026-09-03
+
+A diferencia de Cuadro de mando/Aging/Prioritarios, acá no hay 16
+tarjetas fijas que auditar una por una: hay **4 tarjetas × 10 pedidos**
+(40 lecturas), donde cada pedido es una categoría distinta del riel. Por
+eso el rediseño evalúa el **patrón** de las 4 tarjetas (Detecta/Explica/
+Prioriza/Recomienda) — la misma fórmula corre para los 10 pedidos — no
+cada categoría por separado. Se corrió `scripts/ejecutar-detalle-venta.ts`
+(nuevo, mismo patrón que `ejecutar-cuadro-mando.ts`/`ejecutar-aging.ts`:
+carga el dataset real, ejecuta `leerVentasReales`/`detalleVenta` para los
+10 pedidos del riel y vuelca cada valor intermedio) contra los 10 pedidos
+reales que lista hoy la página.
+
+**Detecta y Prioriza no cambiaron.** Ya están bien diseñados: son las
+dos magnitudes que el propio archivo advierte que nunca hay que sumar
+(total confirmado con IVA/descuento vs. composición a precio de lista
+sin ellos, ver "🟢 Verificado con query real" más arriba en esta
+sección) — mezclarlas o "corregirlas" para que coincidan sería romper la
+regla de honestidad central de esta página.
+
+**Explica — de conteo suelto de líneas a concentración del SKU líder.**
+
+| Antes | Después | Por qué |
+|---|---|---|
+| KPI = "N líneas" (ej. "5 líneas", "28 líneas") · etiqueta "SKU en el pedido" | KPI = % del SKU líder en la composición (ej. "43.51%") · etiqueta "del pedido en un solo SKU" | Un conteo de líneas no dice si el pedido depende de un solo producto o está repartido — la misma familia de defecto ya corregida en otras páginas (conteo suelto sin contexto). El dato ya se calculaba (`filas[0].pct`, `repartir()` ordena desc) y vivía escondido dentro del `resumen`; ahora es el número grande de la tarjeta. |
+
+Verificado con los 3 pedidos revisados con clic real: VTA-S03700
+(WALMART, 5 líneas) → **43.51%** en un solo SKU (el casco Shenzhen L,
+riesgo real de quiebre de stock si ese producto falla); VTA-S03699
+(WALMART, 6 líneas) → **33.01%**; VTA-S03694 (CEMACO, 28 líneas) →
+apenas **14.99%** — un pedido mucho más diversificado, visible de
+inmediato en el número grande, donde antes solo decía "28 líneas" sin
+decir si esas 28 estaban repartidas parejo o dominadas por una. El
+conteo de líneas no se perdió: sigue en el `resumen` ("...entre 28
+líneas en total").
+
+**Recomienda — de "% del historial acumulado" a "vs. ticket promedio de sus otros pedidos".**
+
+| Antes | Después | Por qué |
+|---|---|---|
+| KPI = `totalConfirmado / clienteFila.valor × 100` ("% del historial acumulado del cliente") | KPI = comparación firmada contra el ticket promedio de los OTROS pedidos del cliente (ej. "+12.65%", "-39.77%") · etiqueta "vs. su ticket promedio histórico" | El KPI viejo se achica solo con la antigüedad de la cuenta, sin importar si el pedido de hoy fue grande o chico: para WALMART (146 pedidos) cualquier pedido individual da ~0.8-0.9%, un número que no distingue "pedido normal" de "pedido enorme para este cliente". La comparación contra su propio promedio SÍ es comparable entre un cliente nuevo y uno de siempre, y es la pregunta real que ordena una conversación comercial: "¿este pedido es más grande o más chico de lo normal para este cliente?" |
+
+**Corrección adicional, encontrada al construir el reemplazo (no un bug
+del KPI viejo, que no la tenía):** el ticket promedio no se calcula
+contra `clienteFila.ticket` (que **incluye** el propio pedido que se
+está mirando en su promedio, sesgándolo hacia 0), sino contra el
+promedio de los pedidos del cliente **sin contar este**. Verificado con
+query real que el sesgo es chico para cuentas con mucho historial
+(WALMART: +12.55% con auto-inclusión vs. +12.65% sin ella) pero se vuelve
+significativo para cuentas con pocos pedidos — el caso más marcado de
+los 10 pedidos del riel: CASCOS ABRAHAM (4 pedidos históricos, VTA-S03650)
+pasa de **-42.18%** (ticket promedio incluyéndose a sí mismo) a
+**-49.31%** (ticket promedio de sus otros 3 pedidos, la comparación
+honesta) — una diferencia de más de 7 puntos porcentuales por el simple
+hecho de no restar el propio pedido antes de promediar. Mismo tipo de
+disciplina que ya exigió B18-14/B18-15 en Aging: verificar con número
+real antes de asumir que una fórmula obvia es la correcta.
+
+Se agregó también, sin costo de una fuente nueva (`lectura.ventas` ya
+estaba cargado), la recencia: días desde el pedido confirmado anterior
+de ese mismo cliente, en el `resumen` de la tarjeta (ej. "Su pedido
+anterior fue hace 19 días", o "Es el primer pedido confirmado de este
+cliente en el dataset" cuando no hay uno previo).
+
+Caso límite manejado sin inventar dato: cuando el cliente tiene
+exactamente 1 pedido confirmado en todo el dataset (este mismo), no hay
+ningún "otro pedido" con qué comparar — la tarjeta muestra **"Sin
+dato"** / "sin pedidos previos para comparar" en vez de forzar una
+comparación contra sí mismo (que daría siempre 0.00%, un número con
+apariencia de señal real que no lo sería). No se encontró ningún caso
+así entre los 10 pedidos listados hoy (el mínimo observado fue 2
+pedidos históricos), pero el código lo contempla para cuando aparezca.
+
+**Verificado con clic real** (Playwright para Python, mismo Chromium de
+`ms-playwright`, sobre `/ventas/detalle`) en los 3 primeros pedidos del
+riel (VTA-S03700, VTA-S03699, VTA-S03694), las 4 tarjetas de cada uno:
+los números en pantalla (KPI, etiqueta, `resumen`) coinciden
+exactamente con los que produjo `scripts/ejecutar-detalle-venta.ts`
+contra el dataset real, y el rótulo de "Corte" (B18-16, arriba) ya dice
+"última venta confirmada — 2026-08-19" en las 3. La dona del drill-down
+(B18-1) sigue sin romperse: en las 12 combinaciones revisadas (3
+pedidos × 4 tarjetas) muestra 100% en las 4 — Detecta porque
+`donaPct: cobertura` (líneas resueltas, 100% real en todo el dataset,
+ver "🟢 Nota" más arriba) y Explica/Prioriza/Recomienda porque ninguna
+trae `donaPct` propio y caen al mismo `categoria.cobertura`, mismo
+criterio de fallback que ya usan las otras 4 páginas — no es un valor
+inventado ni una fila arbitraria de otra tarjeta.
+
 ---
 
 ## 6. Inventario (`/inventario`) — pendiente
+
+---
+
+## 7. Cartera comercial de clientes (`/ventas/clientes`)
+
+**Aviso de arquitectura, verificado en código antes de tocar nada:** a
+diferencia de Cuadro de mando, Aging, Prioritarios y Detalle de venta
+(las 4 páginas de las secciones 1, 2, 3 y 5, todas construidas sobre
+`components/commercial/MoldeB18.tsx` + `lib/contrato-b18.ts`),
+`/ventas/clientes` usa un componente propio y separado:
+`components/commercial/MapaB18Clientes.tsx` (1084 líneas), alimentado
+por `lib/agentes-clientes-b18.ts` + `lib/lecturas-clientes-reales.ts` +
+`lib/contrato-clientes-b18.ts` (un contrato de datos v3 distinto de
+`lib/contrato-b18.ts`, con su propio comentario de cabecera: "CONGELADO
+otra vez en v2 ... Un contrato que se edita a mitad del trabajo no es
+un contrato"). Se construyó temprano en la sesión, antes de que se
+estandarizara el molde compartido. Por eso **ningún arreglo de las
+secciones 1-3 y 5 (B18-1, B18-6, B18-10, B18-16, etc.) se hereda acá
+automáticamente** — cada hallazgo de esta sección se verificó de forma
+independiente, sobre el código real de este componente, sin asumir que
+lo que ya se corrigió en `MoldeB18.tsx` aplicara.
+
+Mismo método y mismo rigor que las secciones anteriores: se cargó
+`cargarDatasetReal()` real (372 clientes, 3,189 pedidos con
+`estado_odoo = 'sale'`) y se ejecutó `leerClientesReales(dataset)` —la
+única función que arma las 4 categorías (Recencia, Comparable,
+Concentración, Recuperación) y los 7 paneles del dashboard integral—
+con un script nuevo, mismo patrón que los anteriores:
+`scripts/ejecutar-clientes.ts` (vuelca los 4 tramos de recencia, los 5
+cortes de concentración, la ventana YTD contra su comparable, las
+cuentas detenidas y los pedidos en Q0.00 — no solo el KPI final).
+Verificado con clic real el 2026-09-03: como el navegador del MCP de
+Playwright ya estaba en uso por otro proceso de esta sesión (mismo
+mensaje `Browser is already in use` que ya registran las secciones 2 y
+5), se usó Playwright para Python contra el mismo binario de Chromium
+pedido (`ms-playwright\chromium-1234\chrome-win64\chrome.exe`), con un
+`user_data_dir` propio — mismo principio de aislamiento que ya usan las
+otras secciones.
+
+### 🟢 Verificado correcto — el dona central NO reproduce el bug B18-1, con firma propia verificada de forma independiente
+
+**Por qué hacía falta comprobarlo aparte:** B18-1 (sección 1) es un bug
+del molde compartido (`MoldeB18.tsx`), y esta página no usa ese molde.
+El fix de B18-1 no podía asumirse acá — había que buscar el mismo *tipo*
+de defecto (una dona que no sigue al KPI que dice representar) de forma
+independiente en `MapaB18Clientes.tsx`.
+
+**Lo que hay en este componente:** el único elemento tipo dona de toda
+la página es `.b18-dona-principal`, dentro de `ReporteCentral`
+(`MapaB18Clientes.tsx`, función `ReporteCentral`, hoy ~línea 939). A
+diferencia del drill-down de `MoldeB18.tsx` (que sí tiene 4 pestañas por
+tarjeta y debía mostrar una dona distinta en cada una), el drill-down
+propio de esta página (`DrilldownAgente`) **no tiene ninguna dona** —
+usa el componente `Barras` para las 4 categorías, sin excepción. El
+único candidato a reproducir B18-1 es entonces la dona del "Reporte
+central", que vive fuera del drill-down, siempre visible en el lienzo
+principal.
+
+**Lo que comprobé con clic real:** esa dona está deliberadamente
+cableada al agente `recencia` (`const recencia = porId("recencia")`,
+línea ~897) y **nunca** al agente que esté activo (`activo`/`agenteActivo`
+sólo controla el resaltado del riel lateral y el bloque "Siguiente
+decisión" de abajo). Hice clic en los 4 botones del riel lateral
+(Recencia, Comparable, Concentración, Recuperación) y extraje, en cada
+uno, el `style` (`--b18-pct`) y el texto de la dona, más el texto del
+bloque "Siguiente decisión":
+
+| Activo (riel lateral) | Dona central | "Siguiente decisión" |
+|---|---|---|
+| Recencia | `--b18-pct: 240.984deg` · "66.94% +90 DÍAS" | RECENCIA · "Trabajar el tramo 61-90..." |
+| Comparable | `--b18-pct: 240.984deg` · "66.94% +90 DÍAS" | COMPARABLE · "Medir cuántos de los 51 de primera compra..." |
+| Concentración | `--b18-pct: 240.984deg` · "66.94% +90 DÍAS" | CONCENTRACIÓN · "Revisar primero la 1 cuenta que está en el Top 20..." |
+| Recuperación | `--b18-pct: 240.984deg` · "66.94% +90 DÍAS" | RECUPERACIÓN · "Llamar las cuentas detenidas..." |
+
+La dona **no cambia nunca** — y eso es correcto, no un bug: su
+`aria-label` (`"${recencia.kpi} de la cartera histórica sin compra
+confirmada en más de 90 días"`) nunca dice que representa al agente
+activo, y el "Siguiente decisión" (que sí cambia en las 4 filas,
+demostrando que `activo` se propaga bien al resto de la pantalla) es la
+pieza de la pantalla que responde "qué hacer con el agente que elegiste"
+— la dona responde otra pregunta fija: "cómo está la recencia de toda la
+cartera", el mismo dato en las 4 filas porque el `role="img"` sólo
+describe eso. `240.984deg = 66.9421% × 3.6`, exacto, coincide con el KPI
+propio de Recencia (`agenteRecencia.kpi`, `lib/agentes-clientes-b18.ts:234`)
+en las 4 filas.
+
+**Conclusión:** no hay un B18-1 independiente en esta página. El diseño
+central es "una lectura ejecutiva fija (Recencia + Comparable)", no "un
+resumen que sigue al agente activo" — documentado así en el propio
+código (`MapaB18Clientes.tsx`, comentario de `ReporteCentral`: "El centro
+es UN reporte, no un resumen de las siete pestañas"), y el comportamiento
+en pantalla es consistente con esa documentación en los 4 casos
+probados, no solo en 1.
+
+### 🟢 Verificado correcto — cruce exacto entre esta página y el dominio Ventas de Cuadro de mando
+
+`lib/lecturas-ventas-reales.ts` (usada por VE en Cuadro de mando, sección
+1) y `lib/lecturas-clientes-reales.ts` (usada acá) son dos lecturas
+**independientes** sobre el mismo universo (`dataset.ventas` filtrado a
+`estado_odoo === "sale"`) — el propio archivo de esta página lo declara
+a propósito ("Mismas convenciones que aquél, a propósito ... Si las dos
+páginas leyeran el mismo hecho con dos reglas distintas, la diferencia
+no se vería: se leería como negocio."). Antes de dar por buena esa
+promesa la comprobé cruzando ambas funciones contra el mismo dataset:
+
+| Cruce | `leerSerieVentas()` (Cuadro de mando · VE) | `leerClientesReales()` (esta página) | Resultado |
+|---|---|---|---|
+| Corte (última venta confirmada) | `2026-08-19` | `2026-08-19` | ✅ exacto |
+| Variación de venta YTD vs. comparable | `24.67%` (coincide con VE-Detecta, sección 1) | `24.67%` | ✅ exacto |
+| Variación de compradores YTD vs. comparable | `35.48%` | `35.48%` (KPI de Explica acá) | ✅ exacto |
+| Compradores / pedidos / venta YTD | 168 / 724 / Q 4,766,666.63 | 168 / 724 / Q 4,766,666.63 | ✅ exacto al centavo |
+
+Dos implementaciones separadas, mismo dataset, mismo resultado — la
+"Última venta" que ahora aclara el rótulo de esta página (ver B18-17
+abajo) es el mismo número, con el mismo significado, que ya usa
+Cuadro de mando en su propio metadato "Corte" del dominio VE
+(`lib/agentes-cuadro-mando.ts:449`, `corteVentas = serie.corte`) — no es
+un corte inventado para esta pantalla.
+
+### 🟡 B18-17 — "Corte: 2026-08-19" también era ambiguo acá, mismo patrón que B18-16 en Detalle de venta
+
+**Dónde:** `components/commercial/MapaB18Clientes.tsx` — el rótulo
+literal `Corte: {mapa.procedencia.corte}` vivía en el encabezado
+principal del lienzo (línea 1051 antes del arreglo), y la misma cifra
+sin aclarar aparecía otras 3 veces: en el `<dt>Corte</dt>` de
+`Procedencia` (línea 61, reutilizado por las 7 secciones del panel B18),
+en el `<dt>Corte</dt>` del `dl` de metadatos de `ReporteCentral` (línea
+990) y en la cabecera del panel B18 integral (`corte
+{mapa.procedencia.corte}`, línea 634).
+
+**Qué comprobé:** `mapa.procedencia.corte` sale de
+`construirMapaClientesB18()` → `leerClientesReales(dataset).corte`, que
+`lib/lecturas-clientes-reales.ts:342` deriva así: `movimientos[length-1].dia`
+— la fecha de la **última venta confirmada** del snapshot (2026-08-19).
+Cuadro de mando, Aging y Prioritarios (secciones 1-3) muestran su propio
+"Corte" con `FECHA_CORTE_DATOS_REALES` (`lib/datosReales.ts`,
+2026-08-24) — la fecha en que se extrajo el snapshot completo de Odoo,
+5 días después. Son dos conceptos legítimos y distintos (un dataset
+puede tener ventas confirmadas más recientes que el corte contable del
+resto de la cartera, o viceversa), pero un rótulo que sólo dice "Corte:"
+no dice cuál de los dos es — exactamente el mismo defecto que ya
+encontró y corrigió, en paralelo, esta misma auditoría para
+`/ventas/detalle` (B18-16, sección 5, con el mismo tipo de ambigüedad y
+la misma diferencia de 5 días).
+
+**Arreglo aplicado — 2026-09-03.** En `MapaB18Clientes.tsx`, sin tocar
+`MoldeB18.tsx` ni `lib/contrato-b18.ts` (no son de esta página):
+
+- Encabezado principal: `Corte: {corte}` → `Última venta registrada: {corte}`.
+- Cabecera del panel B18 integral: `corte {corte}` → `última venta registrada {corte}`.
+- `<dt>Corte</dt>` (dos lugares, `Procedencia` y el `dl` de `ReporteCentral`) → `<dt>Última venta</dt>`.
+
+**Verificado con clic real:** el encabezado principal ahora muestra
+"Última venta registrada: 2026-08-19"; la cabecera del panel B18
+integral muestra "... · última venta registrada 2026-08-19"; los
+metadatos de procedencia (siete secciones del panel B18 más el bloque
+central) muestran la fila "Última venta · 2026-08-19" en vez de
+"Corte · 2026-08-19".
+
+**Prioridad:** media — **✅ corregido 2026-09-03**, verificado con clic
+real en `/ventas/clientes`. Mismo criterio de prioridad que B18-16.
+
+### Rediseño de KPIs — 2026-09-03
+
+Se auditaron las 4 tarjetas (una por categoría: Recencia, Comparable,
+Concentración, Recuperación) con `scripts/ejecutar-clientes.ts` contra
+el dataset real, buscando lo mismo que en las secciones 1-3 y 5:
+redundancia entre tarjetas de la misma pantalla y complementos
+matemáticos exactos (el patrón que en Cuadro de mando reveló que
+CO-Recomienda era 100% menos CO-Explica).
+
+**Punto de partida distinto a las otras páginas:** el propio
+`MapaB18Clientes.tsx` ya trae, en su comentario de cabecera de
+`construirTarjetas()`, la marca de una limpieza anterior a esta sesión:
+*"Antes, Prioriza y Recomienda mostraban las dos el mismo número —las
+cuentas del Top 50 histórico detenidas más de 90 días—, así que dos de
+los cuatro agentes decían lo mismo con distinto rótulo"* — ya resuelto
+antes de este pase. Verificando los 4 KPI actuales a varios decimales
+(Detecta 66.9421%, Prioriza 28.25%, Explica 35.48%, Recomienda 121
+enteros) no encontré ningún par que sea complemento matemático exacto
+del otro, ni ningún par que mida lo mismo con otras palabras: Detecta
+mide estancamiento (recencia), Explica mide crecimiento (comparable
+YTD), Prioriza mide riesgo de concentración, Recomienda medía salud de
+la base. Las 3 primeras se dejan sin cambio — auditadas y confirmadas
+que ya construyen sobre el hallazgo principal ("243 de 363 clientes,
+66.94%, llevan más de 90 días sin comprar") en vez de repetirlo: Explica
+lo contrasta contra crecimiento de compradores (+35.48%) y muestra que
+la mediana de pedidos por cliente cae de 3 a 2 — el crecimiento diluye,
+no fortalece, la frecuencia; Prioriza mide un eje totalmente distinto
+(cuánto del año depende de 5 cuentas); el único que sí cambió es
+Recomienda, por un defecto de valor de negocio, no de exactitud:
+
+| Tarjeta | Antes | Después | Por qué |
+|---|---|---|---|
+| Recomienda | KPI "121" · etiqueta "recurrentes con 2+ pedidos en el año" | KPI "17" · etiqueta "cuentas del Top 50 histórico ya detenidas +90 días" | La pregunta propia de la tarjeta es *"¿A quién llamar primero y por qué?"* (`agenteRecuperacion.pregunta`), pero el número grande no contestaba eso: 121 es una cifra sana (clientes que sí repiten), no una lista de a quién llamar. La lista real ya existía en la misma tarjeta — `lista: filas(detenidos, TOPE_LISTA)` (17 cuentas) y `accion: "Llamar las cuentas detenidas en el orden de esta lista..."` — sólo que relegada a una frase secundaria (`senal`) mientras el KPI grande decía otra cosa. Ahora el KPI, la lista y la acción hablan del mismo universo. `121` no se pierde: sigue siendo la primera fila de `metricas` ("recurrentes 2+ pedidos YTD") y la primera barra del drill-down. |
+
+**De paso, un error de concordancia real, encontrado al hacer clic (no
+al leer código):** con `top20Detenido.length = 1` la acción de Prioriza
+decía *"Revisar primero las 1 cuentas que están en el Top 20..."* —
+singular/plural roto porque el texto siempre usaba plural. Corregido en
+`lib/agentes-clientes-b18.ts` para declinar correctamente cuando el
+conteo es 1 ("la 1 cuenta que está"); verificado con clic real que hoy
+muestra exactamente eso (el dataset real tiene 1 sola cuenta del Top 20
+YTD detenida más de 90 días: HAYDN OTTONIEL MAZARIEGOS, Q 105,066.50,
+120 días).
+
+Verificado con clic real en `/ventas/clientes` (Playwright para Python,
+Chromium aislado) el 2026-09-03: las 4 tarjetas, sus 4 drill-downs y el
+panel B18 integral muestran los números tal cual los devuelve
+`leerClientesReales()` — incluida la tarjeta Recomienda ya con "17" y
+"cuentas del Top 50 histórico ya detenidas +90 días" tanto en la
+tarjeta como en el modal de drill-down (misma fuente,
+`agenteRecuperacion.kpi`, sin una segunda cifra escrita a mano en
+`MapaB18Clientes.tsx`).
 
 ---
 
@@ -1591,11 +1934,14 @@ no tiene ningún dato real detrás.
 | B18-13 | Un pedido sin `total_referencia` se mostraría como "Q 0.00" en vez de "Sin dato" — verificado con query real que hoy no ocurre (0 de 3,189 pedidos) | `agentes-detalle-venta-b18.ts:54,94` + `lecturas-ventas-reales.ts:36` | Baja — preventivo, sin caso real hoy |
 | B18-14 | "Saldo vencido sin gestión" (Gestión) sumaba el saldo TOTAL abierto del cliente (incluye facturas al día), no solo lo vencido — sobreestimaba Q141,599.78 (16.76%) | `agentes-aging-b18.ts` (categoría GE) | Alta — **✅ corregido 2026-09-03**, verificado con clic real en `/aging` |
 | B18-15 | "Pagada" (único motivo de exclusión presente) mostraba 0.00% del saldo excluido — el reparto usaba saldo, y una factura pagada tiene saldo Q0 por definición, en vez de contar facturas | `agentes-aging-b18.ts` (categoría EX) | Media — **✅ corregido 2026-09-03**, verificado con clic real en `/aging` |
+| B18-16 | "Corte: 2026-08-19" en Detalle de venta no decía si era la fecha del snapshot de Odoo (como en `/`, `/aging`, `/prioritarios`) o la fecha de la última venta confirmada real — son 2 conceptos legítimos y distintos (5 días de diferencia hoy) sin ninguna aclaración en el rótulo | `agentes-detalle-venta-b18.ts` (campo `corte`) | Media — **✅ corregido 2026-09-03**, verificado con clic real en `/ventas/detalle` |
+| B18-17 | "Corte: 2026-08-19" en Clientes tenía la misma ambigüedad que B18-16, en 4 lugares del mismo componente (encabezado principal, panel B18 integral, y dos bloques de procedencia) | `components/commercial/MapaB18Clientes.tsx` (4 spots) | Media — **✅ corregido 2026-09-03**, verificado con clic real en `/ventas/clientes` |
 
-Salvo B18-1, B18-14 y B18-15 (ya corregidos y verificados con clic
-real), nada más de esto se ha corregido todavía. Este archivo es el
-inventario, no el changelog — se actualiza a "corregido" recién cuando
-se verifique en pantalla, con clic real, después del arreglo.
+Salvo B18-1, B18-14, B18-15, B18-16 y B18-17 (ya corregidos y
+verificados con clic real), nada más de esto se ha corregido todavía.
+Este archivo es el inventario, no el changelog — se actualiza a
+"corregido" recién cuando se verifique en pantalla, con clic real,
+después del arreglo.
 
 > **Nota al pie (2026-09-03):** el rediseño de KPIs documentado en
 > "Rediseño de KPIs — 2026-09-03" (dentro de la sección 1) no corrige
@@ -1633,3 +1979,40 @@ se verifique en pantalla, con clic real, después del arreglo.
 > confirmó vigente en Aging (categoría AN, mismo síntoma que en Cartera)
 > sin corregirse — misma decisión de diseño pendiente que ya tenía en
 > Cuadro de mando.
+
+> **Nota al pie (2026-09-03), Detalle de venta:** el rediseño de KPIs
+> documentado en "Rediseño de KPIs — 2026-09-03" (dentro de la sección 5)
+> sí agrega una fila nueva a esta tabla — B18-16 — y es, junto con B18-14/
+> B18-15 de Aging, la tercera vez que el propio proceso de auditar con
+> datos reales encuentra un defecto real (acá, un rótulo ambiguo, no una
+> cifra mal calculada) en vez de sólo tarjetas débiles o redundantes.
+> B18-13 (pedido sin `total_referencia` mostraría "Q 0.00" en vez de "Sin
+> dato") **no** se corrigió — sigue exactamente igual, prioridad baja,
+> sin caso real hoy — el rediseño tocó las tarjetas Explica y Recomienda,
+> no el cálculo de `totalConfirmado` que documenta B18-13. A diferencia de
+> Cuadro de mando/Aging/Prioritarios, acá no hay "12 de 16" o "5 de 16"
+> tarjetas para contar: la misma fórmula de Explica y Recomienda corre
+> para los 10 pedidos del riel (40 lecturas), y Detecta/Prioriza se
+> confirmaron sin cambio en las 10 categorías por ser, a propósito, las
+> dos magnitudes que la página nunca debe mezclar.
+
+> **Nota al pie (2026-09-03), Clientes:** el rediseño de KPIs documentado
+> en "Rediseño de KPIs — 2026-09-03" (dentro de la sección 7) agrega una
+> fila nueva a esta tabla — B18-17 — con el mismo defecto que B18-16
+> (rótulo "Corte" ambiguo), encontrado y corregido de forma
+> independiente porque `/ventas/clientes` no comparte componente con
+> `/ventas/detalle` ni con las otras 3 páginas. De las 4 tarjetas de esta
+> página, sólo 1 cambió de KPI (Recomienda: de "121 recurrentes" a "17
+> cuentas detenidas +90 días", ver sección 7) — a diferencia de Cuadro de
+> mando (12 de 16) y Aging (5 de 16), acá el propio componente ya traía,
+> antes de esta sesión, una limpieza previa documentada en su código
+> ("Antes, Prioriza y Recomienda mostraban las dos el mismo número") que
+> dejó las otras 3 tarjetas (Detecta, Explica, Prioriza) ya bien
+> diferenciadas: verificadas a varios decimales, ningún par es
+> complemento matemático exacto del otro ni repite el mismo hallazgo con
+> otras palabras. La sección 7 también verificó, de forma independiente
+> y con clic real (no por herencia de B18-1), que el único elemento tipo
+> dona de esta página —fijo en el "Reporte central", no en el
+> drill-down— no reproduce el defecto de B18-1: nunca afirma seguir al
+> agente activo, y en efecto no lo sigue, de forma consistente en los 4
+> casos probados.

@@ -427,7 +427,7 @@ export function construirMapaClientesB18(dataset: Dataset): MapaClientesB18 {
     problema: `La cuenta mayor sola vale ${pct(top1?.pct ?? 0)} del año; perderla no se compensa con clientes nuevos de una compra.`,
     accion:
       top20Detenido.length > 0
-        ? `Revisar primero las ${entero(top20Detenido.length)} cuentas que están en el Top 20 del año y a la vez sin comprar hace más de 90 días.`
+        ? `Revisar primero ${top20Detenido.length === 1 ? "la" : "las"} ${entero(top20Detenido.length)} cuenta${top20Detenido.length === 1 ? "" : "s"} que ${top20Detenido.length === 1 ? "está" : "están"} en el Top 20 del año y a la vez sin comprar hace más de 90 días.`
         : "Ninguna cuenta del Top 20 del año está detenida: sostener la frecuencia de ese grupo antes de buscar cuentas nuevas.",
     formula: "pct = Σ venta(top N del período) ÷ Σ venta del período × 100 — el denominador es siempre el total, nunca el subconjunto",
     procedencia: proc({
@@ -497,8 +497,14 @@ export function construirMapaClientesB18(dataset: Dataset): MapaClientesB18 {
         ? `${entero(detenidos.length)} cuentas del Top 50 histórico llevan más de 90 días detenidas`
         : "Ninguna cuenta del Top 50 histórico está detenida más de 90 días",
     pregunta: "¿A quién llamar primero y por qué?",
-    kpi: entero(ytd.recurrentes),
-    kpiEtiqueta: "recurrentes con 2+ pedidos en el año",
+    // KPI = tamaño de la lista de llamadas, no la salud general de la base.
+    // Antes acá vivía `ytd.recurrentes` (121): un número sano —clientes que sí
+    // repiten— que no contesta "a quién llamar primero". Esa cifra sigue
+    // disponible (primera fila de `metricas`, abajo, y en el "apoyo" de la
+    // tarjeta); el número grande ahora es el mismo universo que ya arma
+    // `lista` (`detenidos`) y que `accion` ya le pide llamar en orden.
+    kpi: entero(detenidos.length),
+    kpiEtiqueta: "cuentas del Top 50 histórico ya detenidas +90 días",
     micro: distribucion.map((d) => ({
       etiqueta: d.etiqueta,
       alto: ancho(d.n, maxDistribucion),
