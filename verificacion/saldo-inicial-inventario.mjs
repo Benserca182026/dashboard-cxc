@@ -37,8 +37,8 @@
 
 import { readFileSync, existsSync } from "node:fs";
 
-const SUPABASE_URL = "https://jfvmuemyjcdesnoqeaix.supabase.co";
-const SUPABASE_ANON_KEY = "sb_publishable_7l3WptofYtgvkDUHKyfwPQ_x0nl0lc1";
+const SUPABASE_URL = process.env.SUPABASE_URL;
+const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY;
 
 const [rutaQuant, instante] = process.argv.slice(2);
 

@@ -37,9 +37,9 @@ import {
   subirEnLotes,
 } from "./lib-importacion-odoo.mjs";
 
-const SUPABASE_URL = process.env.SUPABASE_URL || "https://jfvmuemyjcdesnoqeaix.supabase.co";
+const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_ANON_KEY =
-  process.env.SUPABASE_ANON_KEY || "sb_publishable_7l3WptofYtgvkDUHKyfwPQ_x0nl0lc1";
+  process.env.SUPABASE_ANON_KEY;
 
 const PALABRAS_CLAVE = {
   numero_pago: ["número", "numero"],

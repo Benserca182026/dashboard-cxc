@@ -63,8 +63,8 @@ import type {
   VentaLinea,
 } from "./types";
 
-const SUPABASE_URL = "https://jfvmuemyjcdesnoqeaix.supabase.co";
-const SUPABASE_ANON_KEY = "sb_publishable_7l3WptofYtgvkDUHKyfwPQ_x0nl0lc1";
+const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
+const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? "";
 const TAMANO_PAGINA = 1000; // límite por defecto de PostgREST por respuesta
 /** Único estado de Odoo que es una venta. "draft"/"sent" son presupuestos; "Cancelado" es un pedido caído. */
 const ESTADO_VENTA_CONFIRMADA = "sale";

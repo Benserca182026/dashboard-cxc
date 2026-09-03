@@ -1,7 +1,7 @@
 import { leerXlsxHoja1 } from "./lib-importacion-odoo.mjs";
 
-const SUPABASE_URL = "https://jfvmuemyjcdesnoqeaix.supabase.co";
-const KEY = "sb_publishable_7l3WptofYtgvkDUHKyfwPQ_x0nl0lc1";
+const SUPABASE_URL = process.env.SUPABASE_URL;
+const KEY = process.env.SUPABASE_ANON_KEY;
 
 const headersBase = {
   apikey: KEY,

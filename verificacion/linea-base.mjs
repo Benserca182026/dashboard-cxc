@@ -10,8 +10,8 @@
 // marcados como REFERENCIA: hay que reconfirmarlos contra Odoo antes de dar por
 // cerrada cualquier prueba, porque amount_residual es un campo vivo.
 
-const URL = "https://jfvmuemyjcdesnoqeaix.supabase.co";
-const KEY = "sb_publishable_7l3WptofYtgvkDUHKyfwPQ_x0nl0lc1";
+const URL = process.env.SUPABASE_URL;
+const KEY = process.env.SUPABASE_ANON_KEY;
 const H = { apikey: KEY, Authorization: `Bearer ${KEY}` };
 
 // La REST de Supabase corta en 1000 filas. venta_lineas tiene 23.869: sin

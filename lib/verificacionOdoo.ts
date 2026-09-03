@@ -12,8 +12,8 @@
 
 import type { BucketAging } from "./types";
 
-const SUPABASE_URL = "https://jfvmuemyjcdesnoqeaix.supabase.co";
-const SUPABASE_ANON_KEY = "sb_publishable_7l3WptofYtgvkDUHKyfwPQ_x0nl0lc1";
+const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
+const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? "";
 
 interface FilaSaldoOdoo {
   tramo: "actual" | "1-30" | "31-60" | "61-90" | "91-120" | "older" | "total";
