@@ -423,10 +423,17 @@ export function construirPrioritariosB18(
     categorias: [score, gestion, concentracion, antiguedad],
     resumen: {
       subtitulo: "Score, gestión, concentración y antigüedad de la worklist priorizada",
+      // Los 4 KPI de cabecera cambiaron (2026-09-03): "Cuentas con saldo
+      // abierto" (111, el 100% de la worklist — no distingue nada) y "Score
+      // líder (simulado)" (la cifra de UN cliente con una heurística no
+      // aprobada por Finanzas) no resumían el grupo ni orientaban ninguna
+      // decisión. Se reemplazan por Concentración Top 5 y Saldo sin gestión:
+      // ambas ya se calculaban para las categorías de abajo, y sí describen
+      // el tamaño real del problema de priorización.
       kpis: [
-        { etiqueta: "Cuentas con saldo abierto", valor: num(filas.length), nota: `${pctB18(coberturaScore)} del saldo en el Top 10 — no es una selección, es el 100% con deuda` },
-        { etiqueta: "Saldo total con deuda abierta", valor: fmt(saldoTotal), nota: `${pctB18(coberturaConcentracion)} en el Top 5 por saldo` },
-        { etiqueta: "Score líder (simulado)", valor: lider ? `${lider.score} pts` : "—", nota: lider?.cliente ?? "sin cuentas" },
+        { etiqueta: "Saldo total con deuda abierta", valor: fmt(saldoTotal), nota: `${num(filas.length)} cuentas priorizadas` },
+        { etiqueta: "Concentración Top 5", valor: pctB18(coberturaConcentracion), nota: `${fmt(saldoTop5)} en 5 de ${num(filas.length)} cuentas` },
+        { etiqueta: "Saldo priorizado sin gestión", valor: fmt(saldoSin), nota: `${num(sinGestion.length)} de ${num(filas.length)} cuentas · ${pctB18(100 - coberturaGestion)} del saldo` },
         { etiqueta: "Saldo de clientes en mora crítica 90+", valor: fmt(saldoCritico), nota: `${pctB18(coberturaAntiguedad)} — por cliente, no por factura; no compara con Cuadro de mando` },
       ],
       tituloMix: "Score simulado del Top 10",
