@@ -94,7 +94,26 @@ export type SubKpiB18 = {
    * como una barra más chica. Ausente cuando `calculo.dato` es null (no hay
    * cifra que graficar, no sólo que redondear).
    */
-  serie?: { etiqueta: string; valor: number; texto: string }[];
+  serie?: { etiqueta: string; valor: number; texto: string; monto?: number }[];
+  /** Datos fijos de contexto debajo del gráfico (ej. facturación total del
+   * año, clientes totales) — no son la serie, son el marco de referencia. */
+  estadisticas?: { etiqueta: string; valor: string }[];
+  /** Aviso corto, siempre visible, cuando la cifra tiene un límite conocido
+   * que no puede quedar escondido detrás de un expandible. */
+  aviso?: string;
+  /** Sigla corta para el círculo de cabecera (2-4 caracteres, ej. "T5"). */
+  icono?: string;
+  /** Pastilla corta junto al número grande: un dato real, no decorativo. */
+  badge?: { texto: string; comparativo: string };
+  /**
+   * SÓLO para `dependencia`: el % de concentración del Top 5 sobre el
+   * alcance ENTERO (`dato.participacion`), como número limpio para graficar.
+   * `titulo` ("29.24% en 5 cuentas") es texto de presentación y `serie` trae
+   * el % de cada cliente individual — ninguno de los dos sirve para dibujar
+   * la tendencia de concentración por año sin parsear texto, así que este
+   * campo se puebla directo desde el cálculo real, nunca con una regex.
+   */
+  participacionTop5?: number;
 };
 
 export type LecturaAgenteVentasB18 = {
@@ -396,8 +415,18 @@ function subKpiDependencia(calculo: CalculoVenta<LecturaDependencia>, alcance: A
         : ` Sin ellas: ${fmt(crecimiento.actual)} contra ${fmt(crecimiento.previo)} sobre ${entero(crecimiento.dias)} días equivalentes (${crecimiento.etiqueta}).`),
     robustez:
       `${entero(dato.pedidos)} pedidos en el alcance, ${entero(dato.pedidosTop5)} de esas cinco cuentas.` +
-      (crecimiento === null ? "" : ` La tasa sin ellas se calcula sobre ${entero(crecimiento.pedidos)} pedidos contra ${entero(crecimiento.pedidosPrevio)}; quitando además el mayor (${fmt(crecimiento.mayorPedido)}) daría ${firmado(crecimiento.variacionSinMayor)}.`) +
-      ` LA CONCENTRACIÓN REAL ES MÁS ALTA QUE ÉSTA: la identidad del cliente se deriva del nombre, así que un mismo cliente escrito de varias formas («MOTOSVENTO GT, AG» y «MOTOSVENTO GT, SOCIEDAD ANONIMA») cuenta como dos cuentas y su venta se parte en dos. Unificar duplicados sólo puede subir el ${pct(dato.participacion)}, nunca bajarlo: este KPI subestima el riesgo.`,
+      (crecimiento === null ? "" : ` La tasa sin ellas se calcula sobre ${entero(crecimiento.pedidos)} pedidos contra ${entero(crecimiento.pedidosPrevio)}; quitando además el mayor (${fmt(crecimiento.mayorPedido)}) daría ${firmado(crecimiento.variacionSinMayor)}.`),
+    // Antes vivía acá, adentro de un "Ver por qué": ahora es un aviso corto y
+    // siempre visible, porque es la diferencia entre creer el número y saber
+    // que puede estar subestimado — eso no se esconde detrás de un clic.
+    icono: "T5",
+    // El complemento directo del titular: si el Top 5 pesa 29.24%, el resto de
+    // la cartera pesa lo que queda — nada de crecimiento, es la misma foto.
+    badge: { texto: pct(dos(100 - dato.participacion)), comparativo: "del resto de los clientes" },
+    // Número limpio para graficar la tendencia de concentración entre
+    // alcances: viene directo de `dato.participacion`, el mismo valor que ya
+    // arma `titulo` y `veredicto`, no uno derivado de ellos.
+    participacionTop5: dato.participacion,
     color: AZUL,
     // Las cinco cuentas, cada una con su peso: el gráfico sostiene el titular
     // (cuánta venta cuelga de cada cabeza) en lugar de repetir la tasa.
@@ -405,7 +434,16 @@ function subKpiDependencia(calculo: CalculoVenta<LecturaDependencia>, alcance: A
       etiqueta: cliente.nombre,
       valor: dato.valorAlcance > 0 ? dos((cliente.valor / dato.valorAlcance) * 100) : 0,
       texto: `${fmt(cliente.valor)} · ${pct(dato.valorAlcance > 0 ? dos((cliente.valor / dato.valorAlcance) * 100) : 0)}`,
+      // El monto crudo en quetzales, aparte del texto ya formateado: para que
+      // el drilldown de Dependencia lo grafique directo, sin parsear texto.
+      monto: cliente.valor,
     })),
+    // Lo que responde a "qué tan preocupados debemos estar": el marco de
+    // referencia completo, no sólo el % de las cinco cuentas.
+    estadisticas: [
+      { etiqueta: `Facturación total ${alcance.etiqueta}`, valor: fmt(dato.valorAlcance) },
+      { etiqueta: "Clientes en el año", valor: entero(dato.clientesTotales) },
+    ],
   };
 }
 
@@ -635,6 +673,13 @@ export type AlcanceVentasB18 = {
   sinComparacion: boolean;
   /** true cuando la ventana comparable tuvo que recortar días para igualar los lados. */
   comparacionRecortada: boolean;
+  /**
+   * Días de la ventana comparable (los mismos en los dos lados), o null cuando
+   * `sinComparacion` es true y no hay ventana. Campo tipado aparte de
+   * `comparacion` (que es una frase ya armada) para que la UI arme una frase
+   * corta ("recortada a 231 días") sin tener que parsear el texto largo.
+   */
+  diasComparables: number | null;
   subKpis: SubKpiB18[];
 };
 
@@ -698,6 +743,7 @@ export function construirMapaVentasB18(dataset: Dataset, fmt: (valor: number) =>
         : alcance.comparable.motivo,
       sinComparacion: ventana === null,
       comparacionRecortada: ventana?.recortada ?? false,
+      diasComparables: ventana ? ventana.dias : null,
       subKpis: [
         subKpiDependencia(lectura.dependencia, alcance, fmt),
         subKpiConsistencia(lectura.consistencia, alcance, fmt),

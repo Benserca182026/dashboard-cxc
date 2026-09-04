@@ -258,6 +258,13 @@ body.b18-lienzo-blanco::before {
 @media (max-width:980px) { .b18-prototype-title { margin-left:0; }.b18-map { grid-template-columns:1fr; }.b18-map-lateral { display:grid; grid-template-columns:auto 1fr; align-items:center; border-right:0; border-bottom:1px solid #e1eaff; }.b18-map-lateral > p,.b18-map-status { display:none; }.b18-map-lista { grid-template-columns:repeat(4,minmax(0,1fr)); }.b18-map-lista button { justify-content:center; }.b18-map-grid { grid-template-columns:minmax(180px,.8fr) minmax(330px,1.2fr) minmax(180px,.8fr); gap:20px; }.b18-map-canvas { padding:22px; } }
 @media (max-width:700px) { .b18-prototype-page { padding:18px 14px 30px; }.b18-map { border-radius:22px; }.b18-map-lateral { grid-template-columns:1fr; justify-items:start; }.b18-map-lista { width:100%; grid-template-columns:repeat(2,minmax(0,1fr)); }.b18-map-lista button { justify-content:flex-start; }.b18-map-header { align-items:flex-start; flex-direction:column; }.b18-map-grid { display:flex; min-height:0; flex-direction:column; gap:16px; }.b18-centro { order:-1; padding:33px 18px 17px; }.b18-centro-viz { grid-template-columns:105px minmax(0,1fr); gap:12px; }.b18-dona-principal { width:100px; height:100px; box-shadow:inset 0 0 0 13px #fff; }.b18-dona-principal span { font-size:20px; }.b18-centro h3 { font-size:13px; }.b18-metadatos { justify-content:flex-start; }.b18-rol-content { grid-template-columns:minmax(0,1fr) 66px; }.b18-resumen { grid-template-columns:1fr; }.b18-rol-card { min-height:0; } }
 
+/* Evolución ya no reparte el anillo en 4 tarjetas: sólo Dependencia
+   (`.b18-rol-detecta`) y la Consistencia cronológica (`.b18-rol-explica`)
+   quedan como tarjeta, con el mismo grid por defecto que usa cualquier otro
+   agente (Centro sigue ocupando las dos filas de su columna). Ritmo y
+   Calidad (prioriza/recomienda) se quedan en blanco por instrucción directa:
+   sus celdas del grid simplemente no tienen tarjeta. */
+
 /* El cambio de jerarquía no debe convertir las cuatro lecturas en cuatro
    categorías ni estrechar las tarjetas a media pantalla. */
 .b18-prototype-title { display:flex; align-items:flex-start; justify-content:space-between; gap:20px; }
@@ -831,14 +838,33 @@ div.b18-vt-aviso-identidad li { color:#4a7059; }
    así que acá se le devuelven a mano los estilos de botón que perdió. */
 .b18-vt-sub-boton { display:flex; min-width:0; min-height:0; flex:1; flex-direction:column; width:100%; border:0; margin:0; padding:0; background:none; color:inherit; font:inherit; text-align:left; cursor:pointer; }
 .b18-vt-sub-boton:focus-visible { outline:2px solid var(--b18-role); outline-offset:3px; border-radius:10px; }
+.b18-vt-sub-cabecera { display:flex; align-items:center; gap:7px; }
+/* El círculo de cabecera: mismo lenguaje visual que los círculos VE/PE/CL/TI
+   del panel lateral, no un ícono importado de otro sistema de diseño. */
+.b18-vt-sub-icono { display:grid; flex:none; place-items:center; width:22px; height:22px; border-radius:999px; background:color-mix(in srgb, var(--b18-role) 14%, #fff); color:var(--b18-role); font-size:8px; font-weight:950; letter-spacing:-.02em; }
 .b18-vt-sub-etiqueta { color:#8296bb; font-size:8px; font-weight:950; letter-spacing:.11em; line-height:1.2; text-transform:uppercase; }
+.b18-vt-sub-titulo-fila { display:flex; flex-wrap:wrap; align-items:baseline; gap:7px; margin-top:2px; }
 .b18-vt-sub-titulo { color:var(--b18-role); font-size:clamp(15px,1.45vw,23px); font-weight:950; letter-spacing:-.055em; line-height:1.04; overflow-wrap:anywhere; }
+/* La pastilla: un dato real junto al número grande, nunca decorativa — si el
+   cálculo no aplica, `sub.badge` viene ausente y esto no se renderiza. */
+.b18-vt-sub-badge { display:inline-flex; align-items:baseline; gap:4px; border-radius:999px; background:color-mix(in srgb, var(--b18-role) 11%, #fff); padding:2px 8px; color:var(--b18-role); font-size:10px; font-weight:950; }
+.b18-vt-sub-badge em { color:#7887a6; font-size:8px; font-weight:800; font-style:normal; }
 .b18-vt-subkpi-svg { width:100%; height:34px; margin:2px 0 1px; overflow:visible; }
 .b18-vt-subkpi-base { stroke:#e2eaf9; stroke-width:1; }
 .b18-vt-sub-veredicto,.b18-vt-sub-detalle,.b18-vt-sub-robustez { display:-webkit-box; overflow:hidden; -webkit-box-orient:vertical; margin:0; overflow-wrap:anywhere; }
 .b18-vt-sub-veredicto { -webkit-line-clamp:3; margin-top:2px; color:#17326a; font-size:10px; font-weight:800; line-height:1.3; }
 .b18-vt-sub-detalle { -webkit-line-clamp:3; color:#62799f; font-size:9px; font-weight:700; line-height:1.32; }
 .b18-vt-sub-robustez { -webkit-line-clamp:2; margin-top:auto; border-top:1px solid #edf2fc; padding-top:6px; color:#8093b4; font-size:8px; font-weight:750; line-height:1.3; }
+/* El marco de referencia fijo (facturación total, clientes) debajo de las
+   barras: filas de etiqueta-a-la-izquierda / valor-a-la-derecha, como una
+   mini ficha — no cifras apiladas, para que se lean como una tabla. */
+.b18-vt-sub-stats { display:flex; flex-direction:column; gap:5px; margin:8px 0 2px; border-top:1px solid #edf2fc; padding-top:7px; }
+.b18-vt-sub-stats div { display:flex; align-items:baseline; justify-content:space-between; gap:8px; }
+.b18-vt-sub-stats span { min-width:0; overflow:hidden; color:#7887a6; font-size:9px; font-weight:750; text-overflow:ellipsis; white-space:nowrap; }
+.b18-vt-sub-stats b { flex:none; color:#17326a; font-size:11px; font-weight:950; letter-spacing:-.02em; }
+/* Aviso corto y permanente: nunca detrás de un clic cuando el límite del
+   dato cambia si el número se puede creer tal cual o no. */
+.b18-vt-sub-aviso { margin:6px 0 0; color:#9a5c05; font-size:8px; font-weight:800; line-height:1.35; }
 @media (max-width:700px) {
   .b18-vt-sub-veredicto { -webkit-line-clamp:4; font-size:11px; }
   .b18-vt-sub-detalle { -webkit-line-clamp:4; font-size:10px; }
@@ -852,6 +878,15 @@ div.b18-vt-aviso-identidad li { color:#4a7059; }
    deja de hacer falta y se retira. */
 .b18-vt-subkpi-dep { display:grid; gap:4px; margin:4px 0 2px; }
 .b18-vt-subkpi-dep-fila { display:grid; grid-template-columns:58px minmax(0,1fr) auto; align-items:center; gap:5px; }
+/* La tarjeta-resumen (Dependencia) pidió más aire que el resto: todo estaba
+   pegado, sin espacio entre el círculo, el número, las barras y las filas de
+   abajo. Estas reglas sólo tocan `.b18-vt-sub-resumen`, no las otras 3
+   tarjetas del agente, que siguen con el formato de lectura compacto. */
+.b18-vt-sub-resumen { padding:28px 24px 26px; }
+.b18-vt-sub-resumen .b18-rol-visual { gap:18px; }
+.b18-vt-sub-resumen .b18-vt-sub-titulo-fila { margin-top:4px; }
+.b18-vt-sub-resumen .b18-vt-subkpi-dep { gap:9px; margin:2px 0; }
+.b18-vt-sub-resumen .b18-vt-sub-stats { gap:9px; margin-top:4px; padding-top:14px; }
 .b18-vt-subkpi-dep-nombre { overflow:hidden; color:#41609b; font-size:8px; font-weight:850; text-overflow:ellipsis; white-space:nowrap; }
 .b18-vt-subkpi-dep-track { display:block; height:9px; border-radius:999px; background:#eef2fb; overflow:hidden; }
 .b18-vt-subkpi-dep-track i { display:block; height:100%; border-radius:999px 0 0 999px; }
@@ -860,13 +895,18 @@ div.b18-vt-aviso-identidad li { color:#4a7059; }
 /* Consistencia: semáforo verde/rojo por mes —subió o bajó es la pregunta de
    esta tarjeta— con scroll horizontal para no comprimir el historial entero
    hasta volverlo ilegible (mismo patrón que `.b18-vt-estacion-grafico`). */
-.b18-vt-subkpi-cons { display:flex; align-items:flex-end; gap:6px; height:92px; margin:8px 0 2px; padding:24px 3px 0; overflow-x:auto; overflow-y:visible; }
-.b18-vt-subkpi-cons-col { position:relative; display:flex; flex:none; flex-direction:column; align-items:center; width:16px; }
-.b18-vt-subkpi-cons-col b { position:absolute; bottom:100%; left:2px; margin-bottom:3px; transform:rotate(-42deg); transform-origin:left bottom; white-space:nowrap; color:#178c4e; font-size:7px; font-weight:950; }
-.b18-vt-subkpi-cons-col.is-baja b { color:#c0392b; }
-.b18-vt-subkpi-cons-col i { display:block; width:10px; min-height:3px; border-radius:3px 3px 1px 1px; background:#1f9d55; }
-.b18-vt-subkpi-cons-col.is-baja i { background:#d6483a; }
-.b18-vt-subkpi-cons-col span { margin-top:4px; max-width:32px; overflow:hidden; color:#8093b4; font-size:7px; font-weight:800; text-align:center; text-overflow:ellipsis; white-space:nowrap; }
+/* Filas horizontales: mes a la izquierda, barra desde el centro, % a la
+   derecha — todo en texto horizontal normal, nada rotado ni apretado. */
+.b18-vt-subkpi-cons { display:flex; flex-direction:column; gap:3px; margin:8px 0 2px; }
+.b18-vt-subkpi-cons-fila { display:grid; grid-template-columns:52px minmax(0,1fr) 46px; align-items:center; gap:6px; }
+.b18-vt-subkpi-cons-mes { overflow:hidden; color:#7887a6; font-size:8px; font-weight:800; text-align:right; text-overflow:ellipsis; white-space:nowrap; }
+.b18-vt-subkpi-cons-pista { position:relative; height:9px; background:none; }
+/* La línea central: el punto de referencia (0%) del que salen las barras. */
+.b18-vt-subkpi-cons-pista::before { content:""; position:absolute; top:0; bottom:0; left:50%; width:1px; background:#dbe4f5; }
+.b18-vt-subkpi-cons-pista i { position:absolute; top:0; bottom:0; min-width:2px; border-radius:2px; background:#1f9d55; }
+.b18-vt-subkpi-cons-fila.is-baja .b18-vt-subkpi-cons-pista i { background:#d6483a; }
+.b18-vt-subkpi-cons-valor { color:#178c4e; font-size:9px; font-weight:950; }
+.b18-vt-subkpi-cons-fila.is-baja .b18-vt-subkpi-cons-valor { color:#c0392b; }
 
 /* Calidad: una barra por año con su tasa encima. Pocos años de sobra (el
    histórico son 4-5) así que no necesita el scroll de Consistencia. */
@@ -969,10 +1009,12 @@ div.b18-vt-aviso-identidad li { color:#4a7059; }
    El selector NO es un control cosmético: cambia contra qué rango de días se
    está comparando todo lo que hay alrededor. Por eso el botón del año parcial
    se ve distinto del completo ANTES de pulsarlo (raya diagonal + la palabra
-   "parcial"), y por eso debajo del grupo va una declaración que ocupa espacio
-   real en la página en vez de un tooltip que nadie abre. */
-.b18-vt-alcance-bloque { display:grid; width:100%; gap:7px; margin-bottom:12px; border:1px solid #e3ecfd; border-radius:16px; padding:11px 12px 12px; background:#f8fbff; }
-.b18-map-ventas .b18-vt-alcance-bloque .b18-centro-eyebrow { margin:0; color:#4b7ee4; font-size:9px; letter-spacing:.09em; text-align:left; text-transform:uppercase; }
+   "parcial"). Antes debajo del grupo vivía una caja grande y siempre visible
+   con el párrafo completo; ahora sólo quedan los botones —discretos, sin
+   título arriba— y una frase corta pegada a ellos: la advertencia de
+   "parcial"/"sin comparable" NO puede desaparecer, sólo dejar de ocupar tanto
+   espacio siempre visible. */
+.b18-vt-alcance-bloque { display:grid; width:100%; gap:6px; margin-bottom:12px; }
 .b18-vt-alcance { display:flex; flex-wrap:wrap; gap:5px; }
 .b18-vt-alcance button { display:inline-flex; align-items:center; gap:5px; border:1px solid #d2e0f7; border-radius:999px; padding:5px 11px; background:#fff; color:#41609b; font-size:11px; font-weight:900; letter-spacing:-.01em; cursor:pointer; transition:background .12s,border-color .12s,color .12s; }
 .b18-vt-alcance button:hover { border-color:#9dc2f2; color:#1c4ea6; }
@@ -983,25 +1025,23 @@ div.b18-vt-aviso-identidad li { color:#4a7059; }
 
 /* Los tres estados posibles de una comparación, cada uno con su color: sin
    base (no hay contra qué medir), recortada (vale, pero no cubre el año
-   entero) y completa. Siempre visible: el ícono + el título + UNA línea de
-   veredicto. El razonamiento completo —por qué está recortado, contra qué se
-   compara en detalle— vive en el expandible "Ver por qué" (`.b18-vt-mas`),
-   cerrado por defecto, para no obligar a leer 6-7 líneas siempre. */
-.b18-vt-alcance-decl { border:1px solid #dbe7fa; border-left:4px solid #4b7ee4; border-radius:11px; padding:8px 11px; background:#fff; }
-.b18-vt-alcance-decl b { display:flex; align-items:center; gap:5px; color:#1c4ea6; font-size:9px; font-weight:950; letter-spacing:.06em; text-transform:uppercase; }
-.b18-vt-alcance-icono { font-size:11px; font-style:normal; letter-spacing:0; text-transform:none; }
-.b18-vt-alcance-decl p { margin:4px 0 0; color:#4c6592; font-size:10px; font-weight:750; line-height:1.42; overflow-wrap:anywhere; }
+   entero) y completa. Ya NO es una caja: es una línea chica, ícono + frase
+   corta ("✓ Años calendario completos" / "✂ Comparación recortada a 231
+   días" / "⚠ 2026 sin comparable"), pegada a los botones del filtro. El
+   párrafo completo —por qué está recortado, contra qué se compara en
+   detalle— no se borra: vive entero en el expandible "Ver por qué"
+   (`.b18-vt-mas`), cerrado por defecto. */
+.b18-vt-alcance-decl { display:flex; flex-wrap:wrap; align-items:baseline; gap:3px 10px; }
+.b18-vt-alcance-decl-frase { display:inline-flex; align-items:center; gap:5px; color:#1f7040; font-size:11px; font-weight:900; }
+.b18-vt-alcance-icono { font-size:12px; font-style:normal; }
+.b18-vt-alcance-decl.is-parcial .b18-vt-alcance-decl-frase { color:#9a5c05; }
+.b18-vt-alcance-decl.is-sinbase .b18-vt-alcance-decl-frase { color:#a5342a; }
+.b18-vt-alcance-decl .b18-vt-mas { margin:0; border-top:none; padding-top:0; }
 .b18-vt-alcance-decl .b18-vt-mas summary { color:#4b7ee4; }
-.b18-vt-alcance-decl.is-parcial { border-color:#f0d9ae; border-left-color:#e08c1b; background:#fff8ec; }
-.b18-vt-alcance-decl.is-parcial b { color:#9a5c05; }
-.b18-vt-alcance-decl.is-parcial p { color:#7a5a20; }
 .b18-vt-alcance-decl.is-parcial .b18-vt-mas summary { color:#9a5c05; }
-.b18-vt-alcance-decl.is-sinbase { border-color:#f2ccc7; border-left-color:#c0392b; background:#fdf4f3; }
-.b18-vt-alcance-decl.is-sinbase b { color:#a5342a; }
-.b18-vt-alcance-decl.is-sinbase p { color:#7d3d36; }
 .b18-vt-alcance-decl.is-sinbase .b18-vt-mas summary { color:#a5342a; }
-.b18-vt-alcance-decl.is-completo { border-left-color:#2f8a4d; }
-.b18-vt-alcance-decl.is-completo b { color:#1f7040; }
+.b18-vt-alcance-decl .b18-vt-mas[open] { flex-basis:100%; }
+.b18-vt-alcance-decl .b18-vt-mas p { color:#4c6592; }
 
 /* ── VENTAS · matriz de estacionalidad mes × año ────────────────────────────
    Doce columnas, una por mes; dentro de cada una, una barra por año, todas a
@@ -1062,4 +1102,173 @@ div.b18-vt-aviso-identidad li { color:#4a7059; }
   .b18-vt-estacion-grafico { grid-template-columns:repeat(12,minmax(40px,1fr)); }
   .b18-vt-estacion-barras { height:70px; }
   .b18-vt-alcance-decl p { font-size:11px; }
+}
+
+/* ── Drilldown de Dependencia de clientes: sólo gráficos ────────────────────
+   Mismo cascarón que `.b18-drilldown` (mismo velo, mismo header con botón de
+   cerrar) pero el cuerpo son dos bloques de gráfico con una frase corta cada
+   uno arriba — nada de pestañas ni de párrafos largos. */
+.b18-dep-drilldown { display:grid; gap:20px; }
+/* Mismo cascarón que `.b18-dep-drilldown`: el modal de Consistencia
+   cronológica reusa `.b18-dep-bloque`/`.b18-dep-veredicto` para el veredicto
+   y sólo agrega su propio gráfico adentro. */
+.b18-cons-drilldown { display:grid; gap:20px; }
+.b18-dep-bloque { display:grid; gap:10px; border:1px solid #e3ecfd; border-radius:16px; padding:14px 14px 16px; background:#fff; }
+.b18-dep-veredicto { margin:0; color:#17326a; font-size:13px; font-weight:850; line-height:1.4; }
+
+/* Gráfico A: una barra por año, la cifra pegada arriba — se lee de un
+   vistazo que baja de izquierda a derecha. */
+.b18-dep-tendencia { display:flex; align-items:flex-end; justify-content:space-between; gap:8px; height:140px; padding:0 4px; }
+.b18-dep-tendencia-col { display:flex; flex:1 1 0; flex-direction:column; align-items:center; gap:6px; }
+.b18-dep-tendencia-col b { color:var(--b18-role); font-size:13px; font-weight:950; }
+.b18-dep-tendencia-col i { display:block; width:100%; max-width:52px; min-height:4px; border-radius:8px 8px 3px 3px; background:linear-gradient(180deg,var(--b18-role),color-mix(in srgb,var(--b18-role) 45%,#fff)); }
+.b18-dep-tendencia-col span { color:#62799f; font-size:11px; font-weight:850; }
+
+/* Gráfico B: el núcleo son mini-series (2 a 5 columnas por cliente), los
+   puntuales son una lista compacta sin gráfico propio — son ruido, no
+   patrón, y dibujarles una barra les daría un peso que no tienen. */
+.b18-dep-nucleo { display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:14px; }
+.b18-dep-nucleo-cliente { display:grid; gap:8px; border:1px solid #edf2fb; border-radius:12px; padding:10px 10px 8px; background:#f8faff; }
+.b18-dep-nucleo-cliente > p { margin:0; overflow:hidden; color:#274474; font-size:11px; font-weight:900; text-overflow:ellipsis; white-space:nowrap; }
+/* Altura fija que alcanza con margen para el peor caso: %(11px) + monto(9px)
+   + barra máxima(36px) + año(10px) + 3 espacios de 3px entre ellos = 75px de
+   contenido — nunca se acerca al borde de arriba, no hace falta que la
+   etiqueta se salga del contenedor como pasaba con la versión anterior. */
+.b18-dep-nucleo-mini { display:flex; align-items:flex-end; justify-content:center; gap:9px; height:80px; padding-top:2px; }
+.b18-dep-nucleo-mini-col { display:flex; flex-direction:column; align-items:center; gap:3px; }
+.b18-dep-nucleo-mini-col b { color:#17326a; font-size:9px; font-weight:950; }
+/* El monto en quetzales, debajo del %: mismo dato, otra unidad — no hace
+   falta abrir nada para ver cuánto representaba esa cuenta en dinero real. */
+.b18-dep-nucleo-mini-col em { color:#8093b4; font-size:7px; font-style:normal; font-weight:800; }
+.b18-dep-nucleo-mini-col i { display:block; width:16px; min-height:3px; border-radius:4px 4px 1px 1px; }
+.b18-dep-nucleo-mini-col span { color:#8093b4; font-size:8px; font-weight:800; }
+
+/* Los "puntuales" van detrás de un desplegable: no son el patrón que importa
+   —por definición no se repiten— así que no ocupan espacio hasta que alguien
+   los pide. Mismo lenguaje visual que "Ver por qué" (`.b18-vt-mas`). */
+.b18-dep-puntual-detalle { margin-top:4px; border-top:1px dashed #e3ecfb; padding-top:7px; }
+.b18-dep-puntual-detalle summary { display:inline-flex; align-items:center; gap:3px; list-style:none; color:#8093b4; font-size:10px; font-weight:800; cursor:pointer; }
+.b18-dep-puntual-detalle summary::-webkit-details-marker { display:none; }
+.b18-dep-puntual-detalle summary::after { content:"▾"; font-size:8px; transition:transform .15s ease; }
+.b18-dep-puntual-detalle[open] summary::after { transform:rotate(180deg); }
+.b18-dep-puntual-detalle .b18-dep-puntual { margin-top:7px; }
+.b18-dep-puntual { display:grid; gap:4px; padding:0; list-style:none; }
+.b18-dep-puntual li { display:grid; grid-template-columns:minmax(0,1fr) auto auto; align-items:center; gap:9px; border-bottom:1px solid #f0f4fb; padding:5px 2px; }
+.b18-dep-puntual li span { overflow:hidden; color:#41609b; font-size:11px; font-weight:800; text-overflow:ellipsis; white-space:nowrap; }
+.b18-dep-puntual li b { color:#7a8dad; font-size:10px; font-weight:900; }
+.b18-dep-puntual li em { color:var(--b18-role); font-size:11px; font-style:normal; font-weight:950; }
+
+@media (max-width:700px) {
+  .b18-dep-nucleo { grid-template-columns:repeat(auto-fit,minmax(128px,1fr)); }
+  .b18-dep-tendencia { height:120px; }
+}
+
+/* ── Consistencia del crecimiento: una sola línea cronológica ───────────────
+   Reemplaza el gráfico de 5 líneas por año (mes calendario contra mes
+   calendario) por UNA línea continua que recorre los meses reales en orden,
+   coloreada por tramos de año. Vive en dos lugares con el mismo componente:
+   la tarjeta chica del slot "explica" (`.is-chica`, con scroll horizontal
+   dentro de `.b18-consl-scroll` — mismo patrón que `.b18-vt-estacion-grafico`
+   más abajo) y el modal `DrilldownConsistencia` (`.is-grande`, ancho
+   completo). Sin ejes numéricos ni texto dentro del SVG a propósito: con
+   `preserveAspectRatio="none"` un `<text>` se deforma, así que las
+   etiquetas de año van en una fila HTML aparte. */
+.b18-consl-grafico { position:relative; display:grid; gap:6px; padding:10px 4px 0; background:rgba(255,255,255,.94); border-radius:14px; }
+.b18-consl-scroll { overflow-x:auto; padding-bottom:2px; }
+/* Referencia exacta para todo lo que se posiciona en %: sólo el área del
+   SVG (mismo alto que `.b18-consl-svg`), no la tarjeta completa — si no, el
+   tooltip y los puntos quedan corridos hacia abajo por los años/leyenda. */
+.b18-consl-plano { position:relative; height:110px; }
+.b18-consl-grafico.is-grande .b18-consl-plano { height:220px; }
+.b18-consl-svg { display:block; width:100%; height:100%; overflow:visible; }
+/* Línea fina y sin brillo — el neón vive sólo en los puntos, no acá. */
+.b18-consl-linea { fill:none; stroke-width:1.6; stroke-linejoin:round; stroke-linecap:round; }
+.b18-consl-linea-hit { fill:none; stroke:transparent; stroke-width:14; cursor:pointer; }
+/* Los puntos: círculos HTML reales (nunca deformados por el estirado del
+   SVG), con el brillo de neón del color de su año — doble box-shadow, uno
+   nítido y uno difuso, mismo criterio que el resto de gráficos de línea. */
+.b18-consl-puntos { position:absolute; inset:0; pointer-events:none; }
+.b18-consl-punto {
+  position:absolute;
+  width:6px;
+  height:6px;
+  border-radius:50%;
+  border:1.2px solid transparent;
+  transform:translate(-50%,-50%);
+  pointer-events:auto;
+  cursor:pointer;
+  box-shadow:0 0 2px var(--b18-glow),0 0 6px var(--b18-glow);
+}
+.b18-consl-grafico.is-grande .b18-consl-punto { width:7px; height:7px; }
+.b18-consl-punto.is-parcial { box-shadow:0 0 2px var(--b18-glow),0 0 5px color-mix(in srgb, var(--b18-glow) 60%, transparent); }
+/* Etiquetas de año, una por tramo, posicionadas en % sobre el punto medio de
+   su propio tramo — no en columnas iguales, porque cada año tiene un número
+   distinto de meses observados. */
+.b18-consl-meses { position:relative; height:16px; padding:0 1px; }
+.b18-consl-meses span { position:absolute; transform:translateX(-50%); color:#41609b; font-size:9px; font-weight:900; text-align:center; white-space:nowrap; }
+.b18-consl-leyenda { display:flex; flex-wrap:wrap; gap:10px 14px; margin:2px 0 0; padding:0; list-style:none; }
+.b18-consl-leyenda li { display:inline-flex; align-items:center; gap:5px; color:#41609b; font-size:10px; font-weight:850; }
+.b18-consl-leyenda li i { display:block; width:9px; height:9px; border-radius:3px; }
+/* Tooltip propio del punto activo (hover o tap): mismo lenguaje visual que
+   `.b18-vt-mas`/`.b18-vt-estacion-detalle` — caja blanca, sombra chica, texto
+   9-10px. Posicionado en % sobre `.b18-consl-plano` (el área exacta del
+   gráfico, no la tarjeta completa). `translate` centra la cajita sobre el
+   punto y la sube por encima para no taparlo con el dedo o el cursor. */
+.b18-consl-tooltip { position:absolute; z-index:3; min-width:96px; padding:5px 8px; border:1px solid #e3ecfd; border-radius:9px; background:#fff; box-shadow:0 10px 22px rgba(50,80,140,.18); color:#17326a; font-size:9px; font-weight:800; line-height:1.35; text-align:center; white-space:nowrap; pointer-events:none; transform:translate(-50%,-100%) translateY(-9px); }
+.b18-consl-tooltip b { display:block; font-size:10px; font-weight:950; letter-spacing:-.01em; }
+.b18-consl-tooltip span { display:block; margin-top:1px; color:#4b7ee4; font-size:9px; font-weight:850; }
+
+/* El grid de Evolución ya no tiene 4 tarjetas en 2 filas alrededor del panel
+   central (eso lo siguen usando Pedidos/Clientes/Ticket, no se toca) — son 2
+   tarjetas en una sola fila. Sin este override, `.b18-centro` seguía
+   abarcando 2 filas (`grid-row:1 / span 2`) y el `min-height` heredado del
+   layout viejo, así que quedaba un cuadro blanco alto y vacío debajo del
+   filtro. Selector de 2 clases a propósito: gana por especificidad sin
+   pelear con el orden de las reglas de abajo. */
+.b18-map-grid-evolucion { min-height:0; grid-template-rows:auto; }
+.b18-map-grid-evolucion .b18-centro { grid-row:1; min-height:0; padding:21px; }
+
+/* ── Consistencia del crecimiento: cruce por mismo mes calendario ───────────
+   Segundo gráfico del modal `DrilldownConsistencia`, debajo de la línea
+   cronológica (`.b18-consl-*` arriba). Mismo lenguaje visual —línea suave sin
+   brillo, puntos HTML con brillo de neón, tooltip propio— pero con el eje X
+   fijo en 12 meses (ene..dic) en vez de la cronología completa, porque acá
+   son 5 líneas superpuestas (una por año) comparando siempre el mismo mes
+   calendario. Vive siempre a tamaño completo (nunca en la tarjeta chica), así
+   que no hace falta la variante `.is-chica`/scroll de `.b18-consl-grafico`. */
+/* Fila de ancho completo debajo del grid principal, para el gráfico
+   año-contra-año — mismo lenguaje visual que `.b18-rol-card` (fondo blanco,
+   borde suave, sombra chica) pero ocupando todo el ancho, no una celda. */
+.b18-cons-fila { margin-top:24px; border:1px solid #e4ebfb; border-radius:23px; padding:21px; background:rgba(255,255,255,.94); box-shadow:0 16px 34px rgba(70,104,175,.1); }
+.b18-cons-fila-titulo span { color:#7b2bf4; font-size:9px; font-weight:950; letter-spacing:.11em; text-transform:uppercase; }
+.b18-cons-fila .b18-dep-veredicto { margin-top:4px; }
+.b18-cons-grafico { position:relative; display:grid; gap:6px; padding:10px 4px 0; background:rgba(255,255,255,.94); border-radius:14px; }
+.b18-cons-plano { position:relative; height:220px; }
+.b18-cons-svg { display:block; width:100%; height:100%; overflow:visible; }
+.b18-cons-linea { fill:none; stroke-width:1.6; stroke-linejoin:round; stroke-linecap:round; }
+.b18-cons-linea-hit { fill:none; stroke:transparent; stroke-width:14; cursor:pointer; }
+.b18-cons-puntos { position:absolute; inset:0; pointer-events:none; }
+.b18-cons-punto {
+  position:absolute;
+  width:7px;
+  height:7px;
+  border-radius:50%;
+  border:1.2px solid transparent;
+  transform:translate(-50%,-50%);
+  pointer-events:auto;
+  cursor:pointer;
+  box-shadow:0 0 2px var(--b18-glow),0 0 6px var(--b18-glow);
+}
+.b18-cons-punto.is-parcial { box-shadow:0 0 2px var(--b18-glow),0 0 5px color-mix(in srgb, var(--b18-glow) 60%, transparent); }
+.b18-cons-eje { position:relative; height:16px; padding:0 1px; }
+.b18-cons-eje span { position:absolute; transform:translateX(-50%); color:#41609b; font-size:9px; font-weight:900; text-align:center; white-space:nowrap; }
+.b18-cons-leyenda { display:flex; flex-wrap:wrap; gap:10px 14px; margin:2px 0 0; padding:0; list-style:none; }
+.b18-cons-leyenda li { display:inline-flex; align-items:center; gap:5px; color:#41609b; font-size:10px; font-weight:850; }
+.b18-cons-leyenda li i { display:block; width:9px; height:9px; border-radius:3px; }
+.b18-cons-tooltip { position:absolute; z-index:3; min-width:96px; padding:5px 8px; border:1px solid #e3ecfd; border-radius:9px; background:#fff; box-shadow:0 10px 22px rgba(50,80,140,.18); color:#17326a; font-size:9px; font-weight:800; line-height:1.35; text-align:center; white-space:nowrap; pointer-events:none; transform:translate(-50%,-100%) translateY(-9px); }
+.b18-cons-tooltip b { display:block; font-size:10px; font-weight:950; letter-spacing:-.01em; }
+.b18-cons-tooltip span { display:block; margin-top:1px; color:#4b7ee4; font-size:9px; font-weight:850; }
+
+@media (max-width:700px) {
+  .b18-cons-plano { height:180px; }
 }
