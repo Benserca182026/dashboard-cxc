@@ -808,6 +808,85 @@ div.b18-vt-aviso-identidad li { color:#4a7059; }
    recortarse a la mitad. */
 .b18-map-ventas .b18-vt-cabecera small { letter-spacing:.05em; line-height:1.3; white-space:normal; }
 
+/* ── VENTAS · sub-lecturas del agente activo en las cuatro tarjetas ─────────
+   La jerarquía va al revés que en la tarjeta de agente, y es el punto entero
+   del bloque: arriba el nombre de la medida en letra chica, y el DATO en
+   grande. Con el orden contrario, cuatro rótulos genéricos parecidos entre sí
+   tapaban cuatro cifras distintas.
+
+   La robustez se ancla abajo (margin-top:auto) y separada por una línea: no es
+   un pie de página, es la condición bajo la cual el número de arriba vale. Los
+   textos se recortan por líneas en vez de estirar la tarjeta, porque las cuatro
+   comparten fila con el reporte central y tienen que quedar a la misma altura. */
+/* La tarjeta ya no es un solo <button>: sólo `.b18-vt-sub-boton` abre el
+   drill-down, así que el cursor de "clicable" se limita a esa zona en vez de
+   cubrir también el expandible "Ver por qué" del pie. */
+.b18-map-ventas .b18-vt-sub { cursor:default; }
+.b18-map-ventas .b18-vt-sub { text-align:left; }
+.b18-map-ventas .b18-vt-sub,.b18-map-ventas .b18-vt-sub .b18-rol-visual { justify-content:flex-start; }
+.b18-map-ventas .b18-vt-sub .b18-rol-visual { gap:5px; }
+/* El botón ya no es el propio `.b18-rol-card` —eso pasó al `<div>` que lo
+   envuelve, porque el expandible "Ver por qué" no puede vivir dentro de un
+   <button> (HTML inválido, y el click del <summary> abriría el drill-down)—
+   así que acá se le devuelven a mano los estilos de botón que perdió. */
+.b18-vt-sub-boton { display:flex; min-width:0; min-height:0; flex:1; flex-direction:column; width:100%; border:0; margin:0; padding:0; background:none; color:inherit; font:inherit; text-align:left; cursor:pointer; }
+.b18-vt-sub-boton:focus-visible { outline:2px solid var(--b18-role); outline-offset:3px; border-radius:10px; }
+.b18-vt-sub-etiqueta { color:#8296bb; font-size:8px; font-weight:950; letter-spacing:.11em; line-height:1.2; text-transform:uppercase; }
+.b18-vt-sub-titulo { color:var(--b18-role); font-size:clamp(15px,1.45vw,23px); font-weight:950; letter-spacing:-.055em; line-height:1.04; overflow-wrap:anywhere; }
+.b18-vt-subkpi-svg { width:100%; height:34px; margin:2px 0 1px; overflow:visible; }
+.b18-vt-subkpi-base { stroke:#e2eaf9; stroke-width:1; }
+.b18-vt-sub-veredicto,.b18-vt-sub-detalle,.b18-vt-sub-robustez { display:-webkit-box; overflow:hidden; -webkit-box-orient:vertical; margin:0; overflow-wrap:anywhere; }
+.b18-vt-sub-veredicto { -webkit-line-clamp:3; margin-top:2px; color:#17326a; font-size:10px; font-weight:800; line-height:1.3; }
+.b18-vt-sub-detalle { -webkit-line-clamp:3; color:#62799f; font-size:9px; font-weight:700; line-height:1.32; }
+.b18-vt-sub-robustez { -webkit-line-clamp:2; margin-top:auto; border-top:1px solid #edf2fc; padding-top:6px; color:#8093b4; font-size:8px; font-weight:750; line-height:1.3; }
+@media (max-width:700px) {
+  .b18-vt-sub-veredicto { -webkit-line-clamp:4; font-size:11px; }
+  .b18-vt-sub-detalle { -webkit-line-clamp:4; font-size:10px; }
+  .b18-vt-sub-robustez { -webkit-line-clamp:3; margin-top:9px; font-size:9px; }
+}
+
+/* El gráfico lleva el dato, el texto lleva sólo el veredicto: cada barra de
+   Dependencia/Consistencia/Calidad muestra su propia etiqueta —nombre, mes o
+   año— y su propio monto/% pegados a ella, así que la lista de texto plano
+   que las repetía debajo (ver `TIENE_BARRAS_ETIQUETADAS` en el componente)
+   deja de hacer falta y se retira. */
+.b18-vt-subkpi-dep { display:grid; gap:4px; margin:4px 0 2px; }
+.b18-vt-subkpi-dep-fila { display:grid; grid-template-columns:58px minmax(0,1fr) auto; align-items:center; gap:5px; }
+.b18-vt-subkpi-dep-nombre { overflow:hidden; color:#41609b; font-size:8px; font-weight:850; text-overflow:ellipsis; white-space:nowrap; }
+.b18-vt-subkpi-dep-track { display:block; height:9px; border-radius:999px; background:#eef2fb; overflow:hidden; }
+.b18-vt-subkpi-dep-track i { display:block; height:100%; border-radius:999px 0 0 999px; }
+.b18-vt-subkpi-dep-valor { overflow:hidden; color:#17326a; font-size:8px; font-weight:950; text-overflow:ellipsis; white-space:nowrap; }
+
+/* Consistencia: semáforo verde/rojo por mes —subió o bajó es la pregunta de
+   esta tarjeta— con scroll horizontal para no comprimir el historial entero
+   hasta volverlo ilegible (mismo patrón que `.b18-vt-estacion-grafico`). */
+.b18-vt-subkpi-cons { display:flex; align-items:flex-end; gap:6px; height:92px; margin:8px 0 2px; padding:24px 3px 0; overflow-x:auto; overflow-y:visible; }
+.b18-vt-subkpi-cons-col { position:relative; display:flex; flex:none; flex-direction:column; align-items:center; width:16px; }
+.b18-vt-subkpi-cons-col b { position:absolute; bottom:100%; left:2px; margin-bottom:3px; transform:rotate(-42deg); transform-origin:left bottom; white-space:nowrap; color:#178c4e; font-size:7px; font-weight:950; }
+.b18-vt-subkpi-cons-col.is-baja b { color:#c0392b; }
+.b18-vt-subkpi-cons-col i { display:block; width:10px; min-height:3px; border-radius:3px 3px 1px 1px; background:#1f9d55; }
+.b18-vt-subkpi-cons-col.is-baja i { background:#d6483a; }
+.b18-vt-subkpi-cons-col span { margin-top:4px; max-width:32px; overflow:hidden; color:#8093b4; font-size:7px; font-weight:800; text-align:center; text-overflow:ellipsis; white-space:nowrap; }
+
+/* Calidad: una barra por año con su tasa encima. Pocos años de sobra (el
+   histórico son 4-5) así que no necesita el scroll de Consistencia. */
+.b18-vt-subkpi-calidad { display:flex; align-items:flex-end; justify-content:center; gap:10px; height:92px; margin:8px 0 2px; padding:24px 3px 0; overflow-x:auto; overflow-y:visible; }
+.b18-vt-subkpi-calidad-col { position:relative; display:flex; flex:none; flex-direction:column; align-items:center; width:20px; }
+.b18-vt-subkpi-calidad-col b { position:absolute; bottom:100%; left:2px; margin-bottom:3px; transform:rotate(-30deg); transform-origin:left bottom; white-space:nowrap; color:var(--b18-role); font-size:7px; font-weight:950; }
+.b18-vt-subkpi-calidad-col i { display:block; width:13px; min-height:3px; border-radius:3px 3px 1px 1px; }
+.b18-vt-subkpi-calidad-col span { margin-top:4px; color:#8093b4; font-size:8px; font-weight:850; }
+
+/* "Ver por qué": el mismo expandible cerrado-por-defecto para el resto del
+   razonamiento de una sub-lectura y para el párrafo largo del panel de
+   alcance temporal. Nunca dentro de un <button> —ver nota en el componente. */
+.b18-vt-mas { margin-top:7px; border-top:1px dashed #e3ecfb; padding-top:6px; }
+.b18-vt-mas summary { display:inline-flex; align-items:center; gap:3px; list-style:none; color:var(--b18-role,#4b7ee4); font-size:9px; font-weight:900; cursor:pointer; }
+.b18-vt-mas summary::-webkit-details-marker { display:none; }
+.b18-vt-mas summary::after { content:"▾"; font-size:8px; transition:transform .15s ease; }
+.b18-vt-mas[open] summary::after { transform:rotate(180deg); }
+.b18-vt-mas p { margin:6px 0 0; color:#62799f; font-size:9px; font-weight:700; line-height:1.36; overflow-wrap:anywhere; }
+.b18-vt-mas p + p { margin-top:5px; border-top:1px solid #f0f4fb; padding-top:5px; }
+
 /* ── Dashboard B18 integral · versión gráfica (comparte cabecera/KPIs/footer
    con .b18-dashboard; estas clases son nuevas y no tocan las que usan
    MapaB18Producto/Ventas/Clientes). Barras ≤24px, punta redondeada 4px y
@@ -881,3 +960,106 @@ div.b18-vt-aviso-identidad li { color:#4a7059; }
 .b18-dash-hero .b18-dash-medidor b { display:block; height:100%; border-radius:99px; background:#1a7fe6; }
 .b18-dash-hero small { color:#7a8dad; font-size:9px; font-weight:700; }
 .b18-dash-hero p { margin:6px 0 0; color:#62799f; font-size:10px; font-weight:700; line-height:1.35; }
+
+/* ── VENTAS · filtro de alcance temporal ────────────────────────────────────
+   Todo lo de abajo usa el prefijo `b18-vt-`, que no existe en ninguna otra
+   página, o vive bajo `.b18-map-ventas`. Nada de esto alcanza a
+   /ventas/productos ni a los otros mapas B18.
+
+   El selector NO es un control cosmético: cambia contra qué rango de días se
+   está comparando todo lo que hay alrededor. Por eso el botón del año parcial
+   se ve distinto del completo ANTES de pulsarlo (raya diagonal + la palabra
+   "parcial"), y por eso debajo del grupo va una declaración que ocupa espacio
+   real en la página en vez de un tooltip que nadie abre. */
+.b18-vt-alcance-bloque { display:grid; width:100%; gap:7px; margin-bottom:12px; border:1px solid #e3ecfd; border-radius:16px; padding:11px 12px 12px; background:#f8fbff; }
+.b18-map-ventas .b18-vt-alcance-bloque .b18-centro-eyebrow { margin:0; color:#4b7ee4; font-size:9px; letter-spacing:.09em; text-align:left; text-transform:uppercase; }
+.b18-vt-alcance { display:flex; flex-wrap:wrap; gap:5px; }
+.b18-vt-alcance button { display:inline-flex; align-items:center; gap:5px; border:1px solid #d2e0f7; border-radius:999px; padding:5px 11px; background:#fff; color:#41609b; font-size:11px; font-weight:900; letter-spacing:-.01em; cursor:pointer; transition:background .12s,border-color .12s,color .12s; }
+.b18-vt-alcance button:hover { border-color:#9dc2f2; color:#1c4ea6; }
+.b18-vt-alcance button em { border-radius:999px; padding:1px 5px; background:#fdf0da; color:#9a5c05; font-size:7px; font-style:normal; font-weight:950; letter-spacing:.07em; text-transform:uppercase; }
+.b18-vt-alcance button.is-parcial { border-style:dashed; border-color:#e8c68d; }
+.b18-vt-alcance button.is-activo { border-color:#0f4fa8; background:#0f4fa8; color:#fff; box-shadow:0 6px 14px rgba(15,79,168,.22); }
+.b18-vt-alcance button.is-activo em { background:rgba(255,255,255,.22); color:#fff; }
+
+/* Los tres estados posibles de una comparación, cada uno con su color: sin
+   base (no hay contra qué medir), recortada (vale, pero no cubre el año
+   entero) y completa. Siempre visible: el ícono + el título + UNA línea de
+   veredicto. El razonamiento completo —por qué está recortado, contra qué se
+   compara en detalle— vive en el expandible "Ver por qué" (`.b18-vt-mas`),
+   cerrado por defecto, para no obligar a leer 6-7 líneas siempre. */
+.b18-vt-alcance-decl { border:1px solid #dbe7fa; border-left:4px solid #4b7ee4; border-radius:11px; padding:8px 11px; background:#fff; }
+.b18-vt-alcance-decl b { display:flex; align-items:center; gap:5px; color:#1c4ea6; font-size:9px; font-weight:950; letter-spacing:.06em; text-transform:uppercase; }
+.b18-vt-alcance-icono { font-size:11px; font-style:normal; letter-spacing:0; text-transform:none; }
+.b18-vt-alcance-decl p { margin:4px 0 0; color:#4c6592; font-size:10px; font-weight:750; line-height:1.42; overflow-wrap:anywhere; }
+.b18-vt-alcance-decl .b18-vt-mas summary { color:#4b7ee4; }
+.b18-vt-alcance-decl.is-parcial { border-color:#f0d9ae; border-left-color:#e08c1b; background:#fff8ec; }
+.b18-vt-alcance-decl.is-parcial b { color:#9a5c05; }
+.b18-vt-alcance-decl.is-parcial p { color:#7a5a20; }
+.b18-vt-alcance-decl.is-parcial .b18-vt-mas summary { color:#9a5c05; }
+.b18-vt-alcance-decl.is-sinbase { border-color:#f2ccc7; border-left-color:#c0392b; background:#fdf4f3; }
+.b18-vt-alcance-decl.is-sinbase b { color:#a5342a; }
+.b18-vt-alcance-decl.is-sinbase p { color:#7d3d36; }
+.b18-vt-alcance-decl.is-sinbase .b18-vt-mas summary { color:#a5342a; }
+.b18-vt-alcance-decl.is-completo { border-left-color:#2f8a4d; }
+.b18-vt-alcance-decl.is-completo b { color:#1f7040; }
+
+/* ── VENTAS · matriz de estacionalidad mes × año ────────────────────────────
+   Doce columnas, una por mes; dentro de cada una, una barra por año, todas a
+   la MISMA escala (el máximo de la matriz) para que se puedan comparar tanto
+   entre años como entre meses.
+
+   La casilla sin dato es el detalle que sostiene el gráfico entero: se dibuja
+   como un hueco rayado que NO llega a la línea base y NO tiene color de año.
+   Una barra de altura cero se leería como "ese mes no vendimos"; el hueco se
+   lee como lo que es, ausencia de observación. */
+.b18-vt-estacion { display:grid; width:100%; gap:9px; margin-top:14px; border:1px solid #e3ecfd; border-radius:16px; padding:11px 12px 12px; background:#fff; }
+.b18-vt-estacion-cabecera { display:flex; flex-wrap:wrap; align-items:baseline; justify-content:space-between; gap:6px 12px; }
+.b18-vt-estacion-cabecera span { display:block; color:#4b7ee4; font-size:9px; font-weight:950; letter-spacing:.09em; text-transform:uppercase; }
+.b18-vt-estacion-cabecera strong { display:block; margin-top:2px; color:#17326a; font-size:13px; font-weight:950; letter-spacing:-.03em; }
+.b18-vt-estacion-leyenda { display:flex; flex-wrap:wrap; gap:4px 10px; margin:0; padding:0; list-style:none; }
+.b18-vt-estacion-leyenda li { display:inline-flex; align-items:center; gap:4px; color:#62799f; font-size:9px; font-weight:850; }
+.b18-vt-estacion-leyenda i { display:block; width:9px; height:9px; border-radius:3px; }
+.b18-vt-estacion-leyenda-hueco i { border:1px dashed #c3cede; background:repeating-linear-gradient(135deg,#eef2f8 0 2px,transparent 2px 4px); }
+.b18-vt-estacion-leyenda-parcial i { background:#8fa8c9; background-image:repeating-linear-gradient(135deg,rgba(255,255,255,.9) 0 2px,transparent 2px 4px); }
+
+/* Doce columnas con un piso de 32px: por debajo de eso las cinco barras de
+   un mes dejan de distinguirse entre sí, así que el bloque prefiere
+   desplazarse en horizontal antes que volverse ilegible. */
+.b18-vt-estacion-grafico { display:grid; grid-template-columns:repeat(12,minmax(32px,1fr)); gap:2px; overflow-x:auto; padding-bottom:2px; }
+.b18-vt-estacion-mes { display:grid; min-width:0; gap:3px; border:1px solid transparent; border-radius:9px; padding:4px 2px 3px; background:none; cursor:pointer; }
+.b18-vt-estacion-mes:hover { border-color:#dbe7fa; background:#f7faff; }
+.b18-vt-estacion-mes.is-abierto { border-color:#0f4fa8; background:#eef5ff; }
+.b18-vt-estacion-barras { display:flex; height:88px; align-items:flex-end; justify-content:center; gap:2px; border-bottom:2px solid #e3ecfd; padding-top:34px; }
+.b18-vt-estacion-barra { position:relative; display:flex; flex:1 1 0; min-width:2px; max-width:9px; align-items:flex-end; height:100%; }
+.b18-vt-estacion-barra i { display:block; width:100%; min-height:2px; border-radius:3px 3px 1px 1px; }
+.b18-vt-estacion-barra i.is-parcial { background-image:repeating-linear-gradient(135deg,rgba(255,255,255,.88) 0 3px,transparent 3px 6px); }
+/* La cifra de cada barra, rotada casi vertical para que quepan las cinco
+   (una por año) sin pisarse en una columna de mes de ~9px por barra. */
+.b18-vt-estacion-barra b { position:absolute; bottom:100%; left:50%; margin-bottom:3px; transform:translateX(-50%) rotate(-80deg); transform-origin:center bottom; white-space:nowrap; font-size:6.5px; font-weight:950; }
+/* El hueco: alto fijo y chico, pegado a la base, sin color de año. Se lee
+   como "acá no hay medición", nunca como una barra corta. */
+.b18-vt-estacion-barras s { display:block; flex:1 1 0; min-width:2px; max-width:9px; height:11px; border:1px dashed #cdd8e8; border-radius:3px; background:repeating-linear-gradient(135deg,#f1f5fb 0 2px,transparent 2px 4px); }
+.b18-vt-estacion-mes strong { display:block; color:#3c5c96; font-size:10px; font-weight:950; letter-spacing:-.02em; text-align:center; text-transform:uppercase; }
+.b18-vt-estacion-mes small { display:block; color:#8fa0bd; font-size:7px; font-weight:800; text-align:center; }
+
+.b18-vt-estacion-detalle { border:1px solid #e6eefb; border-radius:12px; padding:9px 11px; background:#f8fbff; }
+.b18-vt-estacion-detalle > p:first-child { display:flex; flex-wrap:wrap; align-items:baseline; gap:4px 9px; margin:0; }
+.b18-vt-estacion-detalle > p:first-child b { color:#17326a; font-size:12px; font-weight:950; text-transform:uppercase; }
+.b18-vt-estacion-detalle > p:first-child em { color:#7a8dad; font-size:9px; font-style:normal; font-weight:800; }
+.b18-vt-estacion-detalle ul { display:grid; gap:3px; margin:7px 0 0; padding:0; list-style:none; }
+.b18-vt-estacion-detalle li { display:grid; grid-template-columns:9px auto minmax(0,auto) minmax(0,1fr); align-items:baseline; gap:7px; }
+.b18-vt-estacion-detalle li i { display:block; width:9px; height:9px; border-radius:3px; background:#dde5f2; }
+.b18-vt-estacion-detalle li span { color:#41609b; font-size:10px; font-weight:900; }
+.b18-vt-estacion-detalle li b { color:#17326a; font-size:11px; font-weight:950; letter-spacing:-.02em; }
+.b18-vt-estacion-detalle li small { color:#8093b4; font-size:8px; font-weight:750; line-height:1.3; overflow-wrap:anywhere; }
+.b18-vt-estacion-detalle li.is-parcial b { color:#9a5c05; }
+.b18-vt-estacion-detalle li.is-vacia b { color:#a5342a; }
+.b18-vt-estacion-detalle li.is-vacia i { border:1px dashed #cdd8e8; background:repeating-linear-gradient(135deg,#f1f5fb 0 2px,transparent 2px 4px); }
+.b18-vt-estacion-promedio { margin:8px 0 0; border-top:1px solid #e6eefb; padding-top:6px; color:#62799f; font-size:9px; font-weight:750; line-height:1.4; }
+.b18-vt-estacion-nota { margin:0; color:#8093b4; font-size:8px; font-weight:750; line-height:1.4; }
+
+@media (max-width:700px) {
+  .b18-vt-estacion-grafico { grid-template-columns:repeat(12,minmax(40px,1fr)); }
+  .b18-vt-estacion-barras { height:70px; }
+  .b18-vt-alcance-decl p { font-size:11px; }
+}
